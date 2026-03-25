@@ -1,0 +1,104 @@
+name: Validate Pull Request
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pull-request:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Fetch develop branch
+        run: |
+          git fetch origin develop:refs/remotes/origin/develop
+
+      - name: Find merge base with develop
+        id: base
+        run: |
+          set -e
+          MERGE_BASE=$(git merge-base HEAD origin/develop)
+          echo "merge_base=$MERGE_BASE" >> $GITHUB_OUTPUT
+          echo "Merge base with develop: $MERGE_BASE"
+
+      - name: Check commits since merge base for forbidden patterns
+        run: |
+          set -e
+          MERGE_BASE="${{ steps.base.outputs.merge_base }}"
+          COMMITS=$(git log --format=%B ${MERGE_BASE}..HEAD || true)
+
+          if echo "$COMMITS" | grep -E "^fixup!" -n; then
+            echo "Found commit messages starting with 'fixup!' between merge base ($MERGE_BASE) and HEAD."
+            echo "Please squash or fix up these commits before merging."
+            exit 1
+          fi
+
+          if echo "$COMMITS" | grep -i "DO NOT MERGE" -n; then
+            echo "Found commit messages containing 'DO NOT MERGE' between merge base ($MERGE_BASE) and HEAD."
+            echo "Please remove or modify these commits before merging."
+            exit 1
+          fi
+
+          echo "No forbidden patterns found in commit messages between merge base and HEAD."
+
+      - name: Search for "DO NOT MERGE"
+        run: |
+          matches=$(git grep -n -I "DO NOT MERGE" -- . \
+            ':(exclude).github/workflows/validate-pull-request.yml' \
+            ':(exclude).claude/CLAUDE.md') || true
+          if [ -n "$matches" ]; then
+            echo "$matches" | while IFS=: read -r file line _; do
+              echo "Error: Found DO NOT MERGE in $file on line $line"
+            done
+            exit 1
+          fi
+
+      - name: Check if branch is rebased on develop
+        run: |
+          set -e
+          MERGE_BASE="${{ steps.base.outputs.merge_base }}"
+          DEVELOP_HEAD=$(git rev-parse origin/develop)
+
+          echo "Merge base: $MERGE_BASE"
+          echo "Develop HEAD: $DEVELOP_HEAD"
+
+          if [ "$MERGE_BASE" != "$DEVELOP_HEAD" ]; then
+            echo "❌ Branch is not fully rebased on develop"
+            echo "The merge base ($MERGE_BASE) does not match develop HEAD ($DEVELOP_HEAD)"
+            echo "Please rebase your branch on the latest develop before merging"
+            exit 1
+          else
+            echo "✅ Branch is fully rebased on develop"
+          fi
+
+      - name: Require CHANGELOG line in commits
+        if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
+        run: |
+          set -e
+          MERGE_BASE="${{ steps.base.outputs.merge_base }}"
+          COMMITS=$(git log --format=%B ${MERGE_BASE}..HEAD || true)
+
+          if echo "$COMMITS" | grep -qE '^CHANGELOG:'; then
+            echo "✅ Found at least one CHANGELOG line in commit messages between merge base ($MERGE_BASE) and HEAD."
+          else
+            echo "❌ No commit message between merge base ($MERGE_BASE) and HEAD contains a line starting with 'CHANGELOG:'."
+            echo "Please add a commit whose message includes a line starting with 'CHANGELOG:' describing the change."
+            exit 1
+          fi
