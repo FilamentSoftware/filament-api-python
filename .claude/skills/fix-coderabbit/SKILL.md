@@ -28,7 +28,7 @@ Prompt: "Review the changes on this branch. Focus on code quality, potential bug
 Alternatively, save the output to a file for parsing:
 
 ```bash
-mkdir -p .claude/coderabbit-fixes
+mkdir -p /tmp/coderabbit-fixes
 ```
 
 ## Step 2: Parse Issues
