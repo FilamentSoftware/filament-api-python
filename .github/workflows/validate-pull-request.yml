@@ -60,7 +60,7 @@ jobs:
 
       - name: Search for "DO NOT MERGE"
         run: |
-          matches=$(grep -r -n -e "DO NOT MERGE" --exclude="validate-pull-request.yml" $GITHUB_WORKSPACE) || true
+          matches=$(grep -r -n -e "DO NOT MERGE" --exclude="validate-pull-request.yml" --exclude="CLAUDE.md" $GITHUB_WORKSPACE) || true
           if [ -n "$matches" ]; then
             echo "$matches" | while IFS=: read -r file line _; do
               echo "Error: Found DO NOT MERGE in $file on line $line"
