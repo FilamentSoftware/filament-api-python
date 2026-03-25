@@ -267,7 +267,7 @@ gh api graphql -f query='
 mutation {
   addPullRequestReviewThreadReply(input: {
     pullRequestReviewThreadId: "THREAD_ID",
-    body: "[From Claude][FIXED] Reordered null checks to handle empty collections first.\n\n_commit: abc123f_"
+    body: "[From Claude][FIXED] Reordered null checks to handle empty collections first.\n\ncommit: abc123f"
   }) {
     comment { id }
   }
