@@ -1,0 +1,27 @@
+[project]
+name = "filament-python-api"
+version = "0.0.0"
+description = "Filament Python API"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [{include = "src"}]
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.0"
+pytest-cov = ">=6.0"
+
+[tool.poetry.group.types.dependencies]
+mypy = ">=1.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
