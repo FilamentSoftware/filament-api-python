@@ -1,12 +1,45 @@
 name: Create Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows:
+      - "Increment Version (develop)"
+      - "Increment Version (main)"
+    types:
+      - completed
 
 jobs:
+  resolve-version:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Download version artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: version
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Get version
+        id: get_version
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < version.txt)"
+          if [[ -z "$version" ]]; then
+            echo "::error::version.txt is empty or contains only whitespace"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $version"
+
   build:
+    needs: resolve-version
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -17,6 +50,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: v${{ needs.resolve-version.outputs.version }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -26,8 +61,11 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
 
-      - name: Set package version from tag
-        run: poetry version "${GITHUB_REF_NAME#v}"
+      - name: Set package version
+        run: poetry version "${{ needs.resolve-version.outputs.version }}"
+
+      - name: Set __version__
+        run: sed -i 's|^__version__ = .*|__version__ = "${{ needs.resolve-version.outputs.version }}"|' src/filament_api/__init__.py
 
       - name: Build package
         run: poetry build
@@ -54,7 +92,7 @@ jobs:
           path: dist/renamed/*
 
   release:
-    needs: build
+    needs: [resolve-version, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -64,26 +102,32 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: v${{ needs.resolve-version.outputs.version }}
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
+          pattern: dist-py*
           path: dist
           merge-multiple: true
 
       - name: Extract changelog
         id: extract_changelog
         shell: bash
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
-          # Determine which changelog to use based on tag
-          if echo "$GITHUB_REF_NAME" | grep -q "dev"; then
+          # Determine which changelog to use based on version
+          if echo "$VERSION" | grep -q "dev"; then
             file="CHANGELOG_DEV.md"
           else
             file="CHANGELOG.md"
           fi
 
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
           if [[ ! -f "$file" ]]; then
-            echo "body=Release $GITHUB_REF_NAME" >> $GITHUB_OUTPUT
+            echo "body=Release v$VERSION" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -106,6 +150,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.resolve-version.outputs.version }}
           body: ${{ steps.extract_changelog.outputs.body }}
-          prerelease: ${{ contains(github.ref_name, 'dev') }}
-          files: dist/*
+          prerelease: ${{ contains(needs.resolve-version.outputs.version, 'dev') }}
+          files: |
+            dist/*
+            ${{ steps.extract_changelog.outputs.file }}
