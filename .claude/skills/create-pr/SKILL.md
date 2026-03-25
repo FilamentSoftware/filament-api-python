@@ -72,7 +72,7 @@ Invoke the `/rebase` skill to fetch develop and rebase onto it.
 Check for CHANGELOG commits and extract lines in a single call (reuse output in Phase 4):
 
 ```bash
-git log origin/develop..HEAD --grep="CHANGELOG" --format="%B"
+git log origin/develop..HEAD --grep="^CHANGELOG:" --format="%B"
 ```
 
 If this returns output, extract `CHANGELOG:` lines from it. If empty, no CHANGELOG commits exist.
@@ -85,17 +85,11 @@ If this returns output, extract `CHANGELOG:` lines from it. If empty, no CHANGEL
 
 **Repository policy:** Every PR branch must include at least one commit with a `CHANGELOG:` line (except dependabot branches).
 
-**For developer-facing changes** (utilities, internal APIs, service internals, docs, refactors, tests, internal infrastructure), use:
-
-```text
-CHANGELOG: no user-facing changes
-```
-
 If no `CHANGELOG:` line is found in any commit on the branch:
 
 1. Stop and propose a CHANGELOG commit message to the user:
-   - For user-facing changes: ask the user for ideas and provide possible options
-   - For developer-facing changes: propose `CHANGELOG: no user-facing changes`
+   - Ask the user for ideas and provide possible options
+   - Every CHANGELOG must be descriptive — never use `CHANGELOG: no user-facing changes`
 2. Format: `{type}({scope}): add CHANGELOG line for {branch-description}`
 3. Body must include one or more `CHANGELOG:` lines
 4. Wait for user approval before creating the commit

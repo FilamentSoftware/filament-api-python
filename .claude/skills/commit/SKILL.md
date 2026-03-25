@@ -52,7 +52,7 @@ have a meaningful, descriptive CHANGELOG line — even for internal changes, des
 
 **When to include a CHANGELOG line:**
 
-If the branch already has a commit with a `CHANGELOG:` line (`git log develop..HEAD --grep="CHANGELOG:"`), additional
+If the branch already has a commit with a `CHANGELOG:` line (`git log develop..HEAD --grep="^CHANGELOG:"`), additional
 commits can omit it. If the branch has no CHANGELOG yet and it's not obvious which commit in the batch should carry it,
 propose a descriptive CHANGELOG line for each commit and ask the user which one(s) to use. The user may also answer
 "no" or "none" to skip the CHANGELOG entirely for this batch. Wait for the user's answer before proceeding.
