@@ -23,6 +23,7 @@ Use the CodeRabbit code-reviewer subagent to review changes:
 ```text
 Task tool with subagent_type: "coderabbit:code-reviewer"
 Prompt: "Review the changes on this branch. Focus on code quality, potential bugs, and style issues. Return a structured list of issues found."
+Args: uncommitted
 ```
 
 Alternatively, save the output to a file for parsing:
@@ -116,7 +117,7 @@ If errors, identify which fix caused them and either:
 
 ## Step 6: Iterate
 
-Run CodeRabbit review again using the coderabbit:code-reviewer subagent.
+Run CodeRabbit review again using the coderabbit:code-reviewer subagent with `Args: uncommitted`.
 
 Repeat Steps 2-5 until:
 
