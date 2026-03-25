@@ -101,7 +101,7 @@ jobs:
           ref: v${{ needs.resolve-version.outputs.version }}
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: dist-py*
           path: dist
