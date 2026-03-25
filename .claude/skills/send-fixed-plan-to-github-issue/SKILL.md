@@ -128,7 +128,7 @@ _[Posted by Claude]_
 COMMENT_EOF
 
 COMMENT_ID=$(gh api --method POST "repos/$REPO/issues/<number>/comments" \
-  -f body=@"$COMMENT_FILE" --jq '.id')
+  -F body=@"$COMMENT_FILE" --jq '.id')
 ```
 
 ### 5. Verify the Comment
