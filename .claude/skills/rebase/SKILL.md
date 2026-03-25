@@ -11,15 +11,19 @@ Safely rebase the current branch onto the latest develop.
 ## Steps
 
 1. **Stash uncommitted changes** (if any):
+
    ```bash
    git stash -u
    ```
+
    If there are no changes to stash, note this and skip the stash/pop steps.
 
 2. **Fetch and rebase onto develop**:
+
    ```bash
    git fetch origin develop && git rebase origin/develop
    ```
+
    If the rebase fails with conflicts:
    - Show the conflicting files
    - Attempt to resolve simple conflicts (e.g., both sides added to the same area)
@@ -27,9 +31,11 @@ Safely rebase the current branch onto the latest develop.
    - After resolving, run `git rebase --continue`
 
 3. **Pop stash** (only if step 1 stashed changes):
+
    ```bash
    git stash pop
    ```
+
    If the pop fails with conflicts:
    - Show the conflicting files and the conflict markers
    - Resolve the conflicts, preferring the working tree (stashed) changes when intent is clear
