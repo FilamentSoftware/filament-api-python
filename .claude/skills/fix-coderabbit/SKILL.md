@@ -20,7 +20,7 @@ fixes with marker comments (for easy identification and cleanup), and report bac
 
 Use the CodeRabbit code-reviewer subagent to review changes:
 
-```
+```text
 Task tool with subagent_type: "coderabbit:code-reviewer"
 Prompt: "Review the changes on this branch. Focus on code quality, potential bugs, and style issues. Return a structured list of issues found."
 ```
