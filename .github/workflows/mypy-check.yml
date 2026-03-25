@@ -35,7 +35,7 @@ jobs:
 
       - run: poetry export --without-hashes --with types --format=requirements.txt > requirements-types.txt
 
-      - uses: jpetrucciani/mypy-check@v1
+      - uses: jpetrucciani/mypy-check@1.19.1
         with:
           path: src
           requirements_file: requirements-types.txt
