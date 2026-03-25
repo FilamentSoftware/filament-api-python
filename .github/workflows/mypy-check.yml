@@ -23,7 +23,7 @@ jobs:
   mypy-check:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
 
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v6
