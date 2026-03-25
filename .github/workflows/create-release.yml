@@ -58,7 +58,7 @@ jobs:
         run: poetry version "${{ needs.resolve-version.outputs.version }}"
 
       - name: Set __version__
-        run: sed -i 's/^__version__ = .*/__version__ = "${{ needs.resolve-version.outputs.version }}"/' src/filament_api/__init__.py
+        run: sed -i 's|^__version__ = .*|__version__ = "${{ needs.resolve-version.outputs.version }}"|' src/filament_api/__init__.py
 
       - name: Build package
         run: poetry build
