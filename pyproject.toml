@@ -1,5 +1,5 @@
 [project]
-name = "filament-python-api"
+name = "filament-api"
 version = "0.0.0"
 description = "Filament Python API"
 requires-python = ">=3.10"
@@ -10,7 +10,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-packages = [{include = "src"}]
+packages = [{include = "filament_api", from = "src"}]
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"
