@@ -1,0 +1,150 @@
+name: Increment Version (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      changelog-file:
+        description: 'Changelog file to update (e.g. CHANGELOG.md or CHANGELOG_DEV.md)'
+        required: true
+        type: string
+      fetch-depth:
+        description: 'Git fetch depth for checkout (0 for full history)'
+        required: false
+        type: number
+        default: 1
+      dev-branch:
+        description: 'Dev branch name for SemanticVersioner (omit for release builds)'
+        required: false
+        type: string
+        default: ''
+      dev-suffix:
+        description: 'Dev version suffix (e.g. "dev")'
+        required: false
+        type: string
+        default: ''
+      use-semantic-dev-versions:
+        description: 'Use semantic dev versions'
+        required: false
+        type: boolean
+        default: false
+      detect-dependabot:
+        description: 'Detect Dependabot merges and auto-set changelog message'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      SLACK_RELEASE_WEBHOOK_URL:
+        required: true
+
+jobs:
+  increment-version:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    timeout-minutes: 5
+
+    permissions:
+      id-token: write
+      contents: write
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.fetch-depth }}
+
+      - name: Detect Dependabot merge
+        if: inputs.detect-dependabot
+        id: detect_dependabot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr_author=$(gh pr list --repo "${{ github.repository }}" --state merged --search "${{ github.sha }}" --json author --jq '.[0].author.login // empty')
+          echo "PR author: $pr_author"
+
+          if [ "$pr_author" = "dependabot[bot]" ]; then
+            echo "is_dependabot=true"
+            echo "is_dependabot=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_dependabot=false"
+            echo "is_dependabot=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Increment Version
+        id: increment_version
+        uses: hughmacdonald/SemanticVersioner@v1
+        with:
+          main-branch: "main"
+          dev-branch: ${{ inputs.dev-branch }}
+          dev-suffix: ${{ inputs.dev-suffix }}
+          use-semantic-dev-versions: ${{ inputs.use-semantic-dev-versions }}
+          changelog-file: ${{ inputs.changelog-file }}
+          changelog-message: ${{ steps.detect_dependabot.outputs.is_dependabot == 'true' && 'Update dependencies' || '' }}
+
+      - name: Create output files
+        run: |
+          echo "${{ steps.increment_version.outputs.new-version }}" > version.txt
+          echo "${{ steps.increment_version.outputs.previous-version }}" > previous-version.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: version
+          path: |
+            ./version.txt
+            ./previous-version.txt
+
+      - name: Extract changelog
+        id: extract
+        shell: bash
+        run: |
+          file="${{ inputs.changelog-file }}"
+          if [[ ! -f "$file" ]]; then
+            echo "$file not found" >&2
+            exit 1
+          fi
+
+          content="$(awk '
+            BEGIN { in_section=0 }
+            /^## / {
+              if (in_section) { exit }
+              in_section=1
+            }
+            in_section { print }
+          ' "$file")"
+
+          if [[ -z "$content" ]]; then
+            echo "No changelog section starting with '## ' found in $file" >&2
+            exit 1
+          fi
+
+          delimiter="EOF_$(date +%s%N)"
+          {
+            echo "snippet<<$delimiter"
+            echo "$content"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send Slack
+        continue-on-error: true
+        uses: act10ns/slack@v2
+        with:
+          status: release
+          config: .github/config/slack_release.yml
+          message: |
+            ```
+            ${{ steps.extract.outputs.snippet }}
+            ```
+        env:
+          VERSION: ${{ steps.increment_version.outputs.new-version }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+
+      - name: Send slack failed
+        continue-on-error: true
+        uses: act10ns/slack@v2
+        if: always() && failure()
+        with:
+          status: failure
+          config: .github/config/slack_release.yml
+          message: "Failed to create release"
+        env:
+          VERSION: "Unknown"
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
