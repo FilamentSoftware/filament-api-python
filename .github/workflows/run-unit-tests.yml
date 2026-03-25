@@ -73,4 +73,4 @@ jobs:
           status: ${{ job.status }}
           config: .github/config/slack.yml
           channel: '#gh-actions'
-        if: always()
+        if: always() && env.SLACK_WEBHOOK_URL != ''
