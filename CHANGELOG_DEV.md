@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.0.3 (2026-03-25 22:29)
+
+### Release
+
+#### FIX
+- Fix release workflow failing due to double v prefix in git tag reference
+
 ## 0.1.0-dev.0.0.2 (2026-03-25 16:49)
 
 ### Release
