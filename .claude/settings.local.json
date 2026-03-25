@@ -3,7 +3,8 @@
     "allow": [
       "Bash(poetry install:*)",
       "Bash(poetry show:*)",
-      "Bash(poetry env:*)"
+      "Bash(poetry env:*)",
+      "Bash(poetry run:*)"
     ]
   }
 }
