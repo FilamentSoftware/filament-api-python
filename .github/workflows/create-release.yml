@@ -38,8 +38,13 @@ jobs:
           for f in dist/*.whl dist/*.tar.gz; do
             [ -f "$f" ] || continue
             base=$(basename "$f")
-            name="${base%%.*}"
-            ext="${base#"$name".}"
+            if [[ "$base" == *.tar.gz ]]; then
+              name="${base%.tar.gz}"
+              ext="tar.gz"
+            else
+              name="${base%.*}"
+              ext="${base##*.}"
+            fi
             mv "$f" "dist/renamed/${name}-py${{ matrix.python-version }}.${ext}"
           done
 
