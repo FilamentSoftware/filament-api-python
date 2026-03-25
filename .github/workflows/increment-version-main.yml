@@ -14,5 +14,6 @@ jobs:
       checks: write
     with:
       changelog-file: CHANGELOG.md
+      fetch-depth: 0
     secrets:
       SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
