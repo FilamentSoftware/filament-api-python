@@ -121,7 +121,7 @@ Use `$PREFER_REST` to choose between REST and GraphQL variants for dual-mode com
    **Important**: Only process UNRESOLVED threads. Resolved threads are from previous
    reviews and should be ignored.
 
-3. Create `.claude/temp/coderabbit-gh-review.md` with this structure:
+3. Create `/tmp/coderabbit-gh-review.md` with this structure:
 
 ```markdown
 # CodeRabbit GitHub Review - PR #XXX
@@ -330,7 +330,7 @@ mutation {
 Delete the working document:
 
 ```bash
-rm .claude/temp/coderabbit-gh-review.md
+rm /tmp/coderabbit-gh-review.md
 ```
 
 ## Notes
