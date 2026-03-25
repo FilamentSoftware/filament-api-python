@@ -42,7 +42,7 @@ jobs:
         run: |
           set -e
           MERGE_BASE="${{ steps.base.outputs.merge_base }}"
-          COMMITS=$(git log --format=%s ${MERGE_BASE}..HEAD || true)
+          COMMITS=$(git log --format=%B ${MERGE_BASE}..HEAD || true)
 
           if echo "$COMMITS" | grep -E "^fixup!" -n; then
             echo "Found commit messages starting with 'fixup!' between merge base ($MERGE_BASE) and HEAD."
@@ -60,7 +60,9 @@ jobs:
 
       - name: Search for "DO NOT MERGE"
         run: |
-          matches=$(grep -r -n -e "DO NOT MERGE" --exclude="validate-pull-request.yml" --exclude="CLAUDE.md" $GITHUB_WORKSPACE) || true
+          matches=$(git grep -n -I "DO NOT MERGE" -- . \
+            ':(exclude).github/workflows/validate-pull-request.yml' \
+            ':(exclude).claude/CLAUDE.md') || true
           if [ -n "$matches" ]; then
             echo "$matches" | while IFS=: read -r file line _; do
               echo "Error: Found DO NOT MERGE in $file on line $line"
