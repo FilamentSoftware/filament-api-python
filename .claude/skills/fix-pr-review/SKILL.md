@@ -176,7 +176,7 @@ Verify against "🤖 Fix all issues with AI agents" section:
 
 1. For each item, spawn a subagent:
 
-   ```
+   ```text
    Task(subagent_type="general-purpose", prompt="Fix: {item details}")
    ```
 
@@ -232,7 +232,7 @@ For each FIXED item (not SKIPPED):
 1. Stage only the files/hunks changed for that fix
 2. Commit with format:
 
-   ```
+   ```text
    fix({scope}): coderabbit review fix
 
    {Paste the full item from the document including issue and fix notes}
@@ -276,7 +276,7 @@ mutation {
 
 Reply format:
 
-```
+```text
 [From Claude][{FIXED | SKIPPED}] {Details - one line or formatted markdown}
 
 commit: {commit_hash}
