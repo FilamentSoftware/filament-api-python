@@ -68,7 +68,7 @@ jobs:
             major="${BASH_REMATCH[2]}"
             minor="${BASH_REMATCH[3]}"
             patch="${BASH_REMATCH[4]}"
-            dev_num=$(( major * 10000 + minor * 100 + patch ))
+            dev_num=$(printf '%d%03d%03d' "$major" "$minor" "$patch")
             raw="${base}.dev${dev_num}"
           fi
           echo "version=$raw" >> "$GITHUB_OUTPUT"
