@@ -71,9 +71,13 @@ def main() -> int:
         print(" ".join(cmd))
         return 0
 
-    # Clear output directory
+    # Clear output directory — guard against deleting outside the repo
     repo_root = Path(__file__).resolve().parents[1]
-    if output_path == output_path.parent or output_path == repo_root:
+    if (
+        output_path == repo_root
+        or output_path == output_path.parent
+        or not output_path.is_relative_to(repo_root)
+    ):
         print(f"Refusing to delete unsafe output path: {output_path}", file=sys.stderr)
         return 1
 
