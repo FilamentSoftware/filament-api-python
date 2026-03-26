@@ -56,15 +56,31 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
 
-      - name: Set package version
+      - name: Convert version to PEP 440
+        id: pep440
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
-        run: poetry version "${VERSION#v}"
+        run: |
+          raw="${VERSION#v}"
+          # Convert semver dev format (e.g. 0.1.0-dev.0.0.3) to PEP 440 (e.g. 0.1.0.dev3)
+          if [[ "$raw" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-dev\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            major="${BASH_REMATCH[2]}"
+            minor="${BASH_REMATCH[3]}"
+            patch="${BASH_REMATCH[4]}"
+            dev_num=$(( major * 10000 + minor * 100 + patch ))
+            raw="${base}.dev${dev_num}"
+          fi
+          echo "version=$raw" >> "$GITHUB_OUTPUT"
+          echo "PEP 440 version: $raw"
+
+      - name: Set package version
+        run: poetry version "${{ steps.pep440.outputs.version }}"
 
       - name: Set __version__
         env:
-          VERSION: ${{ needs.resolve-version.outputs.version }}
-        run: sed -i "s|^__version__ = .*|__version__ = \"${VERSION#v}\"|" src/filament_api/__init__.py
+          PEP440_VERSION: ${{ steps.pep440.outputs.version }}
+        run: sed -i "s|^__version__ = .*|__version__ = \"${PEP440_VERSION}\"|" src/filament_api/__init__.py
 
       - name: Build package
         run: poetry build
