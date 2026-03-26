@@ -30,7 +30,7 @@ def main() -> int:
         / "filament_api"
         / "types"
         / "generated",
-        help="Output directory for generated code (default: src/filament_api/_generated).",
+        help="Output directory for generated code (default: src/filament_api/types/generated).",
     )
     parser.add_argument(
         "--dry-run",
@@ -72,11 +72,20 @@ def main() -> int:
         return 0
 
     # Clear output directory
+    repo_root = Path(__file__).resolve().parents[1]
+    if output_path == output_path.parent or output_path == repo_root:
+        print(f"Refusing to delete unsafe output path: {output_path}", file=sys.stderr)
+        return 1
+
     if output_path.exists():
         shutil.rmtree(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    result = subprocess.run(cmd, check=False)
+    try:
+        result = subprocess.run(cmd, check=False)
+    except FileNotFoundError:
+        print("Error: `dotnet` executable not found on PATH.", file=sys.stderr)
+        return 1
     return result.returncode
 
 
