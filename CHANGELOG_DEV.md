@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.1.1 (2026-03-26 22:37)
+
+### Other
+
+#### OTHER
+- Renamed Python module from filament_api to filament
+
 ## 0.1.0-dev.0.1.0 (2026-03-26 22:16)
 
 ### Codegen
