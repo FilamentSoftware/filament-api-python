@@ -3,7 +3,8 @@
         "D:\\dev\\FilamentSoftware\\MVP\\Filament"
     ],
     "host_commands": [
-        "mypy",
+        "poetry run mypy",
+        "poetry lock",
         "scripts/generate_code.sh",
         "scripts\\generate_code.cmd"
     ]
