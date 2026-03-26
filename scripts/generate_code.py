@@ -82,6 +82,9 @@ def main() -> int:
         return 1
 
     if output_path.exists():
+        if not output_path.is_dir():
+            print(f"Error: output path exists and is not a directory: {output_path}", file=sys.stderr)
+            return 1
         shutil.rmtree(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
