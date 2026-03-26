@@ -3,6 +3,8 @@
         "D:\\dev\\FilamentSoftware\\MVP\\Filament"
     ],
     "host_commands": [
-        "mypy"
+        "mypy",
+        "scripts/generate_code.sh",
+        "scripts\\generate_code.cmd"
     ]
 }
