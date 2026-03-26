@@ -1,7 +1,7 @@
 """Run the Filament backend code generator for Python.
 
-Deletes the contents of the output path, then invokes the .NET GenerateCode
-project to regenerate them.
+Invokes the .NET GenerateCode project into a staging directory, then replaces
+the output path on success.
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -81,19 +82,32 @@ def main() -> int:
         print(f"Refusing to delete unsafe output path: {output_path}", file=sys.stderr)
         return 1
 
-    if output_path.exists():
-        if not output_path.is_dir():
-            print(f"Error: output path exists and is not a directory: {output_path}", file=sys.stderr)
-            return 1
-        shutil.rmtree(output_path)
-    output_path.mkdir(parents=True, exist_ok=True)
+    # Generate into a staging directory, then swap on success
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    staging_path = Path(
+        tempfile.mkdtemp(prefix="filament_codegen_", dir=output_path.parent)
+    )
+    cmd[-1] = str(staging_path)
 
     try:
         result = subprocess.run(cmd, check=False)
     except FileNotFoundError:
         print("Error: `dotnet` executable not found on PATH.", file=sys.stderr)
+        shutil.rmtree(staging_path, ignore_errors=True)
         return 1
-    return result.returncode
+
+    if result.returncode != 0:
+        shutil.rmtree(staging_path, ignore_errors=True)
+        return result.returncode
+
+    if output_path.exists():
+        if not output_path.is_dir():
+            print(f"Error: output path exists and is not a directory: {output_path}", file=sys.stderr)
+            shutil.rmtree(staging_path, ignore_errors=True)
+            return 1
+        shutil.rmtree(output_path)
+    staging_path.replace(output_path)
+    return 0
 
 
 if __name__ == "__main__":
