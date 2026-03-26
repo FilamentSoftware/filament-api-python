@@ -517,7 +517,19 @@ files = [
 ]
 markers = {test = "python_version == \"3.10\""}
 
+[[package]]
+name = "uuid7"
+version = "0.1.0"
+description = "UUID version 7, generating time-sorted UUIDs with 200ns time resolution and 48 bits of randomness"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "uuid7-0.1.0-py2.py3-none-any.whl", hash = "sha256:5e259bb63c8cb4aded5927ff41b444a80d0c7124e8a0ced7cf44efa1f5cccf61"},
+    {file = "uuid7-0.1.0.tar.gz", hash = "sha256:8c57aa32ee7456d3cc68c95c4530bc571646defac01895cfc73545449894a63c"},
+]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "c8b94ed1a9e8e2e762e075edb33c46f0831a3bbeea2549a0cb6999e90b016a1d"
+content-hash = "0d6b73199739948f3522a7c19a07c925d152996440a89a8802480b71c9d0607f"

@@ -3,7 +3,7 @@ name = "filament-api"
 version = "0.0.0"
 description = "Filament Python API"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["uuid7>=0.1.0"]
 
 [build-system]
 requires = ["poetry-core"]
