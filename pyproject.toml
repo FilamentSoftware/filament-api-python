@@ -10,7 +10,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-packages = [{include = "filament_api", from = "src"}]
+packages = [{include = "filament", from = "src"}]
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"

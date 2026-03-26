@@ -28,10 +28,10 @@ def main() -> int:
         type=Path,
         default=Path(__file__).resolve().parents[1]
         / "src"
-        / "filament_api"
+        / "filament"
         / "types"
         / "generated",
-        help="Output directory for generated code (default: src/filament_api/types/generated).",
+        help="Output directory for generated code (default: src/filament/types/generated).",
     )
     parser.add_argument(
         "--dry-run",
