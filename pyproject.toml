@@ -3,7 +3,7 @@ name = "filament-api"
 version = "0.0.0"
 description = "Filament Python API"
 requires-python = ">=3.10,<4.0"
-dependencies = ["uuid-utils>=0.9", "signalr-async>=3.0.0", "typing-inspect>=0.9"]
+dependencies = ["uuid-utils>=0.9", "signalr-async>=3.0.0"]
 
 [build-system]
 requires = ["poetry-core"]
