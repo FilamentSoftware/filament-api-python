@@ -64,6 +64,14 @@ When creating plans:
 - Always save plan files to `plans/`
 - Name plan files descriptively based on the task, with a date prefix, e.g., `2025-01-25-auth-endpoint-plan.md`
 
+## Generated Code
+
+Files in `src/filament/types/generated/` are **auto-generated** and must **never** be edited by hand. If you encounter a bug, type error, or missing feature in generated code:
+
+1. **Do not modify the generated files.** Any manual changes will be overwritten by the next codegen run.
+2. Identify what needs to change and describe the fix in terms of the code-generation logic.
+3. Share a clear description of the problem and a suggested prompt/instructions for fixing the codegen with the user, so they can address it upstream.
+
 ## Code Conventions
 
 - **Python 3.10, 3.11, 3.12, 3.13** — avoid syntax only available in 3.11+ (e.g., `type` statement, `ExceptionGroup`)
