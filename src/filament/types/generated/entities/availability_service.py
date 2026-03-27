@@ -8,6 +8,10 @@ from typing import Optional
 from ..entities.generic import ReferenceEntityBase
 from ..enums import AvailabilityModeEnum, AvailabilityRepeatDaysEnum, AvailabilityRepeatModeEnum
 
+__all__ = [
+    "AvailabilityEntity",
+]
+
 @dataclass
 class AvailabilityEntity(ReferenceEntityBase):
     priority: int = 0

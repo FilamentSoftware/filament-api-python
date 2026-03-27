@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 
 from ..base.base import EntityConnection
 
+__all__ = [
+    "MeetingUserConnection",
+]
+
 @dataclass
 class MeetingUserConnection(EntityConnection):
     required: bool = field(default_factory=bool)

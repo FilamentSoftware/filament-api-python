@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from ..connections.generic import PermissionsRoleConnectionBase_1
 from ..entities.api_key_service import ApiKeyEntity
 
+__all__ = [
+    "ApiKeyPermissionsRoleConnection",
+]
+
 @dataclass
 class ApiKeyPermissionsRoleConnection(PermissionsRoleConnectionBase_1[ApiKeyEntity]):
     pass

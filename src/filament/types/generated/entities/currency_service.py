@@ -10,6 +10,11 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import CurrencyStatus, CurrencySymbolPosition
 
+__all__ = [
+    "CurrencyEntity",
+    "CurrencyRateEntity",
+]
+
 @dataclass
 class CurrencyEntity(Entity):
     symbol: str = field(default_factory=str)

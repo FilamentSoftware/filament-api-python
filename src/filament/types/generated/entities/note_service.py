@@ -10,6 +10,10 @@ from ..base.base import Entity
 from ..entities.task_service import TaskEntity
 from ..entities.user_service import UserEntity
 
+__all__ = [
+    "NoteEntity",
+]
+
 @dataclass
 class NoteEntity(Entity):
     from_user_id: UUID = field(default_factory=uuid7)

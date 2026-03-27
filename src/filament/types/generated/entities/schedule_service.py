@@ -15,6 +15,13 @@ from ..entities.time_log_service import TimeLogEntity
 from ..entities.user_service import UserEntity
 from ..enums import ScheduleSegmentModeEnum, TaskMilestoneDirectionEnum
 
+__all__ = [
+    "PlaceholderUserEntity",
+    "ScheduleResultEntity",
+    "ScheduleMilestoneEntity",
+    "ScheduleSegmentEntity",
+]
+
 @dataclass
 class PlaceholderUserEntity(Entity):
     name: str = field(default_factory=str)

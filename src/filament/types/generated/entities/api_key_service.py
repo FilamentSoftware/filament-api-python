@@ -7,6 +7,10 @@ from typing import Optional
 
 from ..base.base import Entity
 
+__all__ = [
+    "ApiKeyEntity",
+]
+
 @dataclass
 class ApiKeyEntity(Entity):
     name: str = field(default_factory=str)

@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from ..connections.generic import GenericUserSkillConnection_1, PermissionsRoleConnectionBase_1
 from ..entities.user_service import UserEntity
 
+__all__ = [
+    "UserSkillConnection",
+    "UserPermissionsRoleConnection",
+]
+
 @dataclass
 class UserSkillConnection(GenericUserSkillConnection_1[UserEntity]):
     pass

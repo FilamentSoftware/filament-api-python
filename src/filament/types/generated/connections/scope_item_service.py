@@ -12,6 +12,15 @@ from ..entities.scope_item_service import ScopeItemCustomComplexityEntity, Scope
 from ..entities.scope_task_type_service import ScopeTaskTypeEntity, ScopeTaskTypeStepEntity
 from ..entities.scope_template_item_service import ScopeTemplateItemEntity
 
+__all__ = [
+    "ScopeItemDependencyConnection",
+    "ScopeItemMilestoneConnection",
+    "ScopeItemGroupConnection",
+    "ScopeItemOfficeLocationConnection",
+    "ScopeItemTemplateItemConnection",
+    "ScopeItemTaskTypeOverrideConnection",
+]
+
 @dataclass
 class ScopeItemDependencyConnection(EntityConnection):
     size_multiplier: float = 0.0

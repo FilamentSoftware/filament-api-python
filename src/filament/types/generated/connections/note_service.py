@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from ..base.base import EntityConnection
 from ..enums import NoteUserConnectionType
 
+__all__ = [
+    "NoteUserConnection",
+]
+
 @dataclass
 class NoteUserConnection(EntityConnection):
     has_read: bool = field(default_factory=bool)

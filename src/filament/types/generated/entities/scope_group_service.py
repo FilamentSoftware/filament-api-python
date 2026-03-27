@@ -10,6 +10,11 @@ from ..base.base import Entity
 from ..entities.scope_category_service import ScopeCategoryEntity
 from ..enums import ScopeGroupChildType
 
+__all__ = [
+    "ScopeGroupLevelEntity",
+    "ScopeGroupEntity",
+]
+
 @dataclass
 class ScopeGroupLevelEntity(Entity):
     name: str = field(default_factory=str)

@@ -12,6 +12,13 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import AddressEntityBase
 from ..enums import ContactType, Industry
 
+__all__ = [
+    "OrganizationEntity",
+    "TaxCreditLocationEntity",
+    "OfficeLocationEntity",
+    "OrganizationContactEntity",
+]
+
 @dataclass
 class OrganizationEntity(Entity):
     name: str = field(default_factory=str)

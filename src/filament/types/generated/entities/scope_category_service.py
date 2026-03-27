@@ -7,6 +7,10 @@ from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
 
+__all__ = [
+    "ScopeCategoryEntity",
+]
+
 @dataclass
 class ScopeCategoryEntity(Entity):
     name: str = field(default_factory=str)

@@ -12,6 +12,12 @@ from ..entities.generic import GenericComplexityBase
 from ..entities.scope_category_service import ScopeCategoryEntity
 from ..entities.user_service import UserEntity
 
+__all__ = [
+    "ScopeItemNoteEntity",
+    "ScopeItemCustomComplexityEntity",
+    "ScopeItemEntity",
+]
+
 @dataclass
 class ScopeItemNoteEntity(Entity):
     title: str = field(default_factory=str)

@@ -14,6 +14,14 @@ from ..entities.organization_service import OfficeLocationEntity, TaxCreditLocat
 from ..entities.specialty_service import SpecialtyEntity
 from ..enums import NameOrder, UserAddressType, UserEmailType, UserPhoneType, UserStatusEnum, UserTypeEnum
 
+__all__ = [
+    "UserEntity",
+    "UserAddressEntity",
+    "UserPhoneEntity",
+    "UserEmailEntity",
+    "UserCompensationEntity",
+]
+
 @dataclass
 class UserEntity(UserBaseEntity):
     schedule_status: UserStatusEnum = UserStatusEnum.Disabled

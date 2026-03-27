@@ -11,6 +11,10 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
 from ..entities.user_service import UserEntity
 
+__all__ = [
+    "ActualEntity",
+]
+
 @dataclass
 class ActualEntity(ReferenceEntityBase):
     user_id: UUID = field(default_factory=uuid7)

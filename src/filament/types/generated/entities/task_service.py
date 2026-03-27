@@ -12,6 +12,13 @@ from ..entities.scope_item_service import ScopeItemEntity
 from ..entities.scope_service import ScopeEntity
 from ..enums import TaskMilestoneDirectionEnum
 
+__all__ = [
+    "TaskGroupLevelEntity",
+    "TaskMilestoneEntity",
+    "TaskGroupEntity",
+    "TaskEntity",
+]
+
 @dataclass
 class TaskGroupLevelEntity(ReferenceEntityBase):
     name: str = field(default_factory=str)

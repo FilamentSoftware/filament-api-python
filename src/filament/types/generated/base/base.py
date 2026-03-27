@@ -7,6 +7,14 @@ from typing import Generic, Optional, TypeVar
 
 from uuid_utils import UUID, uuid7
 
+__all__ = [
+    "EntityBase",
+    "Entity",
+    "EntityConnectionBase",
+    "EntityConnection",
+    "EntityConnection_2",
+]
+
 @dataclass
 class EntityBase:
     id: UUID = field(default_factory=uuid7)

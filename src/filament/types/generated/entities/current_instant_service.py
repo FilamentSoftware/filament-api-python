@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 
 from ..base.base import Entity
 
+__all__ = [
+    "CurrentInstantEntity",
+    "CurrentInstantSettingsEntity",
+]
+
 @dataclass
 class CurrentInstantEntity(Entity):
     current_instant: datetime.datetime = field(default_factory=datetime.datetime.now)

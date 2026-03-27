@@ -7,6 +7,13 @@ from ..base.base import EntityConnection
 from ..connections.generic import GenericTaskSkillConnection_1
 from ..entities.cast_service import CastEntity
 
+__all__ = [
+    "CastUserConnection",
+    "CastTaskConnection",
+    "CastSkillConnection",
+    "CastOfficeLocationConnection",
+]
+
 @dataclass
 class CastUserConnection(EntityConnection):
     duration_multiplier: float = 0.0

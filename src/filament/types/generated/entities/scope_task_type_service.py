@@ -12,6 +12,12 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import GenericComplexityBase
 from ..entities.specialty_service import SpecialtyEntity
 
+__all__ = [
+    "ScopeTaskTypeEntity",
+    "ScopeTaskTypeStepEntity",
+    "ScopeTaskTypeComplexityEntity",
+]
+
 @dataclass
 class ScopeTaskTypeEntity(Entity):
     name: str = field(default_factory=str)

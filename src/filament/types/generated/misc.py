@@ -13,6 +13,43 @@ from .base.base import EntityBase
 from .connections.user_service import UserPermissionsRoleConnection
 from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, SubscriptionMode
 
+__all__ = [
+    "SwitchUserRequest",
+    "SuccessOrErrorBase",
+    "SetPermissionsRolesRequest",
+    "EntityPermission",
+    "EntityPropertyPermission",
+    "SubscriptionConfig",
+    "StructBase",
+    "DbOrderLevel",
+    "EntityTypePermissions",
+    "PreviewDataRequest",
+    "ServiceDataPreview",
+    "StatusData",
+    "EntityServiceDataUpdate",
+    "SuccessOrError",
+    "ValueOrError_1",
+    "EntityPermissions",
+    "EntityPropertyPermissions",
+    "SubscriptionId",
+    "RequestId",
+    "UpdatedEntityServiceData_1",
+    "DbOrderInstance",
+    "SuccessOrErrorPublic",
+    "ValueOrErrorPublic_1",
+    "WrappedEntity",
+    "ModifyDataRequest",
+    "ProcessingStatus",
+    "ServiceDataUpdate",
+    "ReadDataTypeRequest",
+    "ReadConnectedDataTypeRequest",
+    "ServiceDataRead",
+    "WrappedConnectedEntityWithPermissions",
+    "ReadDataRequest",
+    "ReadConnectedDataRequest",
+    "ServiceDataReadConnected",
+]
+
 T = TypeVar("T")
 T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 

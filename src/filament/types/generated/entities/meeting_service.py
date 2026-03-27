@@ -10,6 +10,11 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..entities.user_service import UserEntity
 
+__all__ = [
+    "MeetingEntity",
+    "MeetingAgendaItemEntity",
+]
+
 @dataclass
 class MeetingEntity(Entity):
     name: str = field(default_factory=str)

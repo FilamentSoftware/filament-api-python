@@ -7,6 +7,16 @@ from ..base.base import EntityConnection
 from ..connections.generic import GenericTaskSkillConnection_1
 from ..entities.task_service import TaskEntity
 
+__all__ = [
+    "TaskDependencyConnection",
+    "TaskGroupConnection",
+    "TaskGroupParentConnection",
+    "TaskGroupLevelParentConnection",
+    "TaskMilestoneConnection",
+    "TaskSkillConnection",
+    "TaskOfficeLocationConnection",
+]
+
 @dataclass
 class TaskDependencyConnection(EntityConnection):
     pass

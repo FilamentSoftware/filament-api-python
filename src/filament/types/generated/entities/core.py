@@ -10,6 +10,16 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus
 
+__all__ = [
+    "ErrorEntity",
+    "RequestEntity",
+    "EventLogEntity",
+    "ScenarioEntity",
+    "ScenarioServiceEntity",
+    "ScenarioEventEntity",
+    "ChangedEntity",
+]
+
 @dataclass
 class ErrorEntity(Entity):
     original_tenant_id: UUID = field(default_factory=uuid7)

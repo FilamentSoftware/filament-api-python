@@ -8,6 +8,13 @@ from ..connections.generic import GenericTaskSkillConnection_1, TaskDependencyOv
 from ..entities.scope_task_type_service import ScopeTaskTypeEntity
 from ..entities.specialty_service import SpecialtyEntity
 
+__all__ = [
+    "ScopeTaskTypeDependencyConnection",
+    "ScopeTaskTypeSpecialtyDependencyConnection",
+    "ScopeTaskTypeSkillConnection",
+    "ScopeTaskTypeOfficeLocationConnection",
+]
+
 @dataclass
 class ScopeTaskTypeDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, ScopeTaskTypeEntity]):
     pass

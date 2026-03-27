@@ -10,6 +10,15 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity, EntityBase
 from ..enums import UserStatusEnum
 
+__all__ = [
+    "AddressEntityBase",
+    "UserBaseEntity",
+    "PhoneEntityBase",
+    "EmailEntityBase",
+    "ReferenceEntityBase",
+    "GenericComplexityBase",
+]
+
 @dataclass
 class AddressEntityBase(Entity):
     address_parts: list[str] = field(default_factory=list)

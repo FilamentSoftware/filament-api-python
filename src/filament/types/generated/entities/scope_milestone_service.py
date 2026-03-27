@@ -10,6 +10,10 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import ScopeMilestoneDirectionEnum
 
+__all__ = [
+    "ScopeMilestoneEntity",
+]
+
 @dataclass
 class ScopeMilestoneEntity(Entity):
     name: str = field(default_factory=str)

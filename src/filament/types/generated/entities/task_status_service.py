@@ -9,6 +9,10 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import BlockUserReasonEnum, TaskStatusEnum
 
+__all__ = [
+    "TaskStatusEntity",
+]
+
 @dataclass
 class TaskStatusEntity(Entity):
     status: TaskStatusEnum = TaskStatusEnum.InProgress

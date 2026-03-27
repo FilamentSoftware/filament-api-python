@@ -9,6 +9,10 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..entities.specialty_service import SpecialtyEntity
 
+__all__ = [
+    "CastEntity",
+]
+
 @dataclass
 class CastEntity(Entity):
     cast_key: str = field(default_factory=str)

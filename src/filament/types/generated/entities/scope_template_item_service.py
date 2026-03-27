@@ -11,6 +11,11 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import GenericComplexityBase
 from ..entities.scope_category_service import ScopeCategoryEntity
 
+__all__ = [
+    "ScopeTemplateItemEntity",
+    "ScopeTemplateItemCustomComplexityEntity",
+]
+
 @dataclass
 class ScopeTemplateItemEntity(Entity):
     name: str = field(default_factory=str)

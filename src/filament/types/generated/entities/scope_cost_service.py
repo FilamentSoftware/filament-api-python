@@ -12,6 +12,10 @@ from ..entities.scope_group_service import ScopeGroupEntity
 from ..entities.scope_item_service import ScopeItemEntity
 from ..entities.scope_template_item_service import ScopeTemplateItemEntity
 
+__all__ = [
+    "ScopeCostEntity",
+]
+
 @dataclass
 class ScopeCostEntity(ReferenceEntityBase):
     context_type: str = field(default_factory=str)

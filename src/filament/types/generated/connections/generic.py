@@ -13,6 +13,16 @@ from ..entities.scope_task_type_service import ScopeTaskTypeComplexityEntity
 from ..entities.skill_service import SkillEntity
 from ..enums import ScopeTaskTypeComplexitySource, TaskDependencyOverrideIncludeState, TaskDependencyOverrideOverlapState
 
+__all__ = [
+    "TaskDependencyConnectionBase_2",
+    "PermissionsRoleConnectionBase_1",
+    "GenericSkillConnection_1",
+    "GenericScopeTaskTypeConnection_2",
+    "TaskDependencyOverrideConnectionBase_2",
+    "GenericUserSkillConnection_1",
+    "GenericTaskSkillConnection_1",
+]
+
 TFromEntity = TypeVar("TFromEntity", bound=Entity)
 TToEntity = TypeVar("TToEntity", bound=Entity)
 TEntity = TypeVar("TEntity", bound=Entity)

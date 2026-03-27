@@ -11,6 +11,10 @@ from ..entities.generic import ReferenceEntityBase
 from ..entities.user_service import UserEntity
 from ..enums import TimeLogModeEnum, TimeLogStatusEnum
 
+__all__ = [
+    "TimeLogEntity",
+]
+
 @dataclass
 class TimeLogEntity(ReferenceEntityBase):
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)

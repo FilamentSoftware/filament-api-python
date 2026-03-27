@@ -3,6 +3,11 @@ from typing import Protocol
 
 from .misc import EntityPermissions, EntityPropertyPermissions, ModifyDataRequest, PreviewDataRequest, ProcessingStatus, ReadConnectedDataRequest, ReadDataRequest, RequestId, ServiceDataPreview, ServiceDataRead, ServiceDataReadConnected, ServiceDataUpdate, SetPermissionsRolesRequest, StatusData, SubscriptionConfig, SubscriptionId, SuccessOrErrorPublic, SwitchUserRequest, ValueOrErrorPublic_1
 
+__all__ = [
+    "ClientMethods",
+    "ServerEvents",
+]
+
 class ClientMethods(Protocol):
     """Methods the client can call on the server."""
 

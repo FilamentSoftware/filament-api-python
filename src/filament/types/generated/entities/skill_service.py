@@ -12,6 +12,12 @@ from ..entities.skill_type_service import SkillTypeEntity
 from ..entities.specialty_service import SpecialtyEntity
 from ..enums import TrainingType
 
+__all__ = [
+    "SkillEntity",
+    "SkillTrainingMaterialEntity",
+    "SkillLevelEntity",
+]
+
 @dataclass
 class SkillEntity(Entity):
     name: str = field(default_factory=str)

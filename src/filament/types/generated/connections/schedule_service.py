@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from ..connections.generic import GenericUserSkillConnection_1
 from ..entities.schedule_service import PlaceholderUserEntity
 
+__all__ = [
+    "PlaceholderUserSkillConnection",
+]
+
 @dataclass
 class PlaceholderUserSkillConnection(GenericUserSkillConnection_1[PlaceholderUserEntity]):
     pass

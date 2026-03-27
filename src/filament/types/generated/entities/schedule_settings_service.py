@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 
 from ..base.base import Entity
 
+__all__ = [
+    "ScheduleSettingsEntity",
+    "ScheduleScopeSettingsEntity",
+]
+
 @dataclass
 class ScheduleSettingsEntity(Entity):
     full_schedule: bool = field(default_factory=bool)

@@ -9,6 +9,10 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import ScopeType
 
+__all__ = [
+    "ScopeEntity",
+]
+
 @dataclass
 class ScopeEntity(Entity):
     name: str = field(default_factory=str)

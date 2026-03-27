@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 
 from ..base.base import Entity
 
+__all__ = [
+    "SpecialtyEntity",
+]
+
 @dataclass
 class SpecialtyEntity(Entity):
     name: str = field(default_factory=str)

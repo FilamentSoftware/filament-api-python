@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 
 from ..base.base import EntityConnection
 
+__all__ = [
+    "ScopeUserConnection",
+]
+
 @dataclass
 class ScopeUserConnection(EntityConnection):
     role: str = field(default_factory=str)

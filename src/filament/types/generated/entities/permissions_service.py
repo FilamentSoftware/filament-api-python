@@ -9,6 +9,11 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import PermissionAction, PermissionType
 
+__all__ = [
+    "PermissionsRoleEntity",
+    "PermissionEntity",
+]
+
 @dataclass
 class PermissionsRoleEntity(Entity):
     name: str = field(default_factory=str)
