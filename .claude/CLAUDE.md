@@ -1,12 +1,19 @@
 # Filament Python API
 
-A Python API for the Filament platform.
+An async Python client for the Filament platform, communicating over SignalR.
 
 ## Project Structure
 
 ```
 filament-python-api/
-├── src/                # Application source code
+├── src/filament/
+│   ├── _client.py          # FilamentClient (async SignalR client)
+│   ├── _serialization.py   # Dataclass <-> dict conversion for SignalR wire format
+│   ├── _exceptions.py      # FilamentError, FilamentAuthenticationError, etc.
+│   └── types/
+│       ├── generated/      # Auto-generated dataclasses from backend (DO NOT EDIT)
+│       ├── conditions.py   # DbConditionInstance
+│       └── options.py      # DataOption
 ├── tests/              # Unit tests (pytest)
 ├── plans/              # Plan documents for issue work
 ├── .claude/            # Claude Code config and skills
@@ -18,8 +25,23 @@ filament-python-api/
 
 - **Python 3.10, 3.11, 3.12, 3.13** with strict mypy type checking
 - **Poetry** for dependency management
-- **pytest** for testing
+- **signalr-async** for SignalR communication with the Filament backend
+- **pytest** + **pytest-asyncio** for testing
 - **mypy** for static type analysis
+
+## Architecture
+
+`FilamentClient` is an async context manager that wraps a SignalR connection:
+
+```python
+async with filament.FilamentClient(api_key_name="key", api_key="secret") as f:
+    result = await f.read_data(request)
+```
+
+- **Authentication**: API key headers (`X-Api-Key-Name` + `X-Api-Key`)
+- **Default endpoint**: `https://backend.filament-software.com:7076/api/v0` (server, port, path all configurable)
+- **Serialization**: `_serialization.py` converts between Python dataclasses (snake_case) and SignalR wire format (camelCase dicts), handling `uuid_utils.UUID`, `from __future__ import annotations`, and enum `None_` naming
+- **Subscription routing**: `subscribe()` stores user callbacks keyed by subscription ID; `DataUpdated` events are routed to the matching callback
 
 ## Common Commands
 
