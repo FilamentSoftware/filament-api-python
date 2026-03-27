@@ -2,8 +2,8 @@
 name = "filament-api"
 version = "0.0.0"
 description = "Filament Python API"
-requires-python = ">=3.10"
-dependencies = ["uuid-utils>=0.9"]
+requires-python = ">=3.10,<4.0"
+dependencies = ["uuid-utils>=0.9", "signalr-async>=3.0.0", "typing-inspect>=0.9"]
 
 [build-system]
 requires = ["poetry-core"]
@@ -14,6 +14,7 @@ packages = [{include = "filament", from = "src"}]
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"
+pytest-asyncio = ">=1.0"
 pytest-cov = ">=6.0"
 
 [tool.poetry.group.types.dependencies]
@@ -25,3 +26,7 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["signalr_async", "signalr_async.netcore", "signalr_async.netcore.protocols"]
+ignore_missing_imports = true
