@@ -6,14 +6,17 @@ An async Python client for the Filament platform, communicating over SignalR.
 
 ```
 filament-python-api/
-├── src/filament/
-│   ├── _client.py          # FilamentClient (async SignalR client)
-│   ├── _serialization.py   # Dataclass <-> dict conversion for SignalR wire format
-│   ├── _exceptions.py      # FilamentError, FilamentAuthenticationError, etc.
-│   └── types/
-│       ├── generated/      # Auto-generated dataclasses from backend (DO NOT EDIT)
-│       ├── conditions.py   # DbConditionInstance
-│       └── options.py      # DataOption
+├── src/
+│   ├── filament/
+│   │   ├── _client.py              # FilamentClient (async SignalR client)
+│   │   ├── _serialization.py       # Dataclass <-> dict conversion for SignalR wire format
+│   │   ├── _condition_builder.py   # Typed Condition(Entity).prop("field") builder
+│   │   ├── _exceptions.py          # FilamentError, FilamentAuthenticationError, etc.
+│   │   └── types/
+│   │       ├── generated/          # Auto-generated dataclasses from backend (DO NOT EDIT)
+│   │       ├── conditions.py       # DbConditionInstance hierarchy + serialization
+│   │       └── options.py          # DataOption + serialization
+│   └── filament_mypy_plugin.py     # Mypy plugin for typed condition builder
 ├── tests/              # Unit tests (pytest)
 ├── plans/              # Plan documents for issue work
 ├── .claude/            # Claude Code config and skills
@@ -40,8 +43,11 @@ async with filament.FilamentClient(api_key_name="key", api_key="secret") as f:
 
 - **Authentication**: API key headers (`X-Api-Key-Name` + `X-Api-Key`)
 - **Default endpoint**: `https://backend.filament-software.com:7076/api/v0` (server, port, path all configurable)
-- **Serialization**: `_serialization.py` converts between Python dataclasses (snake_case) and SignalR wire format (camelCase dicts), handling `uuid_utils.UUID`, `from __future__ import annotations`, and enum `None_` naming
+- **Serialization**: `_serialization.py` converts between Python dataclasses (snake_case) and SignalR wire format (camelCase dicts), handling `uuid_utils.UUID`, `from __future__ import annotations`, and enum `None_` naming. Includes polymorphic dispatch for `DbConditionInstance` and `DataOption` types.
+- **Conditions**: `conditions.py` defines the `DbConditionInstance` hierarchy (matching the C# backend's wire format). `_condition_builder.py` provides a typed `Condition(Entity).prop("field")` API with mypy plugin support for static validation.
+- **Options**: `options.py` defines `DataOption` for typed key-value options with `option_to_dict`/`option_from_dict` serialization.
 - **Subscription routing**: `subscribe()` stores user callbacks keyed by subscription ID; `DataUpdated` events are routed to the matching callback
+- **Mypy plugin**: `filament_mypy_plugin.py` (top-level module, outside `filament/` to avoid circular imports) narrows `Condition.prop()` return types based on entity field types. Registered in `pyproject.toml` via `plugins = ["filament_mypy_plugin"]`.
 
 ## Common Commands
 
