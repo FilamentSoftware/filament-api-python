@@ -83,6 +83,15 @@ def _is_condition_type(tp: Any) -> bool:
         return False
 
 
+def _is_data_option_type(tp: Any) -> bool:
+    """Check if *tp* is ``DataOption``."""
+    try:
+        from filament.types.options import DataOption
+        return isinstance(tp, type) and issubclass(tp, DataOption)
+    except (TypeError, ImportError):
+        return False
+
+
 def _is_list_like(tp: Any) -> bool:
     origin = get_origin(tp)
     return origin is list or origin is ABCSequence
@@ -169,6 +178,11 @@ def _convert_to_dict_value(
         from filament.types.conditions import condition_to_dict
         return condition_to_dict(data)
 
+    # DataOption -> custom serialization
+    if _is_data_option_type(field_type):
+        from filament.types.options import option_to_dict
+        return option_to_dict(data)
+
     # Dataclass -> recurse
     if _is_dataclass_type(field_type):
         return to_dict(data, convert_uuid)
@@ -239,6 +253,13 @@ def _convert_from_dict_value(
         if isinstance(data, dict):
             from filament.types.conditions import condition_from_dict
             return condition_from_dict(data)
+        return data
+
+    # DataOption -> custom deserialization
+    if _is_data_option_type(field_type):
+        if isinstance(data, dict):
+            from filament.types.options import option_from_dict
+            return option_from_dict(data)
         return data
 
     # Dataclass -> recurse
