@@ -74,6 +74,15 @@ def _is_dataclass_type(tp: Any) -> bool:
         return False
 
 
+def _is_condition_type(tp: Any) -> bool:
+    """Check if *tp* is ``DbConditionInstance`` or a subclass of it."""
+    try:
+        from filament.types.conditions import DbConditionInstance
+        return isinstance(tp, type) and issubclass(tp, DbConditionInstance)
+    except (TypeError, ImportError):
+        return False
+
+
 def _is_list_like(tp: Any) -> bool:
     origin = get_origin(tp)
     return origin is list or origin is ABCSequence
@@ -155,6 +164,11 @@ def _convert_to_dict_value(
             return _convert_to_dict_value(data, generic_type_arg, None, convert_uuid)
         return data
 
+    # DbConditionInstance -> custom polymorphic serialization
+    if _is_condition_type(field_type):
+        from filament.types.conditions import condition_to_dict
+        return condition_to_dict(data)
+
     # Dataclass -> recurse
     if _is_dataclass_type(field_type):
         return to_dict(data, convert_uuid)
@@ -218,6 +232,13 @@ def _convert_from_dict_value(
     if isinstance(field_type, TypeVar):
         if generic_type_arg is not None:
             return _convert_from_dict_value(data, generic_type_arg, None)
+        return data
+
+    # DbConditionInstance -> custom polymorphic deserialization
+    if _is_condition_type(field_type):
+        if isinstance(data, dict):
+            from filament.types.conditions import condition_from_dict
+            return condition_from_dict(data)
         return data
 
     # Dataclass -> recurse
