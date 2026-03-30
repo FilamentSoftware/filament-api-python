@@ -489,3 +489,93 @@ class TestConstructorGuards:
     def test_link_requires_link_condition(self) -> None:
         with pytest.raises(TypeError):
             DbConditionLink()
+
+
+class TestOperatorCombining:
+    """Tests for &, |, ~ operator overloading on conditions."""
+
+    def test_and_operator(self) -> None:
+        a = equal_to("x", "1")
+        b = equal_to("y", "2")
+        result = a & b
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.And
+        assert result.children == [a, b]
+
+    def test_or_operator(self) -> None:
+        a = equal_to("x", "1")
+        b = equal_to("y", "2")
+        result = a | b
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.Or
+        assert result.children == [a, b]
+
+    def test_invert_operator(self) -> None:
+        a = equal_to("x", "1")
+        result = ~a
+        assert isinstance(result, DbConditionNot)
+        assert result.child is a
+
+    def test_double_invert(self) -> None:
+        a = equal_to("x", "1")
+        result = ~~a
+        assert isinstance(result, DbConditionNot)
+        assert isinstance(result.child, DbConditionNot)
+        assert result.child.child is a
+
+    def test_precedence_not_before_and(self) -> None:
+        """~a & b should parse as (~a) & b, not ~(a & b)."""
+        a = equal_to("x", "1")
+        b = equal_to("y", "2")
+        result = ~a & b
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.And
+        assert isinstance(result.children[0], DbConditionNot)
+        assert result.children[0].child is a
+        assert result.children[1] is b
+
+    def test_precedence_and_before_or(self) -> None:
+        """a | b & c should parse as a | (b & c), not (a | b) & c."""
+        a = equal_to("x", "1")
+        b = equal_to("y", "2")
+        c = equal_to("z", "3")
+        result = a | b & c
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.Or
+        assert result.children[0] is a
+        inner = result.children[1]
+        assert isinstance(inner, DbConditionCombine)
+        assert inner.condition_type == DbConditionType.And
+        assert inner.children == [b, c]
+
+    def test_full_precedence_chain(self) -> None:
+        """~a | b & c should parse as (~a) | (b & c)."""
+        a = equal_to("x", "1")
+        b = equal_to("y", "2")
+        c = equal_to("z", "3")
+        result = ~a | b & c
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.Or
+        assert isinstance(result.children[0], DbConditionNot)
+        assert result.children[0].child is a
+        inner = result.children[1]
+        assert isinstance(inner, DbConditionCombine)
+        assert inner.condition_type == DbConditionType.And
+        assert inner.children == [b, c]
+
+    def test_operator_result_serializes(self) -> None:
+        """Operator-built conditions should serialize correctly."""
+        a = equal_to("x", "1")
+        b = equal_to("y", "2")
+        result = condition_to_dict(~a | b)
+        assert result["condition"] == "Or"
+        assert result["children"][0]["condition"] == "Not"
+        assert result["children"][1]["condition"] == "EqualTo"
+
+    def test_and_with_non_condition_returns_not_implemented(self) -> None:
+        a = equal_to("x", "1")
+        assert a.__and__("not a condition") is NotImplemented  # type: ignore[arg-type]
+
+    def test_or_with_non_condition_returns_not_implemented(self) -> None:
+        a = equal_to("x", "1")
+        assert a.__or__("not a condition") is NotImplemented  # type: ignore[arg-type]
