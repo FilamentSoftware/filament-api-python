@@ -20,7 +20,7 @@ filament-python-api/
 ├── tests/              # Unit tests (pytest)
 ├── plans/              # Plan documents for issue work
 ├── .claude/            # Claude Code config and skills
-├── .claude-docker/     # Docker sandbox config
+├── .agent-docker/     # Docker sandbox config
 └── .github/workflows/  # CI/CD workflows
 ```
 
@@ -69,8 +69,8 @@ poetry run mypy src/
 
 ### Docker Container Environment
 
-When running inside the Docker sandbox (`.claude-docker/`), use `hostcmd` to execute allowlisted commands on the host.
-The allowlist is defined in `.claude-docker/settings.json` under `host_commands`.
+When running inside the Docker sandbox (`.agent-docker/`), use `hostcmd` to execute allowlisted commands on the host.
+The allowlist is defined in `.agent-docker/settings.json` under `host_commands`.
 
 ```bash
 # Run mypy on the host
