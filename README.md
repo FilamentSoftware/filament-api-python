@@ -17,7 +17,7 @@ poetry install
 
 ```python
 import filament
-from filament.types.generated.misc import ReadDataRequest, ReadDataTypeRequest
+from filament.types import ReadDataRequest, ReadDataTypeRequest
 
 async with filament.FilamentClient(api_key_name="my-key", api_key="secret") as f:
     result = await f.read_data(
@@ -109,11 +109,15 @@ options = {
 Subscribe to real-time data updates with a callback:
 
 ```python
+from uuid_utils import UUID
+
 from filament.types.generated.misc import SubscriptionConfig, ServiceDataUpdate
 from filament.types.generated.enums import DataProcessingStatus, SubscriptionMode
 
 def on_update(update: ServiceDataUpdate) -> None:
     print("Data changed:", update.modified_entities)
+
+scenario_id = UUID(int=0)  # replace with your scenario ID
 
 async with filament.FilamentClient(api_key_name="my-key", api_key="secret") as f:
     result = await f.subscribe(
