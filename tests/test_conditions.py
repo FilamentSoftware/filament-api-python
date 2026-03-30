@@ -1,6 +1,8 @@
 """Tests for the conditions module."""
 from __future__ import annotations
 
+import pytest
+
 from filament._serialization import from_dict, to_dict
 from filament.types.conditions import (
     DbConditionArrayComparison,
@@ -460,3 +462,30 @@ class TestSubclassing:
         ]
         for inst in instances:
             assert isinstance(inst, DbConditionInstance)
+
+
+# ---------------------------------------------------------------------------
+# Constructor guards (negative tests)
+# ---------------------------------------------------------------------------
+
+
+class TestConstructorGuards:
+    def test_base_class_not_instantiable(self) -> None:
+        with pytest.raises(TypeError):
+            DbConditionInstance()
+
+    def test_combine_rejects_invalid_condition_type(self) -> None:
+        with pytest.raises(ValueError):
+            DbConditionCombine(condition_type=DbConditionType.EqualTo)
+
+    def test_comparison_rejects_invalid_condition_type(self) -> None:
+        with pytest.raises(ValueError):
+            DbConditionComparison(condition_type=DbConditionType.And)
+
+    def test_array_comparison_rejects_invalid_condition_type(self) -> None:
+        with pytest.raises(ValueError):
+            DbConditionArrayComparison(condition_type=DbConditionType.EqualTo)
+
+    def test_link_requires_link_condition(self) -> None:
+        with pytest.raises(TypeError):
+            DbConditionLink()
