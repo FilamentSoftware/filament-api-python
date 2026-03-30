@@ -98,6 +98,22 @@ def _is_data_option_type(tp: Any) -> bool:
         return False
 
 
+def _resolve_entity_type(type_name: str) -> Optional[type]:
+    """Look up a concrete EntityBase subclass by name from $type tag."""
+    from filament.types.generated.base.base import EntityBase
+
+    def _walk(cls: type) -> Optional[type]:
+        for sub in cls.__subclasses__():
+            if sub.__name__ == type_name:
+                return sub
+            found = _walk(sub)
+            if found is not None:
+                return found
+        return None
+
+    return _walk(EntityBase)
+
+
 def _is_list_like(tp: Any) -> bool:
     origin = get_origin(tp)
     return origin is list or origin is ABCSequence
@@ -271,7 +287,12 @@ def _convert_from_dict_value(
     # Dataclass -> recurse
     if _is_dataclass_type(field_type):
         if isinstance(data, dict):
-            return from_dict(data, field_type)
+            concrete: Any = field_type
+            if "$type" in data:
+                resolved = _resolve_entity_type(data["$type"])
+                if resolved is not None:
+                    concrete = resolved
+            return from_dict(data, concrete)
         return data
 
     # list[X]
@@ -389,6 +410,12 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
     if not is_dataclass(concrete_cls):
         return None
 
+    # EntityBase $type dispatch: resolve concrete subclass if available
+    if "$type" in data and isinstance(concrete_cls, type) and issubclass(concrete_cls, EntityBase):
+        resolved = _resolve_entity_type(data["$type"])
+        if resolved is not None:
+            concrete_cls = resolved
+
     # concrete_cls is verified to be a dataclass class at this point.
     hints: dict[str, Any] = _resolve_type_hints(concrete_cls)
     dc_fields = fields(concrete_cls)
@@ -406,5 +433,5 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         field_type = hints.get(f.name, f.type)
         dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
 
-    result: T = concrete_cls(**dataclass_data)  # type: ignore[operator,assignment]
+    result: T = concrete_cls(**dataclass_data)
     return result
