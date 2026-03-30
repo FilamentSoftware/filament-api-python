@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import sys
+import types
 from collections.abc import Sequence
 from dataclasses import fields as dc_fields
 from enum import Enum
@@ -102,7 +103,12 @@ def _resolve_type_hints(cls: type[Any]) -> dict[str, Any]:
 
 
 def _is_optional(tp: Any) -> bool:
-    return get_origin(tp) is Union and type(None) in get_args(tp)
+    origin = get_origin(tp)
+    if origin is Union:
+        return type(None) in get_args(tp)
+    if isinstance(tp, types.UnionType):
+        return type(None) in tp.__args__
+    return False
 
 
 def _unwrap_optional(tp: Any) -> Any:
@@ -300,10 +306,12 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
         """Create a ``Between`` range condition."""
         min_wire = _value_to_wire(min_val)
         max_wire = _value_to_wire(max_val)
+        if min_wire is None or max_wire is None:
+            raise ValueError("between() bounds must not be None")
         return self._wrap(DbConditionBetween(
             property=self._wire_name,
-            value_min=min_wire if min_wire is not None else "",
-            value_max=max_wire if max_wire is not None else "",
+            value_min=min_wire,
+            value_max=max_wire,
             inclusive_min=inclusive_min,
             inclusive_max=inclusive_max,
             mode=self._mode,
@@ -409,7 +417,7 @@ class Condition(Generic[TEntity]):
         The mypy plugin narrows the return type statically.
         """
         wire_name = camel_case_from_snake_case(name)
-        category, inner = _classify_field(self._entity_cls, name)
+        category, _inner = _classify_field(self._entity_cls, name)
 
         if category == "comparable":
             return DbConditionComparableProperty[Any](wire_name)
