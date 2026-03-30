@@ -11,6 +11,8 @@ from filament._serialization import (
     snake_case_from_camel_case,
     to_dict,
 )
+from filament.types.generated.base.base import EntityBase
+from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
     DataRequestAction,
@@ -289,3 +291,28 @@ class TestRoundTrip:
         assert restored.data is not None
         assert original.data is not None
         assert restored.data.id == original.data.id
+
+
+# ---------------------------------------------------------------------------
+# EntityBase $type round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestEntityBaseRoundTrip:
+    def test_entity_base_type_dispatch(self) -> None:
+        """to_dict writes $type; from_dict with EntityBase target uses it to restore
+        the concrete subclass."""
+        original = UserEntity(given_name="Alice", family_name="Smith")
+
+        serialized = to_dict(original)
+        assert serialized is not None
+        assert "$type" in serialized
+        assert serialized["$type"] == "UserEntity"
+
+        restored = from_dict(serialized, EntityBase)
+        assert restored is not None
+        assert isinstance(restored, UserEntity), (
+            f"Expected UserEntity but got {type(restored).__name__}"
+        )
+        assert restored.given_name == "Alice"
+        assert restored.family_name == "Smith"
