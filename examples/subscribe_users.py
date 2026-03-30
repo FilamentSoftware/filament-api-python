@@ -41,6 +41,7 @@ def on_user_updated(update: ServiceDataUpdate) -> None:
 
 async def main() -> None:
     async with filament.FilamentClient(
+        organization_id="your-organization-id",
         api_key_name="your-api-key-name",
         api_key="your-api-key",
     ) as f:

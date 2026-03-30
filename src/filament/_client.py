@@ -44,12 +44,15 @@ class FilamentClient:
 
     Usage::
 
-        async with FilamentClient(api_key_name="my-key", api_key="secret") as f:
+        async with FilamentClient(
+            organization_id="org-id", api_key_name="my-key", api_key="secret",
+        ) as f:
             result = await f.read_data(request)
     """
 
     def __init__(
         self,
+        organization_id: str,
         api_key_name: str,
         api_key: str,
         server: str = _DEFAULT_SERVER,
@@ -83,6 +86,7 @@ class FilamentClient:
         headers = {
             "X-Api-Key-Name": api_key_name,
             "X-Api-Key": api_key,
+            "X-Organization-Id": organization_id,
         }
         self._client: Client = Client(
             url,
