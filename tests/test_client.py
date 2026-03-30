@@ -123,12 +123,12 @@ class TestSubscriptionRouting:
     @pytest.mark.asyncio
     async def test_subscribe_stores_callback(self) -> None:
         client = _make_client()
-        sub_id = uuid7()
+        backend_id = uuid7()
         client._hub.invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
-            "data": {"id": str(sub_id)},
+            "data": {"id": str(backend_id)},
         })
 
         callback = MagicMock()
@@ -143,22 +143,73 @@ class TestSubscriptionRouting:
         )
 
         assert result.success is True
-        assert sub_id in client._subscriptions
+        # The returned ID should be a client-generated ID, not the backend ID
+        assert result.data is not None
+        client_id = result.data.id
+        assert client_id != backend_id
+        assert client_id in client._client_callbacks
+        assert client._client_callbacks[client_id] is callback
+        assert backend_id in client._backend_to_client
+        assert client_id in client._backend_to_client[backend_id]
 
     @pytest.mark.asyncio
-    async def test_data_updated_routes_to_callback(self) -> None:
+    async def test_subscribe_multiple_same_backend_id(self) -> None:
+        """Multiple subscribes returning the same backend ID get separate client IDs."""
         client = _make_client()
-        sub_id = uuid7()
+        backend_id = uuid7()
+        client._hub.invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
 
-        callback = MagicMock()
-        client._subscriptions[sub_id] = callback
+        sub_config = SubscriptionConfig(
+            scenario_id=UUID(int=0),
+            status=DataProcessingStatus.Pending,
+            type_name="TestEntity",
+            mode=SubscriptionMode.Data,
+        )
 
-        # Simulate a DataUpdated event
+        cb1 = MagicMock()
+        cb2 = MagicMock()
+        result1 = await client.subscribe(sub_config, callback=cb1)
+        result2 = await client.subscribe(sub_config, callback=cb2)
+
+        assert result1.data is not None
+        assert result2.data is not None
+        assert result1.data.id != result2.data.id
+        assert len(client._backend_to_client[backend_id]) == 2
+
+    @pytest.mark.asyncio
+    async def test_data_updated_routes_to_all_callbacks(self) -> None:
+        """DataUpdated events are dispatched to all callbacks for that backend ID."""
+        client = _make_client()
+        backend_id = uuid7()
+        client._hub.invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
+
+        sub_config = SubscriptionConfig(
+            scenario_id=UUID(int=0),
+            status=DataProcessingStatus.Pending,
+            type_name="TestEntity",
+            mode=SubscriptionMode.Data,
+        )
+
+        cb1 = MagicMock()
+        cb2 = MagicMock()
+        await client.subscribe(sub_config, callback=cb1)
+        await client.subscribe(sub_config, callback=cb2)
+
         update_data = {
             "scenarioId": str(uuid7()),
             "status": 1,
             "requestIds": [],
-            "subscriptionId": {"id": str(sub_id)},
+            "subscriptionId": {"id": str(backend_id)},
             "modifiedEntities": {},
             "progress": False,
             "progressAmount": 0.0,
@@ -166,10 +217,11 @@ class TestSubscriptionRouting:
         }
         await client._handle_data_updated(update_data)
 
-        callback.assert_called_once()
-        arg = callback.call_args[0][0]
+        cb1.assert_called_once()
+        cb2.assert_called_once()
+        arg = cb1.call_args[0][0]
         assert isinstance(arg, ServiceDataUpdate)
-        assert arg.subscription_id.id == sub_id
+        assert arg.subscription_id.id == backend_id
 
     @pytest.mark.asyncio
     async def test_data_updated_ignores_unknown_subscription(self) -> None:
@@ -189,24 +241,104 @@ class TestSubscriptionRouting:
         await client._handle_data_updated(update_data)
 
     @pytest.mark.asyncio
-    async def test_unsubscribe_removes_callback(self) -> None:
+    async def test_unsubscribe_last_client_calls_backend(self) -> None:
+        """Unsubscribing the last client for a backend ID calls backend Unsubscribe."""
         client = _make_client()
-        sub_id = uuid7()
-        client._subscriptions[sub_id] = MagicMock()
+        backend_id = uuid7()
+        client._hub.invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
+
+        cb = MagicMock()
+        result = await client.subscribe(
+            SubscriptionConfig(
+                scenario_id=UUID(int=0),
+                status=DataProcessingStatus.Pending,
+                type_name="TestEntity",
+                mode=SubscriptionMode.Data,
+            ),
+            callback=cb,
+        )
+        assert result.data is not None
+        client_id = result.data.id
+
+        # Reset mock to track unsubscribe call
         client._hub.invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
         })
 
-        await client.unsubscribe(SubscriptionId(id=sub_id))
-        assert sub_id not in client._subscriptions
+        await client.unsubscribe(SubscriptionId(id=client_id))
+
+        # Backend should have been called
+        client._hub.invoke.assert_called_once()
+        call_args = client._hub.invoke.call_args
+        assert call_args is not None
+        assert call_args[0][0] == "Unsubscribe"
+        assert client_id not in client._client_callbacks
+        assert backend_id not in client._backend_to_client
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_non_last_client_skips_backend(self) -> None:
+        """Unsubscribing when other clients remain does NOT call backend."""
+        client = _make_client()
+        backend_id = uuid7()
+        client._hub.invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
+
+        sub_config = SubscriptionConfig(
+            scenario_id=UUID(int=0),
+            status=DataProcessingStatus.Pending,
+            type_name="TestEntity",
+            mode=SubscriptionMode.Data,
+        )
+
+        cb1 = MagicMock()
+        cb2 = MagicMock()
+        result1 = await client.subscribe(sub_config, callback=cb1)
+        result2 = await client.subscribe(sub_config, callback=cb2)
+        assert result1.data is not None
+        assert result2.data is not None
+
+        # Reset mock to track unsubscribe
+        client._hub.invoke = AsyncMock()
+
+        await client.unsubscribe(SubscriptionId(id=result1.data.id))
+
+        # Backend should NOT have been called
+        client._hub.invoke.assert_not_called()
+        # Second callback should still be registered
+        assert result2.data.id in client._client_callbacks
+        assert len(client._backend_to_client[backend_id]) == 1
 
     @pytest.mark.asyncio
     async def test_unsubscribe_all_clears_callbacks(self) -> None:
         client = _make_client()
-        client._subscriptions[uuid7()] = MagicMock()
-        client._subscriptions[uuid7()] = MagicMock()
+        backend_id = uuid7()
+        client._hub.invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
+
+        sub_config = SubscriptionConfig(
+            scenario_id=UUID(int=0),
+            status=DataProcessingStatus.Pending,
+            type_name="TestEntity",
+            mode=SubscriptionMode.Data,
+        )
+        await client.subscribe(sub_config, callback=MagicMock())
+        await client.subscribe(sub_config, callback=MagicMock())
+
         client._hub.invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
@@ -214,7 +346,9 @@ class TestSubscriptionRouting:
         })
 
         await client.unsubscribe_all()
-        assert len(client._subscriptions) == 0
+        assert len(client._client_callbacks) == 0
+        assert len(client._backend_to_client) == 0
+        assert len(client._client_to_backend) == 0
 
 
 class TestEventCallbacks:
