@@ -285,6 +285,8 @@ _CONDITION_TYPE_ARRAY_COMPARISON = frozenset({
 def condition_from_dict(data: dict[str, Any]) -> DbConditionInstance:
     """Deserialize a camelCase wire-format dict to a condition instance."""
 
+    if "condition" not in data:
+        raise ValueError("Missing 'condition' key in condition dict")
     condition_type_str: str = data["condition"]
 
     if condition_type_str == DbConditionType.Not.value:
