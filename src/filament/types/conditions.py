@@ -91,14 +91,22 @@ class DbConditionInstance:
     Not instantiated directly — use one of the concrete subclasses.
     """
 
-    pass
+    def __post_init__(self) -> None:
+        if type(self) is DbConditionInstance:
+            raise TypeError(
+                "DbConditionInstance cannot be instantiated directly; "
+                "use one of the concrete subclasses."
+            )
 
 
 @dataclass
 class DbConditionNot(DbConditionInstance):
     """Negates a child condition."""
 
-    child: DbConditionInstance = field(default_factory=DbConditionInstance)
+    child: DbConditionInstance
+
+
+_COMBINE_ALLOWED = frozenset({DbConditionType.And, DbConditionType.Or})
 
 
 @dataclass
@@ -107,6 +115,24 @@ class DbConditionCombine(DbConditionInstance):
 
     condition_type: DbConditionType = DbConditionType.And
     children: list[DbConditionInstance] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.condition_type not in _COMBINE_ALLOWED:
+            raise ValueError(
+                f"DbConditionCombine.condition_type must be And or Or, "
+                f"got {self.condition_type!r}."
+            )
+
+
+_COMPARISON_ALLOWED = frozenset({
+    DbConditionType.EqualTo,
+    DbConditionType.LessThan,
+    DbConditionType.LessThanOrEqualTo,
+    DbConditionType.GreaterThan,
+    DbConditionType.GreaterThanOrEqualTo,
+    DbConditionType.Like,
+})
 
 
 @dataclass
@@ -120,6 +146,15 @@ class DbConditionComparison(DbConditionInstance):
     value: Optional[str] = field(default=None)
     mode: DbConditionMode = DbConditionMode.Property
     key: Optional[str] = field(default=None)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.condition_type not in _COMPARISON_ALLOWED:
+            raise ValueError(
+                f"DbConditionComparison.condition_type must be one of "
+                f"{[t.value for t in _COMPARISON_ALLOWED]}, "
+                f"got {self.condition_type!r}."
+            )
 
 
 @dataclass
@@ -145,6 +180,13 @@ class DbConditionComparisonArray(DbConditionInstance):
     key: Optional[str] = field(default=None)
 
 
+_ARRAY_COMPARISON_ALLOWED = frozenset({
+    DbConditionType.Intersects,
+    DbConditionType.SubsetOf,
+    DbConditionType.SupersetOf,
+})
+
+
 @dataclass
 class DbConditionArrayComparison(DbConditionInstance):
     """Set operations: ``Intersects``, ``SubsetOf``, ``SupersetOf``."""
@@ -153,6 +195,15 @@ class DbConditionArrayComparison(DbConditionInstance):
     property: str = field(default_factory=str)
     values: list[Optional[str]] = field(default_factory=list)
     mode: DbConditionMode = DbConditionMode.Property
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.condition_type not in _ARRAY_COMPARISON_ALLOWED:
+            raise ValueError(
+                f"DbConditionArrayComparison.condition_type must be one of "
+                f"{[t.value for t in _ARRAY_COMPARISON_ALLOWED]}, "
+                f"got {self.condition_type!r}."
+            )
 
 
 @dataclass
@@ -171,7 +222,12 @@ class DbConditionLink(DbConditionInstance):
     property: str = field(default_factory=str)
     link_type: str = field(default_factory=str)
     link_property: str = field(default_factory=str)
-    link_condition: DbConditionInstance = field(default_factory=DbConditionInstance)
+    link_condition: DbConditionInstance = field(default=None)  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.link_condition is None:
+            raise TypeError("DbConditionLink requires a 'link_condition'.")
 
 
 # ---------------------------------------------------------------------------
