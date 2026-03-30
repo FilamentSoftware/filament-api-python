@@ -133,28 +133,43 @@ class FilamentClient:
 
         callback = self._subscriptions.get(update.subscription_id.id)
         if callback is not None:
-            await _invoke_callback(callback, update)
+            try:
+                await _invoke_callback(callback, update)
+            except Exception:
+                logger.exception(
+                    "Error in DataUpdated callback for subscription %s",
+                    update.subscription_id.id,
+                )
 
     async def _handle_processing_started(self, data: Any) -> None:
         status = from_dict(data, ProcessingStatus)
         if status is None:
             return
         for cb in self._on_processing_started_callbacks:
-            await _invoke_callback(cb, status)
+            try:
+                await _invoke_callback(cb, status)
+            except Exception:
+                logger.exception("Error in ProcessingStarted callback")
 
     async def _handle_processing_completed(self, data: Any) -> None:
         status = from_dict(data, ProcessingStatus)
         if status is None:
             return
         for cb in self._on_processing_completed_callbacks:
-            await _invoke_callback(cb, status)
+            try:
+                await _invoke_callback(cb, status)
+            except Exception:
+                logger.exception("Error in ProcessingCompleted callback")
 
     async def _handle_processing_failed(self, data: Any) -> None:
         status = from_dict(data, ProcessingStatus)
         if status is None:
             return
         for cb in self._on_processing_failed_callbacks:
-            await _invoke_callback(cb, status)
+            try:
+                await _invoke_callback(cb, status)
+            except Exception:
+                logger.exception("Error in ProcessingFailed callback")
 
     async def _handle_keep_alive(self, data: Any) -> None:
         # Handled internally — not exposed to users.
@@ -185,7 +200,10 @@ class FilamentClient:
     ) -> ValueOrErrorPublic_1[EntityPermissions]:
         """Retrieve entity-level permissions for the authenticated user."""
         result_dict: Any = await self._hub.invoke("GetEntityPermissions")
-        result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPermissions])
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPermissions])
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
         if result is not None:
             return result
         return _deserialization_error()
@@ -198,7 +216,10 @@ class FilamentClient:
         result_dict: Any = await self._hub.invoke(
             "GetEntityPropertyPermissions", entity_type_name
         )
-        result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPropertyPermissions])
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPropertyPermissions])
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
         if result is not None:
             return result
         return _deserialization_error()
@@ -210,7 +231,10 @@ class FilamentClient:
         """Read entity data from the server."""
         request_dict = to_dict(request)
         result_dict: Any = await self._hub.invoke("ReadData", request_dict)
-        result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
         if result is not None:
             return result
         return _deserialization_error()
@@ -222,7 +246,10 @@ class FilamentClient:
         """Create, update, or delete entity data."""
         request_dict = to_dict(request)
         result_dict: Any = await self._hub.invoke("ModifyData", request_dict)
-        result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
         if result is not None:
             return result
         return _deserialization_error()
@@ -240,7 +267,10 @@ class FilamentClient:
         """
         subscription_dict = to_dict(subscription)
         result_dict: Any = await self._hub.invoke("Subscribe", subscription_dict)
-        result = from_dict(result_dict, ValueOrErrorPublic_1[SubscriptionId])
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[SubscriptionId])
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
         if result is None:
             return _deserialization_error()
 
@@ -254,9 +284,9 @@ class FilamentClient:
         subscription_id: SubscriptionId,
     ) -> SuccessOrErrorPublic:
         """Cancel a subscription."""
-        self._subscriptions.pop(subscription_id.id, None)
         subscription_dict = to_dict(subscription_id)
         result_dict = await self._hub.invoke("Unsubscribe", subscription_dict)
+        self._subscriptions.pop(subscription_id.id, None)
         result = from_dict(result_dict, SuccessOrErrorPublic)
         if result is not None:
             return result
@@ -264,8 +294,8 @@ class FilamentClient:
 
     async def unsubscribe_all(self) -> SuccessOrErrorPublic:
         """Cancel all active subscriptions."""
-        self._subscriptions.clear()
         result_dict = await self._hub.invoke("UnsubscribeAll")
+        self._subscriptions.clear()
         result = from_dict(result_dict, SuccessOrErrorPublic)
         if result is not None:
             return result
