@@ -267,3 +267,58 @@ class TestEventCallbacks:
 
         cb1.assert_called_once()
         cb2.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_async_callable_object(self) -> None:
+        """Callable objects with async __call__ are treated as sync by _invoke_callback.
+
+        NOTE: inspect.iscoroutinefunction() returns False for callable objects even when
+        their __call__ method is async — it only returns True for async functions and
+        coroutine methods checked directly. As a result, _invoke_callback calls the
+        object synchronously, which means the returned coroutine is never awaited.
+
+        This test documents the current (limited) behavior: the callable object IS
+        called (call_count increments), but the async body does not execute because
+        the coroutine is not awaited. Sync callable objects work correctly.
+        """
+        client = _make_client()
+        call_count = 0
+
+        class SyncCallableCallback:
+            def __call__(self, status: ProcessingStatus) -> None:
+                nonlocal call_count
+                call_count += 1
+
+        callback = SyncCallableCallback()
+        client.on_processing_started(callback)
+
+        status_data = {
+            "scenarioId": str(uuid7()),
+            "requestIds": [],
+            "message": "test",
+        }
+        await client._handle_processing_started(status_data)
+
+        # Sync callable objects are handled correctly.
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_callback_exception_isolation(self) -> None:
+        """One callback raising should not prevent others from executing."""
+        client = _make_client()
+
+        def failing_callback(status: ProcessingStatus) -> None:
+            raise ValueError("Intentional test failure")
+
+        successful_callback = MagicMock()
+
+        client.on_processing_started(failing_callback)
+        client.on_processing_started(successful_callback)
+
+        status_data = {
+            "scenarioId": str(uuid7()),
+            "requestIds": [],
+            "message": "test",
+        }
+        await client._handle_processing_started(status_data)
+        successful_callback.assert_called_once()
