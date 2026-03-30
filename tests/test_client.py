@@ -13,7 +13,6 @@ from uuid_utils import UUID, uuid7
 
 from filament._client import FilamentClient
 from filament._exceptions import FilamentAuthenticationError
-from filament._serialization import to_dict
 from filament.types.generated.enums import (
     DataProcessingStatus,
     ErrorCodes,
