@@ -16,19 +16,26 @@ poetry install
 ## Usage
 
 ```python
+import asyncio
 import filament
 from filament.types import ReadDataRequest, ReadDataTypeRequest
 
-async with filament.FilamentClient(api_key_name="my-key", api_key="secret") as f:
-    result = await f.read_data(
-        ReadDataRequest(request=ReadDataTypeRequest(type_name="UserEntity"))
-    )
+async def main() -> None:
+    async with filament.FilamentClient(
+        organization_id="my-org", api_key_name="my-key", api_key="secret",
+    ) as f:
+        result = await f.read_data(
+            ReadDataRequest(request=ReadDataTypeRequest(type_name="UserEntity"))
+        )
+
+asyncio.run(main())
 ```
 
 The server, port, and path are configurable:
 
 ```python
 f = filament.FilamentClient(
+    organization_id="my-org",
     api_key_name="my-key",
     api_key="secret",
     server="https://dev.backend.filament-software.com",
@@ -61,13 +68,16 @@ condition = Condition.and_(
 )
 
 # Use in queries
-async with filament.FilamentClient(api_key_name="key", api_key="secret") as f:
-    result = await f.read_data(
-        ReadDataRequest(request=ReadDataTypeRequest(
-            type_name="UserEntity",
-            condition=condition,
-        ))
-    )
+async def main() -> None:
+    async with filament.FilamentClient(
+        organization_id="my-org", api_key_name="key", api_key="secret",
+    ) as f:
+        result = await f.read_data(
+            ReadDataRequest(request=ReadDataTypeRequest(
+                type_name="UserEntity",
+                condition=condition,
+            ))
+        )
 ```
 
 To enable mypy validation, add to your `pyproject.toml`:
@@ -119,16 +129,19 @@ def on_update(update: ServiceDataUpdate) -> None:
 
 scenario_id = UUID(int=0)  # replace with your scenario ID
 
-async with filament.FilamentClient(api_key_name="my-key", api_key="secret") as f:
-    result = await f.subscribe(
-        SubscriptionConfig(
-            scenario_id=scenario_id,
-            status=DataProcessingStatus.Pending,
-            type_name="TaskEntity",
-            mode=SubscriptionMode.Data,
-        ),
-        callback=on_update,
-    )
+async def main() -> None:
+    async with filament.FilamentClient(
+        organization_id="my-org", api_key_name="my-key", api_key="secret",
+    ) as f:
+        result = await f.subscribe(
+            SubscriptionConfig(
+                scenario_id=scenario_id,
+                status=DataProcessingStatus.Pending,
+                type_name="TaskEntity",
+                mode=SubscriptionMode.Data,
+            ),
+            callback=on_update,
+        )
 ```
 
 ### Event Callbacks
