@@ -4,7 +4,7 @@ An async Python client for the Filament platform, communicating over SignalR.
 
 ## Project Structure
 
-```
+```text
 filament-python-api/
 ├── src/
 │   ├── filament/
