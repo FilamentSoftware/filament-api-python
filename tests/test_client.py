@@ -41,6 +41,7 @@ def _make_client(**kwargs: Any) -> FilamentClient:
         mock_hub_cls.return_value = mock_hub
 
         client = FilamentClient(
+            organization_id="test-org",
             api_key_name="test-key",
             api_key="test-secret",
             **kwargs,
@@ -54,7 +55,7 @@ class TestClientConstruction:
     def test_default_url(self) -> None:
         with patch("filament._client.Hub"), \
              patch("filament._client.Client") as mock_client_cls:
-            FilamentClient(api_key_name="k", api_key="s")
+            FilamentClient(organization_id="org", api_key_name="k", api_key="s")
             call_args = mock_client_cls.call_args
             assert call_args is not None
             assert call_args[0][0] == "https://backend.filament-software.com:7076"
@@ -63,6 +64,7 @@ class TestClientConstruction:
         with patch("filament._client.Hub"), \
              patch("filament._client.Client") as mock_client_cls:
             FilamentClient(
+                organization_id="org",
                 api_key_name="k",
                 api_key="s",
                 server="https://dev.example.com",
@@ -78,7 +80,7 @@ class TestClientConstruction:
              patch("filament._client.Client"):
             mock_hub = MagicMock()
             mock_hub_cls.return_value = mock_hub
-            FilamentClient(api_key_name="k", api_key="s")
+            FilamentClient(organization_id="org", api_key_name="k", api_key="s")
             registered = {call[0][0] for call in mock_hub.on.call_args_list}
             assert "DataUpdated" in registered
             assert "ProcessingStarted" in registered
