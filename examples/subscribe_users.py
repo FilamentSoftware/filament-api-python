@@ -63,12 +63,12 @@ async def main() -> None:
 
         # Keep running until interrupted
         try:
-            while True:
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
             print("\nUnsubscribing...")
             if result.data is not None:
-                await f.unsubscribe(result.data)
+                await asyncio.shield(f.unsubscribe(result.data))
+            raise
 
 
 if __name__ == "__main__":
