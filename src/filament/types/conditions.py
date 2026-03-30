@@ -98,6 +98,26 @@ class DbConditionInstance:
                 "use one of the concrete subclasses."
             )
 
+    def __and__(self, other: DbConditionInstance) -> DbConditionCombine:
+        """Combine with ``&`` (AND).  Precedence: ``~`` > ``&`` > ``|``."""
+        if not isinstance(other, DbConditionInstance):
+            return NotImplemented
+        return DbConditionCombine(
+            condition_type=DbConditionType.And, children=[self, other],
+        )
+
+    def __or__(self, other: DbConditionInstance) -> DbConditionCombine:
+        """Combine with ``|`` (OR).  Precedence: ``~`` > ``&`` > ``|``."""
+        if not isinstance(other, DbConditionInstance):
+            return NotImplemented
+        return DbConditionCombine(
+            condition_type=DbConditionType.Or, children=[self, other],
+        )
+
+    def __invert__(self) -> DbConditionNot:
+        """Negate with ``~`` (NOT).  Precedence: ``~`` > ``&`` > ``|``."""
+        return DbConditionNot(child=self)
+
 
 @dataclass
 class DbConditionNot(DbConditionInstance):
