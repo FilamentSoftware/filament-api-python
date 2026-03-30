@@ -456,7 +456,7 @@ class TestSubclassing:
             DbConditionComparisonArray(),
             DbConditionArrayComparison(),
             DbConditionContains(),
-            DbConditionLink(),
+            DbConditionLink(link_condition=equal_to("x", "1")),
         ]
         for inst in instances:
             assert isinstance(inst, DbConditionInstance)
