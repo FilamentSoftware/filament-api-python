@@ -130,7 +130,11 @@ class FilamentClient:
         self._auth_message = message
 
     async def _handle_data_updated(self, data: Any) -> None:
-        update = from_dict(data, ServiceDataUpdate)
+        try:
+            update = from_dict(data, ServiceDataUpdate)
+        except (TypeError, ValueError, KeyError):
+            logger.exception("Failed to deserialize DataUpdated payload")
+            return
         if update is None:
             logger.warning("Failed to deserialize DataUpdated payload")
             return
@@ -146,7 +150,11 @@ class FilamentClient:
                 )
 
     async def _handle_processing_started(self, data: Any) -> None:
-        status = from_dict(data, ProcessingStatus)
+        try:
+            status = from_dict(data, ProcessingStatus)
+        except (TypeError, ValueError, KeyError):
+            logger.exception("Failed to deserialize %s payload", "ProcessingStarted")
+            return
         if status is None:
             return
         for cb in self._on_processing_started_callbacks:
@@ -156,7 +164,11 @@ class FilamentClient:
                 logger.exception("Error in ProcessingStarted callback")
 
     async def _handle_processing_completed(self, data: Any) -> None:
-        status = from_dict(data, ProcessingStatus)
+        try:
+            status = from_dict(data, ProcessingStatus)
+        except (TypeError, ValueError, KeyError):
+            logger.exception("Failed to deserialize %s payload", "ProcessingCompleted")
+            return
         if status is None:
             return
         for cb in self._on_processing_completed_callbacks:
@@ -166,7 +178,11 @@ class FilamentClient:
                 logger.exception("Error in ProcessingCompleted callback")
 
     async def _handle_processing_failed(self, data: Any) -> None:
-        status = from_dict(data, ProcessingStatus)
+        try:
+            status = from_dict(data, ProcessingStatus)
+        except (TypeError, ValueError, KeyError):
+            logger.exception("Failed to deserialize %s payload", "ProcessingFailed")
+            return
         if status is None:
             return
         for cb in self._on_processing_failed_callbacks:
@@ -258,6 +274,9 @@ class FilamentClient:
             return result
         return _deserialization_error()
 
+    # Reference frontend's connection.ts - might have multiple callbacks with the
+    # same subscription id - need to track them separately
+    # On the frontend, these are component subscription
     async def subscribe(
         self,
         subscription: SubscriptionConfig,
