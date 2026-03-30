@@ -37,11 +37,14 @@ filament-python-api/
 `FilamentClient` is an async context manager that wraps a SignalR connection:
 
 ```python
-async with filament.FilamentClient(api_key_name="key", api_key="secret") as f:
-    result = await f.read_data(request)
+async def main() -> None:
+    async with filament.FilamentClient(
+        organization_id="org-id", api_key_name="key", api_key="secret",
+    ) as f:
+        result = await f.read_data(request)
 ```
 
-- **Authentication**: API key headers (`X-Api-Key-Name` + `X-Api-Key`)
+- **Authentication**: API key headers (`X-Api-Key-Name` + `X-Api-Key`) and organization header (`X-Organization-Id`)
 - **Default endpoint**: `https://backend.filament-software.com:7076/api/v0` (server, port, path all configurable)
 - **Serialization**: `_serialization.py` converts between Python dataclasses (snake_case) and SignalR wire format (camelCase dicts), handling `uuid_utils.UUID`, `from __future__ import annotations`, and enum `None_` naming. Includes polymorphic dispatch for `DbConditionInstance` and `DataOption` types.
 - **Conditions**: `conditions.py` defines the `DbConditionInstance` hierarchy (matching the C# backend's wire format). `_condition_builder.py` provides a typed `Condition(Entity).prop("field")` API with mypy plugin support for static validation.
