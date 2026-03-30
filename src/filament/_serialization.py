@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime
 import re
 import sys
+import types
 from collections.abc import Sequence as ABCSequence
 from dataclasses import fields, is_dataclass
 from enum import Enum
@@ -46,7 +47,12 @@ def snake_case_from_camel_case(s: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _is_optional(tp: Any) -> bool:
-    return get_origin(tp) is Union and type(None) in get_args(tp)
+    origin = get_origin(tp)
+    if origin is Union:
+        return type(None) in get_args(tp)
+    if isinstance(tp, types.UnionType):
+        return type(None) in tp.__args__
+    return False
 
 
 def _unwrap_optional(tp: Any) -> Any:
