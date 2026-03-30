@@ -340,9 +340,7 @@ def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
     dc_fields = fields(data)
 
     # Check for specified_properties filtering
-    specified_properties: Optional[list[str]] = None
-    if hasattr(data, "specified_properties"):
-        specified_properties = getattr(data, "specified_properties")
+    specified_properties: Optional[list[str]] = getattr(data, "specified_properties", None)
 
     result: dict[str, Any] = {}
     for f in dc_fields:
@@ -402,8 +400,5 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         field_type = hints.get(f.name, f.type)
         dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
 
-    try:
-        result: T = concrete_cls(**dataclass_data)  # type: ignore[operator,assignment]
-        return result
-    except TypeError:
-        raise
+    result: T = concrete_cls(**dataclass_data)  # type: ignore[operator,assignment]
+    return result
