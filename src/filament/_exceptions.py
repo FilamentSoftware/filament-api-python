@@ -1,3 +1,4 @@
+"""Exception hierarchy for the Filament client."""
 from __future__ import annotations
 
 

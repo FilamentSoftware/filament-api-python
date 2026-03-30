@@ -92,6 +92,7 @@ class DbConditionInstance:
     """
 
     def __post_init__(self) -> None:
+        """Prevent direct instantiation of the abstract base class."""
         if type(self) is DbConditionInstance:
             raise TypeError(
                 "DbConditionInstance cannot be instantiated directly; "
@@ -137,6 +138,7 @@ class DbConditionCombine(DbConditionInstance):
     children: list[DbConditionInstance] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        """Validate that ``condition_type`` is ``And`` or ``Or``."""
         super().__post_init__()
         if self.condition_type not in _COMBINE_ALLOWED:
             raise ValueError(
@@ -168,6 +170,7 @@ class DbConditionComparison(DbConditionInstance):
     key: Optional[str] = field(default=None)
 
     def __post_init__(self) -> None:
+        """Validate that ``condition_type`` is a supported comparison type."""
         super().__post_init__()
         if self.condition_type not in _COMPARISON_ALLOWED:
             raise ValueError(
@@ -217,6 +220,7 @@ class DbConditionArrayComparison(DbConditionInstance):
     mode: DbConditionMode = DbConditionMode.Property
 
     def __post_init__(self) -> None:
+        """Validate that ``condition_type`` is a supported array comparison type."""
         super().__post_init__()
         if self.condition_type not in _ARRAY_COMPARISON_ALLOWED:
             raise ValueError(
@@ -245,6 +249,7 @@ class DbConditionLink(DbConditionInstance):
     link_condition: DbConditionInstance = field(default=None)  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
+        """Validate that ``link_condition`` is provided."""
         super().__post_init__()
         if self.link_condition is None:
             raise TypeError("DbConditionLink requires a 'link_condition'.")

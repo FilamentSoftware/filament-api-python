@@ -68,6 +68,7 @@ def _unwrap_optional(tp: ProperType) -> ProperType:
 
 
 def _is_comparable(tp: ProperType) -> bool:
+    """Return ``True`` if *tp* is one of the known comparable scalar types."""
     return isinstance(tp, Instance) and tp.type.fullname in _COMPARABLE_FULLNAMES
 
 
@@ -95,6 +96,7 @@ class FilamentConditionPlugin(Plugin):
     def get_method_hook(
         self, fullname: str
     ) -> Optional[Callable[[MethodContext], MypyType]]:
+        """Return the hook for ``Condition.prop()`` if *fullname* matches."""
         if fullname == _PROP_FULLNAME:
             return self._prop_hook
         return None

@@ -47,6 +47,7 @@ def snake_case_from_camel_case(s: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _is_optional(tp: Any) -> bool:
+    """Return ``True`` if *tp* is ``Optional[X]`` (i.e. ``Union[X, None]``)."""
     origin = get_origin(tp)
     if origin is Union:
         return type(None) in get_args(tp)
@@ -56,10 +57,12 @@ def _is_optional(tp: Any) -> bool:
 
 
 def _unwrap_optional(tp: Any) -> Any:
+    """Extract the inner type from ``Optional[X]``."""
     return next(a for a in get_args(tp) if a is not type(None))
 
 
 def _is_uuid_type(tp: Any) -> bool:
+    """Return ``True`` if *tp* is ``uuid_utils.UUID``."""
     try:
         return tp is uuid_utils.UUID
     except TypeError:
@@ -67,6 +70,7 @@ def _is_uuid_type(tp: Any) -> bool:
 
 
 def _is_enum_type(tp: Any) -> bool:
+    """Return ``True`` if *tp* is an :class:`~enum.Enum` subclass."""
     try:
         return isinstance(tp, type) and issubclass(tp, Enum)
     except TypeError:
@@ -74,6 +78,7 @@ def _is_enum_type(tp: Any) -> bool:
 
 
 def _is_dataclass_type(tp: Any) -> bool:
+    """Return ``True`` if *tp* is a dataclass class (not an instance)."""
     try:
         return isinstance(tp, type) and is_dataclass(tp)
     except TypeError:
@@ -115,11 +120,13 @@ def _resolve_entity_type(type_name: str) -> Optional[type]:
 
 
 def _is_list_like(tp: Any) -> bool:
+    """Return ``True`` if *tp* is ``list[X]`` or ``Sequence[X]``."""
     origin = get_origin(tp)
     return origin is list or origin is ABCSequence
 
 
 def _is_dict_like(tp: Any) -> bool:
+    """Return ``True`` if *tp* is ``dict[K, V]``."""
     return get_origin(tp) is dict
 
 
@@ -180,6 +187,11 @@ def _convert_to_dict_value(
     generic_type_arg: Any,
     convert_uuid: bool,
 ) -> Any:
+    """Recursively convert a Python value to its wire-format representation.
+
+    Handles ``Optional``, ``TypeVar``, dataclasses, lists, dicts, enums,
+    UUIDs, and datetimes.
+    """
     # Optional[X] -> unwrap
     if _is_optional(field_type):
         inner = _unwrap_optional(field_type)
@@ -255,6 +267,11 @@ def _convert_from_dict_value(
     field_type: Any,
     generic_type_arg: Any,
 ) -> Any:
+    """Recursively convert a wire-format value back to its Python representation.
+
+    Handles ``Optional``, ``TypeVar``, dataclasses (with ``$type`` dispatch),
+    lists, dicts, enums, UUIDs, datetimes, and primitive coercion.
+    """
     # Optional[X] -> unwrap
     if _is_optional(field_type):
         inner = _unwrap_optional(field_type)

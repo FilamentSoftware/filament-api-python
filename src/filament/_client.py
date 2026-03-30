@@ -59,6 +59,15 @@ class FilamentClient:
         port: int = _DEFAULT_PORT,
         path: str = _DEFAULT_PATH,
     ) -> None:
+        """Initialise the client.
+
+        :param organization_id: The Filament organization to connect to.
+        :param api_key_name: Name of the API key used for authentication.
+        :param api_key: Secret value of the API key.
+        :param server: Base URL of the Filament backend server.
+        :param port: Port number the backend listens on.
+        :param path: URL path prefix for the SignalR hub endpoint.
+        """
         self._api_key_name = api_key_name
         self._authentication_failed = False
         self._auth_message: Optional[str] = None
@@ -114,6 +123,11 @@ class FilamentClient:
     # ------------------------------------------------------------------
 
     async def __aenter__(self) -> FilamentClient:
+        """Open the SignalR connection.
+
+        Raises :class:`FilamentAuthenticationError` if the server rejects
+        the API key during the connection handshake.
+        """
         await self._client.__aenter__()
         if self._authentication_failed:
             await self._client.__aexit__(None, None, None)
@@ -128,6 +142,7 @@ class FilamentClient:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
+        """Close the SignalR connection."""
         await self._client.__aexit__(exc_type, exc_val, exc_tb)
 
     # ------------------------------------------------------------------
@@ -135,11 +150,13 @@ class FilamentClient:
     # ------------------------------------------------------------------
 
     async def _handle_authentication_failed(self, message: str = "") -> None:
+        """Record an ``AuthenticationFailed`` event from the server."""
         logger.error("Authentication failed: %s", message)
         self._authentication_failed = True
         self._auth_message = message
 
     async def _handle_data_updated(self, data: Any) -> None:
+        """Deserialize a ``DataUpdated`` event and fan out to all matching callbacks."""
         try:
             update = from_dict(data, ServiceDataUpdate)
         except (TypeError, ValueError, KeyError):
@@ -166,6 +183,7 @@ class FilamentClient:
                         )
 
     async def _handle_processing_started(self, data: Any) -> None:
+        """Deserialize a ``ProcessingStarted`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
         except (TypeError, ValueError, KeyError):
@@ -180,6 +198,7 @@ class FilamentClient:
                 logger.exception("Error in ProcessingStarted callback")
 
     async def _handle_processing_completed(self, data: Any) -> None:
+        """Deserialize a ``ProcessingCompleted`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
         except (TypeError, ValueError, KeyError):
@@ -194,6 +213,7 @@ class FilamentClient:
                 logger.exception("Error in ProcessingCompleted callback")
 
     async def _handle_processing_failed(self, data: Any) -> None:
+        """Deserialize a ``ProcessingFailed`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
         except (TypeError, ValueError, KeyError):
@@ -208,8 +228,7 @@ class FilamentClient:
                 logger.exception("Error in ProcessingFailed callback")
 
     async def _handle_keep_alive(self, data: Any) -> None:
-        # Handled internally — not exposed to users.
-        pass
+        """Handle a ``KeepAlive`` heartbeat from the server (no-op)."""
 
     # ------------------------------------------------------------------
     # Event callback registration
@@ -387,6 +406,7 @@ class FilamentClient:
         return _error_result_public("Failed to deserialize UnsubscribeAll response")
 
 def _deserialization_error() -> ValueOrErrorPublic_1[Any]:
+    """Return a failed ``ValueOrErrorPublic_1`` for deserialization failures."""
     return ValueOrErrorPublic_1(
         success=False,
         message="Failed to deserialize server response",
@@ -396,6 +416,7 @@ def _deserialization_error() -> ValueOrErrorPublic_1[Any]:
 
 
 def _error_result_public(message: str) -> SuccessOrErrorPublic:
+    """Return a failed ``SuccessOrErrorPublic`` with the given message."""
     return SuccessOrErrorPublic(
         success=False,
         message=message,

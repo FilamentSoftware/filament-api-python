@@ -103,6 +103,7 @@ def _resolve_type_hints(cls: type[Any]) -> dict[str, Any]:
 
 
 def _is_optional(tp: Any) -> bool:
+    """Return ``True`` if *tp* is ``Optional[X]`` (i.e. ``Union[X, None]``)."""
     origin = get_origin(tp)
     if origin is Union:
         return type(None) in get_args(tp)
@@ -112,6 +113,7 @@ def _is_optional(tp: Any) -> bool:
 
 
 def _unwrap_optional(tp: Any) -> Any:
+    """Extract the inner type from ``Optional[X]``."""
     return next(a for a in get_args(tp) if a is not type(None))
 
 
@@ -174,12 +176,21 @@ class DbConditionProperty(Generic[T]):
         *,
         _invert: bool = False,
     ) -> None:
+        """Initialise the property wrapper.
+
+        :param wire_name: The camelCase property name used in the wire format.
+        :param mode: Condition mode (property, dictionary key/value, etc.).
+        :param key: Optional dictionary key for ``DictionaryValue`` mode.
+        :param _invert: If ``True``, conditions produced by this wrapper are
+            automatically wrapped in a ``DbConditionNot``.
+        """
         self._wire_name = wire_name
         self._mode = mode
         self._key = key
         self._invert = _invert
 
     def _wrap(self, condition: DbConditionInstance) -> DbConditionInstance:
+        """Wrap *condition* in a ``DbConditionNot`` if this property is inverted."""
         if self._invert:
             return DbConditionNot(child=condition)
         return condition
@@ -369,6 +380,10 @@ class DbConditionDictProperty(Generic[TKey, TValue]):
     """Typed property wrapper for dict fields — provides key/keys/values accessors."""
 
     def __init__(self, wire_name: str) -> None:
+        """Initialise the dict property wrapper.
+
+        :param wire_name: The camelCase property name used in the wire format.
+        """
         self._wire_name = wire_name
 
     def key(self, key_value: TKey) -> DbConditionProperty[TValue]:
@@ -408,6 +423,11 @@ class Condition(Generic[TEntity]):
     """
 
     def __init__(self, entity_cls: Type[TEntity]) -> None:
+        """Initialise the condition builder for the given entity class.
+
+        :param entity_cls: The dataclass entity type whose fields will be
+            validated when calling :meth:`prop`.
+        """
         self._entity_cls = entity_cls
 
     def prop(self, name: str) -> DbConditionProperty[Any]:

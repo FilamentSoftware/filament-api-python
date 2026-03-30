@@ -1,3 +1,4 @@
+"""Filament Python API — async client for the Filament platform over SignalR."""
 __version__ = "0.0.0-dev"
 
 from typing import Optional, Type, TypeVar
