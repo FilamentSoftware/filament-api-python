@@ -416,3 +416,69 @@ class TestWireFormatEquivalence:
         typed_wire = condition_to_dict(typed)
         assert typed_wire["condition"] == "And"
         assert len(typed_wire["children"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Operator combining (&, |, ~) with typed builder
+# ---------------------------------------------------------------------------
+
+
+class TestOperatorCombiningTyped:
+    def test_and_operator(self) -> None:
+        a = Condition(UserEntity).prop("given_name").equal_to("Alice")
+        b = Condition(UserEntity).prop("schedule_status").equal_to(UserStatusEnum.Enabled)
+        result = a & b
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.And
+        assert len(result.children) == 2
+
+    def test_or_operator(self) -> None:
+        a = Condition(UserEntity).prop("given_name").equal_to("Alice")
+        b = Condition(UserEntity).prop("given_name").equal_to("Bob")
+        result = a | b
+        assert isinstance(result, DbConditionCombine)
+        assert result.condition_type == DbConditionType.Or
+
+    def test_invert_operator(self) -> None:
+        a = Condition(UserEntity).prop("given_name").equal_to("Alice")
+        result = ~a
+        assert isinstance(result, DbConditionNot)
+
+    def test_operator_equivalent_to_static_methods(self) -> None:
+        """& and | produce the same wire format as Condition.and_/or_."""
+        a = Condition(UserEntity).prop("given_name").equal_to("Alice")
+        b = Condition(UserEntity).prop("schedule_status").equal_to(UserStatusEnum.Enabled)
+
+        operator_wire = condition_to_dict(a & b)
+        static_wire = condition_to_dict(Condition.and_(a, b))
+        assert operator_wire == static_wire
+
+        operator_wire = condition_to_dict(a | b)
+        static_wire = condition_to_dict(Condition.or_(a, b))
+        assert operator_wire == static_wire
+
+    def test_precedence_with_typed_builder(self) -> None:
+        """~a | b & c parses as (~a) | (b & c) with typed conditions."""
+        a = Condition(UserEntity).prop("given_name").equal_to("Alice")
+        b = Condition(UserEntity).prop("schedule_status").equal_to(UserStatusEnum.Enabled)
+        c = Condition(TaskEntity).prop("user_count").greater_than(0)
+
+        result = ~a | b & c
+        wire = condition_to_dict(result)
+        assert wire["condition"] == "Or"
+        assert wire["children"][0]["condition"] == "Not"
+        assert wire["children"][1]["condition"] == "And"
+
+    def test_complex_expression(self) -> None:
+        """Real-world-style query using operators."""
+        active = Condition(UserEntity).prop("schedule_status").equal_to(UserStatusEnum.Enabled)
+        alice = Condition(UserEntity).prop("given_name").equal_to("Alice")
+        bob = Condition(UserEntity).prop("given_name").equal_to("Bob")
+
+        result = active & (alice | bob)
+        wire = condition_to_dict(result)
+        assert wire["condition"] == "And"
+        assert wire["children"][0]["condition"] == "EqualTo"
+        assert wire["children"][0]["property"] == "scheduleStatus"
+        assert wire["children"][1]["condition"] == "Or"
+        assert len(wire["children"][1]["children"]) == 2
