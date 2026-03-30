@@ -9,7 +9,7 @@ from typing import Any, Optional, Type, Union
 
 from signalr_async.netcore import Hub, Client
 from signalr_async.netcore.protocols import JsonProtocol
-from uuid_utils import UUID
+from uuid_utils import UUID, uuid7
 
 from filament._exceptions import FilamentAuthenticationError
 from filament._serialization import from_dict, to_dict
@@ -63,8 +63,18 @@ class FilamentClient:
         self._authentication_failed = False
         self._auth_message: Optional[str] = None
 
-        # Subscription routing: subscription UUID -> user callback
-        self._subscriptions: dict[UUID, Callback] = {}
+        # Subscription routing — supports multiple callbacks per backend
+        # subscription.  The backend returns the same subscription ID when
+        # the same type+permissions are subscribed to more than once.  We
+        # generate a unique *client* subscription ID for each ``subscribe``
+        # call so callers can unsubscribe independently.
+        #
+        # backend sub ID  →  set of client sub IDs
+        self._backend_to_client: dict[UUID, set[UUID]] = {}
+        # client sub ID  →  callback
+        self._client_callbacks: dict[UUID, Callback] = {}
+        # client sub ID  →  backend sub ID  (reverse lookup for unsubscribe)
+        self._client_to_backend: dict[UUID, UUID] = {}
 
         # User-registered event callbacks
         self._on_processing_started_callbacks: list[Callback] = []
@@ -139,15 +149,21 @@ class FilamentClient:
             logger.warning("Failed to deserialize DataUpdated payload")
             return
 
-        callback = self._subscriptions.get(update.subscription_id.id)
-        if callback is not None:
-            try:
-                await _invoke_callback(callback, update)
-            except Exception:
-                logger.exception(
-                    "Error in DataUpdated callback for subscription %s",
-                    update.subscription_id.id,
-                )
+        backend_id = update.subscription_id.id
+        client_ids = self._backend_to_client.get(backend_id)
+        if client_ids is not None:
+            for client_id in list(client_ids):
+                callback = self._client_callbacks.get(client_id)
+                if callback is not None:
+                    try:
+                        await _invoke_callback(callback, update)
+                    except Exception:
+                        logger.exception(
+                            "Error in DataUpdated callback for subscription %s"
+                            " (client %s)",
+                            backend_id,
+                            client_id,
+                        )
 
     async def _handle_processing_started(self, data: Any) -> None:
         try:
@@ -274,9 +290,6 @@ class FilamentClient:
             return result
         return _deserialization_error()
 
-    # Reference frontend's connection.ts - might have multiple callbacks with the
-    # same subscription id - need to track them separately
-    # On the frontend, these are component subscription
     async def subscribe(
         self,
         subscription: SubscriptionConfig,
@@ -287,6 +300,12 @@ class FilamentClient:
         The *callback* is called with a :class:`ServiceDataUpdate` argument
         whenever the server sends a ``DataUpdated`` event for this subscription.
         It may be a sync or async callable.
+
+        Returns a client-generated :class:`SubscriptionId`.  Use this ID with
+        :meth:`unsubscribe` to remove the callback.  The backend is always
+        called and may return the same subscription ID for duplicate
+        type/permission combinations.  The backend ``Unsubscribe`` is only
+        sent when the last client subscription sharing a backend ID is removed.
         """
         subscription_dict = to_dict(subscription)
         result_dict: Any = await self._hub.invoke("Subscribe", subscription_dict)
@@ -298,7 +317,23 @@ class FilamentClient:
             return _deserialization_error()
 
         if result.success and result.data is not None:
-            self._subscriptions[result.data.id] = callback
+            backend_id = result.data.id
+            client_id = uuid7()
+
+            # Track the mapping
+            if backend_id not in self._backend_to_client:
+                self._backend_to_client[backend_id] = set()
+            self._backend_to_client[backend_id].add(client_id)
+            self._client_callbacks[client_id] = callback
+            self._client_to_backend[client_id] = backend_id
+
+            # Return the client-generated subscription ID
+            return ValueOrErrorPublic_1(
+                success=result.success,
+                message=result.message,
+                error_code=result.error_code,
+                data=SubscriptionId(id=client_id),
+            )
 
         return result
 
@@ -306,19 +341,46 @@ class FilamentClient:
         self,
         subscription_id: SubscriptionId,
     ) -> SuccessOrErrorPublic:
-        """Cancel a subscription."""
-        subscription_dict = to_dict(subscription_id)
-        result_dict = await self._hub.invoke("Unsubscribe", subscription_dict)
-        self._subscriptions.pop(subscription_id.id, None)
-        result = from_dict(result_dict, SuccessOrErrorPublic)
-        if result is not None:
-            return result
-        return _error_result_public("Failed to deserialize Unsubscribe response")
+        """Cancel a subscription by its client-generated ID.
+
+        The backend ``Unsubscribe`` call is only made when the last client
+        subscription sharing the same backend subscription ID is removed.
+        """
+        client_id = subscription_id.id
+        backend_id = self._client_to_backend.pop(client_id, None)
+        self._client_callbacks.pop(client_id, None)
+
+        if backend_id is not None:
+            client_ids = self._backend_to_client.get(backend_id)
+            if client_ids is not None:
+                client_ids.discard(client_id)
+                if not client_ids:
+                    # Last client for this backend subscription — tell backend
+                    del self._backend_to_client[backend_id]
+                    backend_sub = SubscriptionId(id=backend_id)
+                    result_dict = await self._hub.invoke(
+                        "Unsubscribe", to_dict(backend_sub),
+                    )
+                    result = from_dict(result_dict, SuccessOrErrorPublic)
+                    if result is not None:
+                        return result
+                    return _error_result_public(
+                        "Failed to deserialize Unsubscribe response",
+                    )
+
+        # No backend call needed (or unknown client ID) — return success
+        return SuccessOrErrorPublic(
+            success=True,
+            message="",
+            error_code=ErrorCodes.None_,
+        )
 
     async def unsubscribe_all(self) -> SuccessOrErrorPublic:
         """Cancel all active subscriptions."""
         result_dict = await self._hub.invoke("UnsubscribeAll")
-        self._subscriptions.clear()
+        self._backend_to_client.clear()
+        self._client_callbacks.clear()
+        self._client_to_backend.clear()
         result = from_dict(result_dict, SuccessOrErrorPublic)
         if result is not None:
             return result
