@@ -47,7 +47,7 @@ async def main() -> None:
             user = filament.as_entity(wrapped.entity, UserEntity)
             if user is None:
                 continue
-            name = f"{user.given_name} {user.family_name}".strip()
+            name = f"{user.given_name or ''} {user.family_name or ''}".strip()
             print(f"{name:<30} {user.user_name:<20} {user.email_address}")
 
 

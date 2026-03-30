@@ -16,7 +16,7 @@ from filament.types import (
 
 
 def on_user_updated(update: ServiceDataUpdate) -> None:
-    for type_name, changes in update.modified_entities.items():
+    for changes in update.modified_entities.values():
         for entity in changes.created:
             user = filament.as_entity(entity, UserEntity)
             if user is None:
