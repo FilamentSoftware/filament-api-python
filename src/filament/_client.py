@@ -10,7 +10,7 @@ from types import TracebackType
 from typing import Any, Optional, Type, Union
 
 from pysignalr.client import SignalRClient
-from pysignalr.messages import CompletionMessage
+from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
 
 from filament._exceptions import FilamentAuthenticationError, FilamentConnectionError
@@ -209,13 +209,14 @@ class FilamentClient:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[Any] = loop.create_future()
 
-        async def on_completion(message: CompletionMessage) -> None:
+        async def on_completion(message: Message) -> None:
             if future.done():
                 return
-            if message.error:
-                future.set_exception(Exception(message.error))
-            else:
-                future.set_result(message.result)
+            if isinstance(message, CompletionMessage):
+                if message.error:
+                    future.set_exception(Exception(message.error))
+                else:
+                    future.set_result(message.result)
 
         await self._signalr_client.send(method, list(args), on_invocation=on_completion)
         return await future
@@ -453,6 +454,7 @@ class FilamentClient:
                 success=result.success,
                 message=result.message,
                 error_code=result.error_code,
+                error_id=None,
                 data=SubscriptionId(id=client_id),
             )
 
@@ -494,6 +496,7 @@ class FilamentClient:
             success=True,
             message="",
             error_code=ErrorCodes.None_,
+            error_id=None,
         )
 
     async def unsubscribe_all(self) -> SuccessOrErrorPublic:
@@ -513,6 +516,7 @@ def _deserialization_error() -> ValueOrErrorPublic_1[Any]:
         success=False,
         message="Failed to deserialize server response",
         error_code=ErrorCodes.InternalError,
+        error_id=None,
         data=None,
     )
 
@@ -523,6 +527,7 @@ def _error_result_public(message: str) -> SuccessOrErrorPublic:
         success=False,
         message=message,
         error_code=ErrorCodes.InternalError,
+        error_id=None,
     )
 
 
