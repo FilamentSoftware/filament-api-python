@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Generic, Optional, TypeVar
 
 from uuid_utils import UUID, uuid7
+from filament._specified_properties import SpecifiedPropertiesBase
 
 __all__ = [
     "EntityBase",
@@ -16,7 +17,7 @@ __all__ = [
 ]
 
 @dataclass(kw_only=True)
-class EntityBase:
+class EntityBase(SpecifiedPropertiesBase):
     """
     Base class for all entities in the system.
     

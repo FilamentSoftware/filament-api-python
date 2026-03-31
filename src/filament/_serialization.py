@@ -430,7 +430,7 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
 
     dataclass_data: dict[str, Any] = {}
     for f in dc_fields:
-        if f.metadata.get("ignore", False):
+        if f.metadata.get("ignore", False) or not f.init:
             continue
 
         camel_key = camel_case_from_snake_case(f.name)
@@ -447,4 +447,7 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
 
     result: T = concrete_cls(**dataclass_data)
+    # Clear specified_properties for deserialized entities so all fields serialize.
+    if hasattr(result, "specified_properties"):
+        object.__setattr__(result, "specified_properties", None)
     return result

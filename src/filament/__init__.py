@@ -10,6 +10,7 @@ from filament._exceptions import (
     FilamentConnectionError,
     FilamentError,
 )
+from filament._specified_properties import SpecifiedPropertiesBase
 from filament.types.generated.base.base import EntityBase
 
 _E = TypeVar("_E", bound=EntityBase)
@@ -29,4 +30,5 @@ __all__ = [
     "FilamentAuthenticationError",
     "FilamentConnectionError",
     "FilamentError",
+    "SpecifiedPropertiesBase",
 ]

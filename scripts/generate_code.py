@@ -63,6 +63,8 @@ def main() -> int:
         "--language",
         "python",
         "--exclude-system-types",
+        "--entity-base",
+        "filament._specified_properties.SpecifiedPropertiesBase",
         "-o",
         str(output_path),
     ]
