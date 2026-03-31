@@ -46,6 +46,14 @@ __all__ = [
 ]
 
 class AvailabilityModeEnum(Enum):
+    """
+    An enum to define what affect an <see cref="T:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity" /> has on overall availability.
+    
+    :cvar Unknown: Unknown
+    :cvar Unavailable: This entity defines a time period when the user is specifically unavailable.
+    :cvar Available: This entity defines a time period when the user is specifically available.
+    :cvar AvailableIfRequired: This entity defines a time period when the user is available if required.
+    """
     Unknown = 0
     Unavailable = 1
     Available = 2
@@ -53,6 +61,21 @@ class AvailabilityModeEnum(Enum):
 
 
 class AvailabilityRepeatDaysEnum(Flag):
+    """
+    An enum to reference the days of the week that an <see cref="T:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity" /> repeats on. This enum supports
+    flags, so multiple values can be stored at the same time.
+    
+    :cvar None_: Invalid option - does not repeat on any day.
+    :cvar Monday: Repeats on Mondays.
+    :cvar Tuesday: Repeats on Tuesdays.
+    :cvar Wednesday: Repeats on Wednesdays.
+    :cvar Thursday: Repeats on Thursdays.
+    :cvar Friday: Repeats on Fridays.
+    :cvar Weekdays: Repeats on all weekdays.
+    :cvar Saturday: Repeats on Saturdays.
+    :cvar Sunday: Repeats on Sundays.
+    :cvar Weekend: Repeats on all weekend days.
+    """
     None_ = 0
     Monday = 1 << 1
     Tuesday = 1 << 2
@@ -66,6 +89,16 @@ class AvailabilityRepeatDaysEnum(Flag):
 
 
 class AvailabilityRepeatModeEnum(Enum):
+    """
+    An enum to specify how often an availability should repeat
+    
+    :cvar None_: No repeat.
+    :cvar Day: Repeat each day.
+    :cvar Week: Repeat each week (with optional repeating on multiple days of the week - see
+                <see cref="T:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityRepeatDaysEnum" />).
+    :cvar Month: Repeat each month.
+    :cvar Year: Repeat each year.
+    """
     None_ = 0
     Day = 1
     Week = 2
@@ -74,11 +107,28 @@ class AvailabilityRepeatModeEnum(Enum):
 
 
 class BlockUserReasonEnum(Enum):
+    """
+    Enumerates the possible reasons for blocking a user within the system.
+    
+    :cvar Unknown: Represents an unspecified or unknown reason for blocking a user.
+                   This value typically serves as a default placeholder when the actual
+                   reason for the block has not been determined or documented.
+    :cvar NotAppropriate: Specifies that the user has been flagged as not appropriate to work on this
+                          task.
+    """
     Unknown = 0
     NotAppropriate = 1
 
 
 class ChangedEntityStatus(Enum):
+    """
+    The status of a changed entity.
+    
+    :cvar Unknown: Unknown status.
+    :cvar Created: Entity was created.
+    :cvar Updated: Entity was updated.
+    :cvar Deleted: Entity was deleted.
+    """
     Unknown = 0
     Created = 1
     Updated = 2
@@ -86,22 +136,73 @@ class ChangedEntityStatus(Enum):
 
 
 class ContactType(Enum):
+    """
+    Valid organization contact types.
+    
+    :cvar General: General contact type.
+    :cvar Billing: Billing contact type.
+    :cvar Technical: Technical contact type.
+    """
     General = 0
     Billing = 1
     Technical = 2
 
 
 class CurrencyStatus(Enum):
+    """
+    Defines whether a currency is enabled or disabled.
+    
+    :cvar Disabled: The currency is disabled and not available for use.
+    :cvar Enabled: The currency is enabled and available for use.
+    """
     Disabled = 0
     Enabled = 1
 
 
 class CurrencySymbolPosition(Enum):
+    """
+    Defines the position of the currency symbol relative to the amount.
+    
+    :cvar Before: The currency symbol appears before the amount (e.g., $100).
+    :cvar After: The currency symbol appears after the amount (e.g., 100EUR).
+    """
     Before = 0
     After = 1
 
 
 class DataOptionType(Enum):
+    """
+    The type of data option.
+    
+    :cvar Invalid: Invalid type.
+    :cvar Null: Null type.
+    :cvar String: String type.
+    :cvar Bool: Boolean type.
+    :cvar Int: Integer type.
+    :cvar Double: Double type.
+    :cvar Decimal: Decimal type.
+    :cvar Guid: GUID type.
+    :cvar Instant: Instant type.
+    :cvar Duration: Duration type.
+    :cvar Interval: Interval type.
+    :cvar LocalDateTime: Local date time type.
+    :cvar LocalDate: Local date type.
+    :cvar LocalTime: Local time type.
+    :cvar DateTimeZone: Date time zone type.
+    :cvar StringArray: String array type.
+    :cvar BoolArray: Boolean array type.
+    :cvar IntArray: Integer array type.
+    :cvar DoubleArray: Double array type.
+    :cvar DecimalArray: Decimal array type.
+    :cvar GuidArray: GUID array type.
+    :cvar InstantArray: Instant array type.
+    :cvar DurationArray: Duration array type.
+    :cvar IntervalArray: Interval array type.
+    :cvar LocalDateTimeArray: Local date time array type.
+    :cvar LocalDateArray: Local date array type.
+    :cvar LocalTimeArray: Local time array type.
+    :cvar DateTimeZoneArray: Date time zone array type.
+    """
     Invalid = 0
     Null = 1
     String = 2
@@ -133,6 +234,22 @@ class DataOptionType(Enum):
 
 
 class DataProcessingStatus(Flag):
+    """
+    Represents the status of data processing in the system.
+    
+    :cvar Unknown: Represents an undefined or uninitialized state of data processing.
+                   This status is used when the processing state is not explicitly set or is unknown.
+    :cvar Pending: Indicates that the data processing is queued but has not yet started.
+                   This status represents an initial stage where the processing is awaiting execution.
+    :cvar Processing: Indicates that data is currently undergoing processing.
+                      This status represents an active state where data processing operations are being performed.
+    :cvar Complete: Indicates that data processing has been completed successfully.
+                    This status signifies the final stage where all processing tasks are
+                    finished and the data is ready or has been fully processed.
+    :cvar All: Represents the combined state where all stages of data processing
+               (Pending, Processing, and Complete) are included.
+               This status signifies a scenario where every processing state is jointly applicable.
+    """
     Unknown = 0
     Pending = 1 << 0
     Processing = 1 << 1
@@ -141,6 +258,20 @@ class DataProcessingStatus(Flag):
 
 
 class DataRequestAction(Enum):
+    """
+    Represents the actions that can be performed in a data request.
+    
+    :cvar Unknown: Represents an unspecified or unknown action in a data request.
+                   This is the default value and typically indicates an invalid
+                   or uninitialized action.
+    :cvar Create: Represents the action to create new data within a data request.
+                  This action is used to define that the request intends to add
+                  new entries to a data repository or system.
+    :cvar Update: Represents an action to modify existing data in a data request.
+                  Typically used to update specific properties or entities while retaining the rest of the data unchanged.
+    :cvar Delete: Represents a request to delete data in a data modification action.
+                  This action is used to remove specific entities or data records.
+    """
     Unknown = 0
     Create = 1
     Update = 2
@@ -148,11 +279,66 @@ class DataRequestAction(Enum):
 
 
 class DbOrderDirection(Enum):
+    """
+    The direction for database ordering.
+    
+    :cvar Ascending: Ascending order.
+    :cvar Descending: Descending order.
+    """
     Ascending = 0
     Descending = 1
 
 
 class ErrorCodes(Enum):
+    """
+    Represents a set of predefined error codes that can be used to indicate
+    specific error conditions in the application.
+    
+    :cvar None_: Represents the absence of any error or issue.
+                 This is used as a default or initial state to indicate that
+                 no error condition is present.
+    :cvar NotSupported: Indicates that the operation or functionality being requested
+                        is not supported by the system or the current context.
+                        This error code typically arises when attempting to use a feature
+                        or perform an action that is not implemented or is intentionally
+                        restricted.
+    :cvar InternalError: Represents an internal error within the system.
+                         This error code indicates unexpected or unhandled conditions
+                         that occur within the application, often due to logic faults,
+                         resource issues, or framework-level problems.
+    :cvar SerializationError: Indicates an error related to serialization processes.
+                              This error code represents issues encountered during conversion
+                              of data to or from a serialized format, such as incorrect format,
+                              deserialization failures, or unsupported data structures.
+    :cvar AuthenticationError: Indicates an error related to authentication failures.
+                               This error code represents issues such as invalid credentials,
+                               expired authentication tokens, or incorrect authentication mechanisms.
+    :cvar PermissionDenied: Indicates that the requested operation or access was denied due to insufficient permissions.
+                            This error code is used to signify a lack of authorization or access rights for the current user or process.
+    :cvar ScenarioError: Represents an error related to the execution or processing of a specific scenario.
+                         This error code is used to identify issues that occur in scenario-based workflows or operations.
+    :cvar SubscriptionError: Indicates an error related to subscription handling or processes.
+                             This error code typically signifies issues such as subscription failures,
+                             unexpected subscription states, or invalid subscription operations.
+    :cvar RequestError: Indicates an error that occurs due to issues in processing a request.
+                        This error code is typically used when a client request cannot be completed
+                        as expected, often due to malformed requests, unexpected input, or service limitations.
+    :cvar Cancelled: Indicates that an operation was cancelled prior to completion.
+                     This error code is used when a process is explicitly interrupted
+                     or terminated by a user or system action.
+    :cvar NotReady: Indicates that the operation or resource is not in a state ready to proceed.
+                    This error code is used to signify that certain preconditions or preparations are incomplete or missing.
+    :cvar NoData: Indicates that no data is available for the requested operation or query.
+                  This error code can be used to signal situations where the system
+                  was unable to retrieve or find the required data.
+    :cvar ConnectionError: Represents an error condition that occurs during connection attempts or operations.
+                           This error code is used to indicate failures or issues related to establishing or maintaining a connection.
+    :cvar TypeError: Represents an error condition that occurs when there is a mismatch or invalid type detected.
+                     This error code is used to indicate issues arising from improper or unexpected type usage.
+    :cvar RateLimitExceeded: Indicates that the API key has exceeded its configured rate limit.
+                             This error code is used when too many requests have been made within
+                             the rate limit window.
+    """
     None_ = 0
     NotSupported = 1
     InternalError = 2
@@ -171,21 +357,52 @@ class ErrorCodes(Enum):
 
 
 class Industry(Enum):
+    """
+    An enum that defines valid training methods
+    
+    :cvar VisualEffects: Visual Effects industry.  This is the default.
+    :cvar Development: Software development industry.
+    """
     VisualEffects = 0
     Development = 1
 
 
 class NameOrder(Enum):
+    """
+    Specifies the order in which names should be displayed.
+    
+    :cvar GivenNameFirst: Indicates that the given name (first name) should be displayed before
+                          the family name (last name) when ordering or presenting names.
+    :cvar FamilyNameFirst: Indicates that the family name (last name) should be displayed before
+                           the given name (first name) when ordering or presenting names.
+    """
     GivenNameFirst = 0
     FamilyNameFirst = 1
 
 
 class NoteUserConnectionType(Enum):
+    """
+    Represents the type of connection a user has to a note.
+    
+    :cvar To: The user is the primary recipient of the note.
+    :cvar Cc: The user is a secondary recipient of the note.
+    """
     To = 0
     Cc = 1
 
 
 class PermissionAction(Flag):
+    """
+    An enum (supporting flags) for the action that is allowed by each Permission entity
+    
+    :cvar None_: No permission action.
+    :cvar Create: Permission to create entities.
+    :cvar Read: Permission to read entities.
+    :cvar Update: Permission to update entities.
+    :cvar PropertyAll: All property-level permission actions (Create, Read, Update).
+    :cvar Delete: Permission to delete entities.
+    :cvar All: All permission actions (Create, Read, Update, Delete).
+    """
     None_ = 0
     Create = 1 << 0
     Read = 1 << 1
@@ -196,18 +413,42 @@ class PermissionAction(Flag):
 
 
 class PermissionType(Enum):
+    """
+    The type of permission.
+    
+    :cvar None_: No permission type.
+    :cvar Entity: Entity permission.
+    :cvar Scenario: Scenario permission.
+    """
     None_ = 0
     Entity = 1
     Scenario = 2
 
 
 class ReadMode(Enum):
+    """
+    Specifies the mode for reading data from the database.
+    
+    :cvar Data: Read the actual data records.
+    :cvar Count: Read only the count of matching records.
+    :cvar Distinct: Read distinct values for specified properties.
+    """
     Data = 0
     Count = 1
     Distinct = 2
 
 
 class RequestStatus(Enum):
+    """
+    The status of a request.
+    
+    :cvar Unknown: Unknown status.
+    :cvar Pending: Request is pending.
+    :cvar Processing: Request is being processed.
+    :cvar Completed: Request has been completed.
+    :cvar Failed: Request has failed.
+    :cvar Cancelled: Request has been cancelled.
+    """
     Unknown = 0
     Pending = 1
     Processing = 2
@@ -217,6 +458,14 @@ class RequestStatus(Enum):
 
 
 class ScenarioEventAction(Enum):
+    """
+    Specifies the possible actions that can be performed on a scenario event.
+    
+    :cvar Unknown: Represents an action for a scenario event that is not explicitly defined or recognized.
+    :cvar Create: Represents an action to create a new scenario event or related entities.
+    :cvar Update: Represents an action to update an existing scenario event, modifying its attributes or related data.
+    :cvar Delete: Represents an action to remove or delete entities within a scenario event.
+    """
     Unknown = 0
     Create = 1
     Update = 2
@@ -224,6 +473,15 @@ class ScenarioEventAction(Enum):
 
 
 class ScenarioServiceTypeEnum(Enum):
+    """
+    Specifies the type of scenario service behavior for data propagation and synchronization.
+    
+    :cvar None_: No scenario service type specified.
+    :cvar Source: The service acts as a source of scenario data.
+    :cvar Propagate: The service propagates scenario data to downstream services.
+    :cvar Live: The service operates on live data.
+    :cvar LivePropagate: The service operates on live data and propagates changes to downstream services.
+    """
     None_ = 0
     Source = 1
     Propagate = 2
@@ -232,12 +490,45 @@ class ScenarioServiceTypeEnum(Enum):
 
 
 class ScenarioStatus(Enum):
+    """
+    The status of a scenario.
+    
+    :cvar Creating: Scenario is being created.
+    :cvar RequiresPropagation: Scenario requires propagation.
+    :cvar UpToDate: Scenario is up to date.
+    """
     Creating = 0
     RequiresPropagation = 1
     UpToDate = 2
 
 
 class ScheduleSegmentModeEnum(Enum):
+    """
+    Represents the mode of a schedule segment within the scheduling system.
+    
+    :cvar Unknown: Represents an undefined or unknown mode for a schedule segment.
+                   This value is typically used as a default or placeholder when the mode
+                   of the segment is not explicitly set or cannot be determined.
+    :cvar Work: Represents a mode in which the schedule segment is allocated
+                for performing work-related tasks. This mode is used to designate
+                time periods where core operational activities are carried out.
+    :cvar Buffer: Represents a buffer mode for a schedule segment.
+                  This mode is used to allocate time specifically designated
+                  as a buffer or transitional period, separate from active work
+                  or processing segments.
+    :cvar Processing: Represents a mode where a schedule segment is designated for processing operations.
+                      This time is considered background processing, and is not assigned to a user.
+    :cvar Group: Represents a mode indicating a grouped or collective category for a schedule segment.
+                 This value is used when the segment is intended to encapsulate or represent multiple
+                 related segments or activities typically treated collectively.
+    :cvar User: Represents a user-defined mode for a schedule segment.
+                This value allows customization or designation of a segment
+                based on user-specific requirements or configurations within the scheduling system.
+    :cvar Meeting: Represents a schedule segment designated for meetings.
+                   This mode is used to allocate time specifically for meetings within the scheduling system.
+    :cvar TimeLog: Represents a schedule segment that corresponds to logged time.
+                   This mode is used to indicate time that has already been worked and recorded via a TimeLogEntity.
+    """
     Unknown = 0
     Work = 1
     Buffer = 2
@@ -249,22 +540,60 @@ class ScheduleSegmentModeEnum(Enum):
 
 
 class ScopeGroupChildType(Enum):
+    """
+    Represents the different types of child elements that a scope group can contain.
+    
+    :cvar Group: Children of this group should be another group.
+    :cvar Item: Children of this group should be scope items.
+    """
     Group = 0
     Item = 1
 
 
 class ScopeMilestoneDirectionEnum(Enum):
+    """
+    Defines the direction of a scope milestone.
+    
+    :cvar StartAfter: Indicates that connected tasks must start after the milestone.
+    :cvar EndBefore: Indicates that connected tasks must end before the milestone.
+    """
     StartAfter = 0
     EndBefore = 1
 
 
 class ScopeTaskTypeComplexitySource(Enum):
+    """
+    The source of the complexity data for a task type connection.
+    
+    :cvar None_: No complexity data is provided.  The task should not be added.
+    :cvar TaskTypeComplexity: The complexity data is provided by the task type.
+    :cvar Custom: The complexity data is provided by a custom complexity entity.
+    """
     None_ = 0
     TaskTypeComplexity = 1
     Custom = 2
 
 
 class ScopeType(Enum):
+    """
+    Represents the type or category of a scope within the system.
+    
+    :cvar Film: Represents a scope type that signifies work related to film productions
+                in the system.
+    :cvar Episodic: Represents a scope type that signifies work related to episodic productions,
+                    such as television series or web series, within the system.
+    :cvar Commercial: Represents a scope type that signifies work related to commercial projects
+                      in the system.
+    :cvar Pipeline: Represents a scope type that signifies work related to pipeline processes
+                    or workflows within the system.
+    :cvar Development: Represents a scope type that signifies development-related work
+                       within the system. This may encompass activities such as creating,
+                       enhancing, or maintaining software, tools, or workflows.
+    :cvar ResearchAndDevelopment: Represents a scope type that signifies work related to research and development
+                                  activities within the system.
+    :cvar Other: Represents a scope type that does not fall under predefined categories
+                 in the system, allowing for custom or miscellaneous classifications.
+    """
     Film = 0
     Episodic = 1
     Commercial = 2
@@ -275,28 +604,83 @@ class ScopeType(Enum):
 
 
 class SubscriptionMode(Flag):
+    """
+    Represents the mode of a subscription, defining the types of updates
+    that the subscription should receive. Each mode can be combined using bitwise operations
+    by leveraging the <see cref="T:System.FlagsAttribute" />.
+    
+    :cvar None_: Represents the absence of a subscription mode. When the mode is set to <c>None</c>,
+                 the subscription will not receive any updates or notifications.
+    :cvar Data: Represents a subscription mode that allows receiving updates related to data changes,
+                including creation, updates, or deletion of entities.
+    :cvar Progress: Represents a subscription mode where updates related to the progress of an operation
+                    or a process are received. When this mode is enabled, the subscription will include
+                    notifications or updates indicating changes in progress or status.
+    """
     None_ = 0
     Data = 1 << 0
     Progress = 1 << 1
 
 
 class TaskDependencyOverrideIncludeState(Enum):
+    """
+    Specifies the possible states for including or excluding a task dependency override.
+    
+    :cvar Default: The override should use the default (inherited) include state.
+    :cvar Include: The override is specifying that this dependency should be explicitly included.
+    :cvar Exclude: The override is specifying that this dependency should be explicitly excluded.
+    """
     Default = 0
     Include = 1
     Exclude = 2
 
 
 class TaskDependencyOverrideOverlapState(Enum):
+    """
+    Specifies the possible states for the overlap proportion in a task dependency override.
+    
+    :cvar Default: The overlap should be the default (inherited) overlap.
+    :cvar Custom: The overlap should be a custom overlap as defined by this override.
+    """
     Default = 0
     Custom = 1
 
 
 class TaskMilestoneDirectionEnum(Enum):
+    """
+    Defines the direction of a task milestone, specifying whether the milestone is
+    to start after or end before a designated point in time or task scheduling.
+    
+    :cvar StartAfter: Represents a task milestone direction where the milestone is configured
+                      to start at or after a designated point in time. This is generally used
+                      to ensure that dependent tasks or deadlines begin no earlier than the
+                      specified milestone.
+    :cvar EndBefore: Represents a task milestone direction where the milestone is configured
+                     to end at or before a designated point in time. This is typically used
+                     to ensure that dependent tasks or deadlines conclude no later than the
+                     specified milestone.
+    """
     StartAfter = 0
     EndBefore = 1
 
 
 class TaskStatusEnum(Enum):
+    """
+    Represents the status of a task within the workflow or process lifecycle.
+    
+    :cvar InProgress: Indicates that a task is currently in progress and actively being worked on.
+                      This status reflects that the task is not yet completed but has transitioned
+                      from an initial or awaiting state to active execution.
+    :cvar Processing: Represents a status where the task is undergoing processing. This indicates that
+                      the task is actively being handled by the system or a workflow stage, but is not
+                      yet in a completed or finalized state.
+    :cvar RequiresReview: Indicates that a task requires review before proceeding further in the workflow.
+                          This status reflects that the task has reached a completion or checkpoint
+                          where evaluation, validation, or approval is necessary.
+    :cvar Finished: Represents a task that has been completed successfully. This status indicates
+                    that all necessary work associated with the task has been finalized and no further
+                    actions are required.
+    """
     InProgress = 0
     Processing = 1
     RequiresReview = 2
@@ -304,33 +688,81 @@ class TaskStatusEnum(Enum):
 
 
 class TimeLogModeEnum(Enum):
+    """
+    Represents the mode of a time log entry, indicating what type of activity was logged.
+    
+    :cvar Work: The time log represents productive work time.
+                Work mode time logs create corresponding schedule segments.
+    :cvar Break: The time log represents a break period.
+                 Break mode time logs mark the user as unavailable but do not create schedule segments.
+    """
     Work = 0
     Break = 1
 
 
 class TimeLogStatusEnum(Enum):
+    """
+    Represents the status of a time log entry.
+    
+    :cvar Pending: The time log is pending and has not yet been submitted.
+                   Pending time logs are not processed by the scheduler.
+    :cvar Submitted: The time log has been submitted and is ready for processing.
+                     Only submitted time logs are synchronized with the schedule.
+    """
     Pending = 0
     Submitted = 1
 
 
 class TrainingType(Enum):
+    """
+    An enum that defines valid training methods
+    
+    :cvar OnTheJob: Represents training conducted directly in a practical work environment, where
+                    skills are acquired through hands-on tasks and real-world application.
+                    Often involves learning while performing job-related duties.
+    :cvar WithMentor: Represents training conducted with the guidance and support of a mentor,
+                      where the mentor facilitates the learning process by providing expertise,
+                      personalized feedback, and hands-on oversight to enhance the learner's skills and knowledge.
+    """
     OnTheJob = 0
     WithMentor = 1
 
 
 class UserAddressType(Enum):
+    """
+    An enum that defines valid types of addresses.
+    
+    :cvar Home: Represents a home address.
+    :cvar Business: Represents a business address.
+    :cvar Other: Represents an address of another type.
+    """
     Home = 0
     Business = 1
     Other = 2
 
 
 class UserEmailType(Enum):
+    """
+    Enum that defines valid email address types.
+    
+    :cvar Home: Represents a home email address.
+    :cvar Business: Represents a business email address.
+    :cvar Other: Represents an email address of another type.
+    """
     Home = 0
     Business = 1
     Other = 2
 
 
 class UserPhoneType(Enum):
+    """
+    An enum that defines valid phone number types.
+    
+    :cvar Home: Represents a home phone number.
+    :cvar Business: Represents a business phone number.
+    :cvar Mobile: Represents a mobile phone number.
+    :cvar Other: Represents a phone number of another type.
+    """
     Home = 0
     Business = 1
     Mobile = 2
@@ -338,10 +770,22 @@ class UserPhoneType(Enum):
 
 
 class UserStatusEnum(Enum):
+    """
+    Indicates the operational status of a user within the system.
+    
+    :cvar Disabled: Represents a user status indicating that the user account is inactive or unavailable for use within the system.
+    :cvar Enabled: Indicates that the user is currently active and operational within the system.
+    """
     Disabled = 0
     Enabled = 1
 
 
 class UserTypeEnum(Enum):
+    """
+    Defines the type of user within the system.
+    
+    :cvar Internal: Represents a user who operates within the organization, such as an employee.
+    :cvar External: Represents a user who operates outside of the organization, such as a client.
+    """
     Internal = 0
     External = 1

@@ -15,6 +15,22 @@ __all__ = [
 
 @dataclass
 class TaskStatusEntity(Entity):
+    """
+    Represents the status entity for a task, defined as a sidecar entity
+    associated with <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
+    
+    :param status: The status of the task as defined by the <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEnum" /> enumeration.
+                   This property represents the current phase or state of a task within its lifecycle, such as
+                   InProgress, Processing, RequiresReview, or Finished.
+    :param block_user_ids: The collection of user identifiers associated with their corresponding
+                           blocking reasons, as specified in the <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.BlockUserReasonEnum" /> enumeration.
+                           This property is used to track which users have been blocked and the reasons for their block status
+                           in the context of a task's lifecycle.
+    :param override_review_tags: A collection of tags used to override the default review process for a task.
+                                 If a task has override review tags, it won't be placed into the standard review
+                                 slot, but will instead find the first review slot that matches one of these tags.
+    :param processing_duration: Represents the estimated processing duration required until the task is finished.
+    """
     status: TaskStatusEnum = TaskStatusEnum.InProgress
     block_user_ids: dict[UUID, BlockUserReasonEnum] = field(default_factory=dict)
     override_review_tags: list[str] = field(default_factory=list)

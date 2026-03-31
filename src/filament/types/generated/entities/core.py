@@ -22,6 +22,20 @@ __all__ = [
 
 @dataclass
 class ErrorEntity(Entity):
+    """
+    Represents an error that has occurred, including details such as message, error code, and stack trace.
+    
+    :param original_tenant_id: Identifies the unique identifier of the tenant associated with the original source
+                               of the error. This property is used to trace the origin of the error
+                               in multi-tenant environments.
+    :param message: Describes the textual information associated with the error entity.
+                    Typically provides a human-readable description or details about the error.
+    :param error_code: Represents the specific code that categorizes the type of error encountered.
+                       Used for defining error types in a structured and identifiable manner.
+    :param stack_trace: Contains the stack trace information related to the error.
+                        Typically used for debugging purposes to trace the sequence of method calls
+                        that led to the error, providing insight into its origin and context.
+    """
     original_tenant_id: UUID = field(default_factory=uuid7)
     message: str = field(default_factory=str)
     error_code: ErrorCodes = ErrorCodes.None_
@@ -30,6 +44,16 @@ class ErrorEntity(Entity):
 
 @dataclass
 class RequestEntity(Entity):
+    """
+    Represents a request entity in the system.
+    
+    :param sequence: The sequence number of the request.
+    :param requested_at: When the request was requested.
+    :param status: The status of the request.
+    :param error_message: Error message if the request failed.
+    :param affected_entities: List of affected entity IDs.
+    :param request_data: The serialized request data associated with this entity.
+    """
     sequence: int = 0
     requested_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     status: RequestStatus = RequestStatus.Unknown
@@ -40,6 +64,15 @@ class RequestEntity(Entity):
 
 @dataclass
 class EventLogEntity(Entity):
+    """
+    Represents an event log entry created when data is processed.
+    
+    :param sequence: The sequence number of the event log entry. Monotonically increasing.
+    :param entity_type_name: The name of the entity type that was affected.
+    :param action: The action that was performed (Create, Update, Delete).
+    :param entity_ids: The IDs of the entities that were affected.
+    :param property_names: The names of the properties that were modified (for Update actions).
+    """
     sequence: int = 0
     entity_type_name: str = field(default_factory=str)
     action: DataRequestAction = DataRequestAction.Unknown
@@ -49,6 +82,17 @@ class EventLogEntity(Entity):
 
 @dataclass
 class ScenarioEntity(Entity):
+    """
+    Represents a scenario entity.
+    
+    :param name: The name of the scenario.
+    :param description: The description of the scenario.
+    :param status: The status of the scenario.
+    :param owner_user_id: The user ID of the owner.
+    :param shared_user_ids: List of user IDs that share this scenario.
+    :param parent_id: The parent scenario ID.
+    :param parent: Represents the parent scenario entity linked to this entity.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     status: ScenarioStatus = ScenarioStatus.Creating
@@ -60,12 +104,44 @@ class ScenarioEntity(Entity):
 
 @dataclass
 class ScenarioServiceEntity(Entity):
+    """
+    Represents a specialized entity that encompasses the properties and behavior
+    specific to a scenario service within the application context.
+    
+    :param service_name: The name of the service associated with the scenario.
+    :param service_type: Specifies the type of the service associated with the scenario.
+    """
     service_name: str = field(default_factory=str)
     service_type: ScenarioServiceTypeEnum = ScenarioServiceTypeEnum.None_
 
 
 @dataclass
 class ScenarioEventEntity(Entity):
+    """
+    Represents an event that is part of a scenario, providing contextual information
+    for processing and applying actions to entities within a scenario.
+    
+    :param service_name: Represents the name of the service associated with the scenario event.
+                         This property is used to store the service type or identifier that is
+                         relevant for the context of the event.
+    :param primary_entity_type_name: Represents the type name of the primary entity associated with a scenario event.
+                                     This property is used to identify the main entity that the event refers to,
+                                     often enabling precise filtering and categorization of scenario events.
+    :param entity_type_name: Represents the type or category of an entity associated with a scenario event.
+                             This property is used to identify and group entities by their classifications
+                             within the context of scenario processing.
+    :param user_id: Specifies the unique identifier of the user associated with the scenario event.
+                    This property is used to track the user responsible for the event or associated with it,
+                    enabling audit trails and contextual processing of events.
+    :param is_connection: Indicates whether the event is related to a connection operation.
+                          This property is used to identify if the scenario event is associated
+                          with connecting or linking entities within the scenario.
+    :param action: Specifies the action to be applied to an entity within the context of a scenario event.
+                   This property identifies the type of operation (e.g., create, update, delete) associated
+                   with the event.
+    :param data: Stores serialized JSON data representing a collection of entities or
+                 other relevant information for processing in a scenario event.
+    """
     service_name: str = field(default_factory=str)
     primary_entity_type_name: str = field(default_factory=str)
     entity_type_name: str = field(default_factory=str)
@@ -77,6 +153,19 @@ class ScenarioEventEntity(Entity):
 
 @dataclass
 class ChangedEntity(Entity):
+    """
+    Represents a changed entity in the system.
+    
+    :param primary_entity_type_name: The primary entity type name.
+    :param entity_type_name: The entity type name.
+    :param is_connection: Whether this is a connection.
+    :param from_id: The from ID (for connections).
+    :param to_id: The to ID (for connections).
+    :param entity_data: The entity data as JSON.
+    :param status: The status of the change.
+    :param updated_properties: List of updated property names.
+    :param is_new: Whether this entity is new.
+    """
     primary_entity_type_name: str = field(default_factory=str)
     entity_type_name: str = field(default_factory=str)
     is_connection: bool = field(default_factory=bool)

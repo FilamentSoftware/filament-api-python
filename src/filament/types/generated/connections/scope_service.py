@@ -11,5 +11,12 @@ __all__ = [
 
 @dataclass
 class ScopeUserConnection(EntityConnection):
+    """
+    Represents a connection between a scope and a user.
+    
+    :param role: What role this user has.
+    :param responsible: Is this user responsible over all for this scope entity? Will they review it? Will they
+                        approve it?
+    """
     role: str = field(default_factory=str)
     responsible: bool = field(default_factory=bool)

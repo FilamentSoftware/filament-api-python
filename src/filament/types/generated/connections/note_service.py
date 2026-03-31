@@ -12,5 +12,11 @@ __all__ = [
 
 @dataclass
 class NoteUserConnection(EntityConnection):
+    """
+    Represents a connection between a note and a user, defining the relationship and properties of the connection.
+    
+    :param has_read: Has this user read the note?
+    :param type: What type of connection is this?  To or Cc?
+    """
     has_read: bool = field(default_factory=bool)
     type: NoteUserConnectionType = NoteUserConnectionType.To

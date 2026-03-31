@@ -18,6 +18,27 @@ __all__ = [
 
 @dataclass
 class ScopeCostEntity(ReferenceEntityBase):
+    """
+    Represents a scope cost entity that includes chargeable and estimated costs,
+    as well as contextual references to related entities.
+    
+    :param context_type: Represents the type of the context associated with the scope cost.
+                         Typically stores the name of the entity type that the context refers to.
+    :param context_id: Represents the unique identifier for the associated context entity linked to the scope cost.
+    :param instance: Whether or not this entity is referring to a specific instance of the referenced entity,
+                     or the entity as a whole. This is used when referencing a ScopeItemEntity with a Count &gt; 1.
+                     The ScopeCostEntity with Instance set to false will be the cost of all of the instances
+                     of the ScopeItemEntity, and the ScopeCostEntity with Instance set to true will be the cost
+                     of a single instance of the ScopeItemEntity.
+    :param context: A helper method for setting the context type and id.
+    :param chargeable_direct: The chargeable cost of this item directly.  This does not include the chargeable amount of any dependents.
+    :param chargeable_dependent: The chargeable cost of this item's dependents.
+    :param estimated_cost_direct: The estimated cost of this item directly.  This does not include the estimated cost of any dependents.
+    :param estimated_cost_dependent: The estimated cost of this item's dependents.
+    :param currency_id: The resolved currency for this cost calculation.
+                        Determined from the currency of the item the cost is for.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     context_type: str = field(default_factory=str)
     context_id: UUID = field(default_factory=uuid7)
     instance: bool = field(default_factory=bool)

@@ -16,6 +16,18 @@ __all__ = [
 
 @dataclass
 class NoteEntity(Entity):
+    """
+    A note entity that can be attached to any other entity.
+    
+    :param from_user_id: The unique identifier of the user who this note is from.
+    :param from_user: The user who this note is from.
+    :param title: The title of the note.
+    :param content: The content of the note.
+    :param checklist: A list of checklist items for this note.
+    :param on_id: The id of the entity this note is on.
+    :param on_type: The type of the entity this note is on.
+    :param on: The entity this note is on.
+    """
     from_user_id: UUID = field(default_factory=uuid7)
     from_user: Optional[UserEntity] = field(default=None)
     title: str = field(default_factory=str)

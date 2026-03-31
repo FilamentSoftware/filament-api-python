@@ -17,6 +17,15 @@ __all__ = [
 
 @dataclass
 class CurrencyEntity(Entity):
+    """
+    An entity that represents a currency used within an organization.
+    
+    :param symbol: The symbol used to represent this currency (e.g., $, EUR, GBP).
+    :param code: The ISO 4217 currency code (e.g., USD, EUR, GBP).
+    :param decimal_points: The number of decimal points used when displaying amounts in this currency.
+    :param symbol_position: Whether the currency symbol appears before or after the amount.
+    :param status: Whether the currency is enabled or disabled.
+    """
     symbol: str = field(default_factory=str)
     code: str = field(default_factory=str)
     decimal_points: int = 0
@@ -26,6 +35,17 @@ class CurrencyEntity(Entity):
 
 @dataclass
 class CurrencyRateEntity(Entity):
+    """
+    An entity that represents an exchange rate for a currency at a specific point in time.
+    
+    :param currency_id: A link to the currency this rate applies to.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    :param start_instant: The instant from which this rate is effective.
+    :param rate: The exchange rate relative to an arbitrary fixed point.
+                 This is most likely to be relative to the organization's default currency,
+                 but if it is not, then the relationship between a currency and the organization's
+                 default currency will be calculated.
+    """
     currency_id: UUID = field(default_factory=uuid7)
     currency: Optional[CurrencyEntity] = field(default=None)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)

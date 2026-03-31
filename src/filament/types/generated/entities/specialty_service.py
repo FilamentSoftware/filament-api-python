@@ -11,6 +11,13 @@ __all__ = [
 
 @dataclass
 class SpecialtyEntity(Entity):
+    """
+    Represents a specialty within an organization.
+    
+    :param name: A single word name for the specialty. This is analogous to a department name.
+    :param description: A description of what this specialty covers.
+    :param sort_order: Represents the ordering of the specialty entity in the context of sorting operations.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     sort_order: int = 0

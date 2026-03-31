@@ -15,6 +15,20 @@ __all__ = [
 
 @dataclass
 class ScopeEntity(Entity):
+    """
+    Represents a specific entity with associated metadata and behaviors, categorized by its scope type.
+    
+    :param name: The name of the scope/project.
+    :param description: A description of the scope/project.
+    :param scope_type: The type of project this is.  This will be used to auto set up some aspects of the project.
+    :param image_link: A link to an image to use when referencing this Scope
+    :param task_duration_multiplier: An overall multiplier that applies to all task durations. This allows a project to effectively
+                                     adjust the duration of all tasks in one place.
+    :param chargeable_multiplier: An overall multiplier on chargeable costs. This is used to set global discounts for an entire project.
+    :param currency_id: The currency used for this scope's monetary values.
+                        This is not an EntityLinkProperty because this type is in FSCore, and CurrencyEntity
+                        is in CoreServices.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     scope_type: ScopeType = ScopeType.Film

@@ -13,9 +13,9 @@ __all__ = [
 
 @dataclass
 class UserSkillConnection(GenericUserSkillConnection_1[UserEntity]):
-    pass
+    """Represents a connection between a user and a skill, including the user's proficiency level."""
 
 
 @dataclass
 class UserPermissionsRoleConnection(PermissionsRoleConnectionBase_1[UserEntity]):
-    pass
+    """Represents a connection between a user and a permissions role within a specific context."""

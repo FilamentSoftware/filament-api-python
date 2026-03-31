@@ -33,11 +33,30 @@ TCustomComplexityEntity = TypeVar("TCustomComplexityEntity", bound=GenericComple
 
 @dataclass
 class TaskDependencyConnectionBase_2(EntityConnection, Generic[TFromEntity, TToEntity]):
+    """
+    Represents a base class for task dependency connections.
+    
+    :param overlap_proportion: The proportion tasks can overlap the connected task type. This is used when building task templates to
+                               automatically determine the upstream and downstream dependencies between different tasks.
+                               
+                               For example if you had an OverlapProportion of 0.5 between a lighting and compositing task type,
+                               Filament would connect step 3 of the lighting task to step 1 of the compositing task (assuming the
+                               dependency chain was: Lighting ---(0.5)--- Compositing ).
+    """
     overlap_proportion: float = 0.0
 
 
 @dataclass
 class PermissionsRoleConnectionBase_1(EntityConnection, Generic[TFromEntity]):
+    """
+    Abstract base class for connections between an entity and a permissions role within a specific context.
+    
+    :param context_type: Specifies the type of context in which the permissions role connection is applicable.
+    :param context_id: Represents the unique identifier for the specific context in which the
+                       permissions role connection is applicable.
+    :param context: Represents the context associated with the permissions role connection,
+                    defining the specific scope or domain where the connection is applicable.
+    """
     context_type: Optional[str] = field(default=None)
     context_id: Optional[UUID] = field(default=None)
     context: Optional[ScopeEntity] = field(default=None)
@@ -45,12 +64,29 @@ class PermissionsRoleConnectionBase_1(EntityConnection, Generic[TFromEntity]):
 
 @dataclass
 class GenericSkillConnection_1(EntityConnection, Generic[TEntity]):
+    """
+    Represents a generic connection between an entity and a skill entity.
+    
+    :param context_ids: List of context-skill Guid
+    :param contexts: Set ContextIds property by passing in context Entities for type-safety.
+    """
     context_ids: list[UUID] = field(default_factory=list)
     contexts: Optional[list[SkillEntity]] = field(default=None)
 
 
 @dataclass
 class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TCustomComplexityEntity]):
+    """
+    Represents a connection between a generic scope entity and a task type entity.
+    
+    :param add_to_dependent: If AddToDependent is true, this task should be added to any dependant item not to this item itself
+    :param complexity_source: Where the duration of this task is determined.  It can be a custom amount or from the Complexity
+                              linked to the task.
+    :param complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to <see cref="F:Filament.Services.CoreServices.Entities.Other.ScopeTaskTypeComplexitySource.TaskTypeComplexity" />.
+    :param complexity: A helper method for setting the complexity id.
+    :param custom_complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to <see cref="F:Filament.Services.CoreServices.Entities.Other.ScopeTaskTypeComplexitySource.Custom" />.
+    :param custom_complexity: A helper method for setting the custom complexity id.
+    """
     add_to_dependent: bool = field(default_factory=bool)
     complexity_source: ScopeTaskTypeComplexitySource = ScopeTaskTypeComplexitySource.None_
     complexity_id: Optional[UUID] = field(default=None)
@@ -61,17 +97,36 @@ class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TC
 
 @dataclass
 class TaskDependencyOverrideConnectionBase_2(TaskDependencyConnectionBase_2[TFromEntity, TToEntity], Generic[TFromEntity, TToEntity]):
+    """
+    Represents a base class for task dependency override connections.
+    
+    :param include_state: Should this connection be included?
+    :param overlap_state: Does this connection contain a custom overlap that should be applied?
+    """
     include_state: TaskDependencyOverrideIncludeState = TaskDependencyOverrideIncludeState.Default
     overlap_state: TaskDependencyOverrideOverlapState = TaskDependencyOverrideOverlapState.Default
 
 
 @dataclass
 class GenericUserSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TEntity]):
+    """
+    Represents a generic connection between an entity and a skill entity with user-related functionality.
+    
+    :param level: The level of the user's skill.
+    """
     level: int = 0
 
 
 @dataclass
 class GenericTaskSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TEntity]):
+    """
+    Represents a generic connection between an entity and a skill entity with task-related functionality.
+    
+    :param min_skill_level: The minimum skill level required for the task.
+    :param max_skill_level: The maximum skill level allowed for the task.
+    :param primary_skill: Is this the primary skill used for the task? Used to determine what skills are being fed back
+                          on by the machine learning system.
+    """
     min_skill_level: int = 0
     max_skill_level: int = 0
     primary_skill: bool = field(default_factory=bool)

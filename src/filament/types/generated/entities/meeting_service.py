@@ -17,6 +17,21 @@ __all__ = [
 
 @dataclass
 class MeetingEntity(Entity):
+    """
+    Represents a meeting entity, including details such as name, description, duration, owner,
+    start time constraints, time zone, and related review task configurations.
+    
+    :param name: The name/title of the meeting.
+    :param description: The description of what the meeting is about.
+    :param duration: The expected duration of the meeting.
+    :param owner_user_id: The id of the user that is responsible for the meeting.
+    :param owner_user: A helper property for setting the <property cref="P:Filament.Services.CoreServices.Entities.MeetingService.MeetingEntity.OwnerUserId" /> property.
+    :param earliest_start_date_time: The earliest time the meeting can start.
+    :param latest_start_date_time: The latest time the meeting can start.
+    :param date_time_zone: What time zone the meeting is being called under.
+    :param review_task_groups: A list of all review tasks group that this meeting will use to auto generate a task review list.
+    :param include_review_task_users: Should the users who created content to be reviewed be automatically invited to the meeting?
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -31,6 +46,15 @@ class MeetingEntity(Entity):
 
 @dataclass
 class MeetingAgendaItemEntity(Entity):
+    """
+    Represents an agenda item within a meeting.
+    
+    :param meeting_id: Represents the unique identifier of the meeting associated with the agenda item.
+    :param meeting: A helper property for setting MeetingId. Pass in a MeetingEntity type.
+    :param title: The agenda item title
+    :param description: A more detailed description of the agenda item.
+    :param priority: The priority of this item in the agenda.
+    """
     meeting_id: UUID = field(default_factory=uuid7)
     meeting: Optional[MeetingEntity] = field(default=None)
     title: str = field(default_factory=str)

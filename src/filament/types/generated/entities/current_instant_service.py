@@ -13,9 +13,21 @@ __all__ = [
 
 @dataclass
 class CurrentInstantEntity(Entity):
+    """
+    Represents an entity that encapsulates the current instant in time.
+    
+    :param current_instant: Represents the current instant in time associated with the entity.
+                            This property is used to capture a specific point in time, typically for
+                            tracking or temporal comparisons.
+    """
     current_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
 
 
 @dataclass
 class CurrentInstantSettingsEntity(Entity):
+    """
+    Represents settings for the Current Instant service.
+    
+    :param update_period: The period at which the current instant should be updated.
+    """
     update_period: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())

@@ -24,6 +24,26 @@ __all__ = [
 
 @dataclass
 class PlaceholderUserEntity(Entity):
+    """
+    Represents a placeholder user entity with associated properties and behaviors,
+    including office location linkage and a specified time interval.
+    
+    :param name: The name of the placeholder user entity.
+                 This property represents a string value used to identify or label the entity.
+    :param office_location_id: The identifier for the office location associated with the placeholder user entity.
+                               This property links the entity to a specific <see cref="T:Filament.Services.CoreServices.Entities.OrganizationService.OfficeLocationEntity" />.
+    :param office_location: The office location associated with the placeholder user entity.
+                            This property establishes a relationship with a specific <see cref="T:Filament.Services.CoreServices.Entities.OrganizationService.OfficeLocationEntity" />
+                            and facilitates the linkage to its identifier.
+    :param primary_specialty_id: The unique identifier for the primary specialty associated with the placeholder user entity.
+                                 This property links the user entity to a specific specialty through a relational reference.
+    :param primary_specialty: Represents the primary specialty associated with the placeholder user entity.
+                              This property links the entity to a specialty definition in the domain model.
+    :param start_instant: Represents the starting point in time for the associated placeholder user entity's schedule.
+                          This property is updated dynamically based on the earliest task start time linked to the entity.
+    :param end_instant: Specifies the end point in time for the placeholder user's schedule or availability.
+                        This property is typically updated based on task data associated with the entity.
+    """
     name: str = field(default_factory=str)
     office_location_id: UUID = field(default_factory=uuid7)
     office_location: Optional[OfficeLocationEntity] = field(default=None)
@@ -35,6 +55,18 @@ class PlaceholderUserEntity(Entity):
 
 @dataclass
 class ScheduleResultEntity(Entity):
+    """
+    Represents the results of a scheduling process within the scheduling service.
+    
+    :param schedule_start_instant: The start instant of the scheduling process.
+    :param schedule_end_instant: The end instant of the scheduling process.
+    :param milestones_missed: A dictionary representing the milestones that were not achieved during the scheduling process,
+                              keyed by their unique identifiers, with the associated missed duration for each milestone.
+    :param early_placeholder_users: A dictionary containing placeholder user ids that were required to start earlier than the expected
+                                    earliest start time, with the associated instant representing the earliest start time required.
+    :param scores: A dictionary representing scores associated with various items, identified by a string key and paired with a double value.
+    :param combined_score: Represents the combined score computed from individual scores, utilized for evaluating the overall performance or outcome.
+    """
     schedule_start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     milestones_missed: dict[UUID, datetime.timedelta] = field(default_factory=dict)
@@ -45,6 +77,17 @@ class ScheduleResultEntity(Entity):
 
 @dataclass
 class ScheduleMilestoneEntity(ReferenceEntityBase):
+    """
+    Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks.
+    
+    :param name: The given name for this milestone.
+    :param description: The description of this milestone
+    :param instant: The moment in time this milestone is due. If this is null, then the milestone does not have a fixed instant,
+                    as there are no upstream tasks that are connected to it, and the referenced milestone is flexible.
+    :param delayed_by: The duration that this milestone has been delayed by. If this is null, then the milestone has not been delayed,
+                       or this milestone does not have a specific instant.
+    :param direction: Should tasks start after this milestone or end before it?
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     instant: Optional[datetime.datetime] = field(default=None)
@@ -54,6 +97,34 @@ class ScheduleMilestoneEntity(ReferenceEntityBase):
 
 @dataclass
 class ScheduleSegmentEntity(ReferenceEntityBase):
+    """
+    Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships.
+    
+    :param name: The name of the schedule segment. Represents a descriptive or identifying title for the segment.
+    :param description: A brief textual explanation or characterization of the schedule segment.
+                        Provides additional context or details about the segment.
+    :param reasons_data: A descriptive field that provides justification or explanation related to the schedule segment,
+                         stored as a serialized JSON string.
+    :param start_instant: Represents the starting point in time for the schedule segment as an instant.
+                          This property defines the exact timestamp from which the segment begins.
+    :param end_instant: The end time of the schedule segment, represented as an instant in time.
+                        Defines the point at which this segment concludes.
+    :param user_type: Specifies the type of user associated with the schedule segment.
+                      Represents a categorization or classification of the user, such as regular user, placeholder, etc.
+    :param user_id: Represents the unique identifier of the user associated with a schedule segment.
+                    This property is used to link the schedule segment to a specific user entity within the system.
+    :param user: Represents an entity related to the schedule segment, associated via a user type and user identifier.
+                 Used to establish and manage a link to the corresponding user or entity providing context or ownership for the schedule segment.
+    :param mode: The mode of the schedule segment, specifying its functional purpose within the schedule.
+                 Possible values include Unknown, Work, Buffer, Processing, Group, User, and Meeting.
+    :param parent_ids: The identifier of the parent segments associated with the current schedule segment entity.
+                       Used to establish hierarchical relationships between segments.
+    :param parents: The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment.
+    :param time_log_id: The identifier of the time log entry associated with this schedule segment.
+                        This is used to link logged work time segments back to their source time log.
+    :param time_log: The time log entry associated with this schedule segment.
+                     Used to conveniently link a segment to its source time log.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     reasons_data: str = field(default_factory=str)

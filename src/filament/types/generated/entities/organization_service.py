@@ -21,6 +21,17 @@ __all__ = [
 
 @dataclass
 class OrganizationEntity(Entity):
+    """
+    An entity that represents an organization.
+    
+    :param name: The name of the organization or legal entity using Filament.
+    :param description: A description of the company itself. What it does, industry, history.
+    :param industry: What industry this company is operating in. This will be used to set the default data
+                     being imported into the database for this organization.
+    :param currency_id: The default currency for this organization. All monetary values will be displayed
+                        in this currency unless overridden at a more specific level.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     industry: Industry = Industry.VisualEffects
@@ -30,6 +41,18 @@ class OrganizationEntity(Entity):
 
 @dataclass
 class TaxCreditLocationEntity(Entity):
+    """
+    A geographic or political location defined by its inclusion in a tax credit policy.
+    This could be for Visual Effects tax rebates, research tax credits or any other form
+    of tax credit that might apply to work produced.
+    
+    :param organization_id: A link to the organization this belongs to.
+    :param organization: A helper method for setting the OrganizationId property.  Pass in a OrganizationEntity type.
+    :param name: A readable name for the tax location.
+    :param code: Tax location code for brevity.
+    :param currency_id: The currency used at this tax credit location.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     organization_id: UUID = field(default_factory=uuid7)
     organization: Optional[OrganizationEntity] = field(default=None)
     name: str = field(default_factory=str)
@@ -40,6 +63,21 @@ class TaxCreditLocationEntity(Entity):
 
 @dataclass
 class OfficeLocationEntity(AddressEntityBase):
+    """
+    An entity that describes any office locations this company has.  This is distinct
+    from their tax credit locations as it is possible to have multiple offices in a single
+    tax credit area.
+    
+    :param organization_id: A link to the organization this belongs to.
+    :param organization: A helper method for setting the OrganizationId property.  Pass in a OrganizationEntity type.
+    :param name: A readable name for the office location.
+    :param code: Office location code for brevity.
+    :param date_time_zone: The time zone that local times should be calculated based on.
+    :param location_minimum_wage_per_hour: The legal minimum wage in this office location.
+    :param standard_working_day_duration: The length of the standard working day at this office location.
+    :param currency_id: The currency used at this office location.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     organization_id: UUID = field(default_factory=uuid7)
     organization: Optional[OrganizationEntity] = field(default=None)
     name: str = field(default_factory=str)
@@ -53,6 +91,16 @@ class OfficeLocationEntity(AddressEntityBase):
 
 @dataclass
 class OrganizationContactEntity(Entity):
+    """
+    A contact entity linked to a specific organization.
+    
+    :param organization_id: A link to the organization this belongs to.
+    :param organization: A helper method for setting the OrganizationId property.  Pass in a OrganizationEntity type.
+    :param name: The name of the contact. For example, Marketing, Press, General.
+    :param email_address: The email address for this contact.
+    :param phone_number: The phone number for this contact.
+    :param contact_type: What type of contact is this?
+    """
     organization_id: UUID = field(default_factory=uuid7)
     organization: Optional[OrganizationEntity] = field(default=None)
     name: str = field(default_factory=str)

@@ -19,34 +19,54 @@ __all__ = [
 
 @dataclass
 class TaskDependencyConnection(EntityConnection):
-    pass
+    """Represents a connection that defines a dependency relationship between two task entities."""
 
 
 @dataclass
 class TaskGroupConnection(EntityConnection):
-    pass
+    """
+    Represents a connection between a task entity and a task group entity.
+    This class is a specialization of <see cref="T:Filament.FSCore.Entities.EntityConnection`2" /> to handle
+    connections specifically between <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" /> and <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />.
+    Implements the <see cref="T:System.IEquatable`1" /> interface for equality checks.
+    """
 
 
 @dataclass
 class TaskGroupParentConnection(EntityConnection):
-    pass
+    """Represents a connection between a task group entity and its parent task group entity."""
 
 
 @dataclass
 class TaskGroupLevelParentConnection(EntityConnection):
-    pass
+    """Represents a connection between two instances of TaskGroupLevelEntity, establishing a parent-child relationship at the task group level."""
 
 
 @dataclass
 class TaskMilestoneConnection(EntityConnection):
-    pass
+    """
+    Represents a connection between a TaskEntity and a TaskMilestoneEntity.
+    Used to define and manage the association between tasks and their respective milestones.
+    This class extends from the EntityConnection generic base class and implements equality checks.
+    """
 
 
 @dataclass
 class TaskSkillConnection(GenericTaskSkillConnection_1[TaskEntity]):
-    pass
+    """
+    Represents a specific connection between a task and a skill,
+    extending functionality of a generic task-skill connection.
+    This class provides equality checks suited for TaskSkillConnection objects.
+    """
 
 
 @dataclass
 class TaskOfficeLocationConnection(EntityConnection):
+    """
+    Represents a connection between a task and an office location within the system, extending the EntityConnection functionality.
+    
+    :param priority: Represents the priority of the task-office location connection.
+                     This value determines the priority level associated with the connection
+                     between a task and an office location.
+    """
     priority: int = 0

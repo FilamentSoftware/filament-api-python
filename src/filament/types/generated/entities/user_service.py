@@ -24,6 +24,38 @@ __all__ = [
 
 @dataclass
 class UserEntity(UserBaseEntity):
+    """
+    A user entity that gives basic details about a user of the system..
+    
+    :param schedule_status: Represents whether the user should be included in schedules or not.
+    :param user_type: Whether this user is an internal or external user
+    :param given_name: The given name for this user.
+    :param middle_names: The middle name for this user.
+    :param family_name: The family name for this user.
+    :param preferred_name: The user's preferred name.
+    :param name_display_order: The order the user prefers to have their name displayed.
+    :param user_name: The username.
+    :param password: Represents the user's password, used for authentication purposes.
+                     This property is marked as write-only to ensure secure handling and to restrict retrieval of its value.
+    :param email_address: Represents the primary email address associated with the user.
+                          Used as a primary means of electronic communication for the user.
+    :param pronouns: The pronouns this user perfers to use.
+    :param image_link: Link path to the user profile image.
+    :param name: Gets the full name of the user formatted based on the specified display order.
+                 Includes the given name, optional middle names, and family name
+                 displayed in either "Given Name First" or "Family Name First" order.
+    :param tax_credit_location_id: The Guid for the TaxCreditLocationEntity that defines where this user us based
+                                   from a tax credit perspective.
+    :param office_location_id: The Guid for the OfficeLocationEntity that defines which office this user works out of.
+    :param tax_credit_location: A helper method for setting the TaxCreditLocationId.
+    :param office_location: A helper method for setting the OfficeLocationId.
+    :param primary_specialty_id: The Guid for the primary specialty for this user as calculated when skills are updated.
+    :param primary_specialty: A helper method for setting the PrimarySpecialtyId
+    :param compensation_per_hour_suggested: This is a suggested compensation for the user calculated based on their current skills and
+                                            skill levels.
+    :param currency_id: The currency this user's monetary values are denominated in.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     schedule_status: UserStatusEnum = UserStatusEnum.Disabled
     user_type: UserTypeEnum = UserTypeEnum.Internal
     given_name: str = field(default_factory=str)
@@ -50,6 +82,13 @@ class UserEntity(UserBaseEntity):
 
 @dataclass
 class UserAddressEntity(AddressEntityBase):
+    """
+    An address entity linked to a specific user.
+    
+    :param user_id: The UserID that this address belongs to.
+    :param user: A helper method for setting the UserId property.  Pass in a UserEntity.
+    :param user_address_type: The address for this address. One of Home, Business or Other.
+    """
     user_id: UUID = field(default_factory=uuid7)
     user: Optional[UserEntity] = field(default=None)
     user_address_type: UserAddressType = UserAddressType.Home
@@ -57,6 +96,13 @@ class UserAddressEntity(AddressEntityBase):
 
 @dataclass
 class UserPhoneEntity(PhoneEntityBase):
+    """
+    Phone number linked to a specific user.
+    
+    :param user_id: The ID of the user this phone number belongs to.
+    :param user: A helper method for setting the UserId property. Pass in a UserEntity.
+    :param user_phone_type: The type of phone number. Home, Business or Other.
+    """
     user_id: UUID = field(default_factory=uuid7)
     user: Optional[UserEntity] = field(default=None)
     user_phone_type: UserPhoneType = UserPhoneType.Home
@@ -64,6 +110,13 @@ class UserPhoneEntity(PhoneEntityBase):
 
 @dataclass
 class UserEmailEntity(EmailEntityBase):
+    """
+    An email addressed linked to a specific user.
+    
+    :param user_id: User ID that this email address is linked to.
+    :param user: A helper method for setting the UserId property.  Pass in a UserEntity type.
+    :param user_email_type: This describes the type of email address this is. Home, Work or Other.
+    """
     user_id: UUID = field(default_factory=uuid7)
     user: Optional[UserEntity] = field(default=None)
     user_email_type: UserEmailType = UserEmailType.Home
@@ -71,6 +124,17 @@ class UserEmailEntity(EmailEntityBase):
 
 @dataclass
 class UserCompensationEntity(Entity):
+    """
+    An email addressed linked to a specific user.
+    
+    :param user_id: User ID that this email address is linked to.
+    :param user: A helper method for setting the UserId property.  Pass in a UserEntity type.
+    :param compensation_per_hour: The hourly compensation this user receives.  Used to calculate estimated and actual
+                                  costs.
+    :param start_instant: The instant in time this compensation came into force.
+    :param currency_id: The currency this compensation is denominated in.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     user_id: UUID = field(default_factory=uuid7)
     user: Optional[UserEntity] = field(default=None)
     compensation_per_hour: float = 0.0

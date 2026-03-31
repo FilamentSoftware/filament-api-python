@@ -12,4 +12,4 @@ __all__ = [
 
 @dataclass
 class ApiKeyPermissionsRoleConnection(PermissionsRoleConnectionBase_1[ApiKeyEntity]):
-    pass
+    """Represents a connection between an authenticated API key and a permissions role within a specific context."""

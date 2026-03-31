@@ -17,6 +17,23 @@ __all__ = [
 
 @dataclass
 class ActualEntity(ReferenceEntityBase):
+    """
+    Defines actual time and cost spent on a task and details of when it was started and finished.
+    
+    :param user_id: The unique identifier of the user associated with this entity.
+    :param user: The user associated with this entity.
+    :param duration: Represents the total time duration spent on a specific task or activity.
+    :param processing_duration: The duration of additional processing associated with the task.
+    :param proportion: The proportion that this task is complete.
+    :param costs_by_currency_rate_id: The monetary costs attributed to this task, keyed by CurrencyRateEntity ID.
+                                      Each entry represents a cost amount at a specific currency rate.
+    :param currency_id: The resolved currency for this cost calculation.
+                        Determined from the organization's default currency.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    :param total_reference_cost: The total cost in the organization's default (reference) currency.
+    :param start_instant: The instant (UTC) when work on the task started.
+    :param end_instant: The instant (UTC) when work on the task finished.
+    """
     user_id: UUID = field(default_factory=uuid7)
     user: Optional[UserEntity] = field(default=None)
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())

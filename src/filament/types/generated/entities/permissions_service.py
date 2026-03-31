@@ -16,6 +16,15 @@ __all__ = [
 
 @dataclass
 class PermissionsRoleEntity(Entity):
+    """
+    Represents a role that defines permissions within the system.
+    
+    :param name: The role's name, used to uniquely identify the role within the system.
+    :param description: Additional details or explanation about the role's purpose or usage.
+    :param context_type: The type of the context entity that this role should be associated with.
+    :param level: The level of this role, which can be used to determine whether a user has permission to assign it
+    :param inferred_role_ids: A list of role identifiers that are inferred based on the context or hierarchy of the current role.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     context_type: Optional[str] = field(default=None)
@@ -25,6 +34,19 @@ class PermissionsRoleEntity(Entity):
 
 @dataclass
 class PermissionEntity(Entity):
+    """
+    Represents a permission entity.
+    
+    :param permissions_role_id: Identifier for the associated PermissionsRoleEntity, linking a permission to a specific role.
+    :param permissions_role: Represents the associated role for a specific permission in the system.
+    :param permission_type: The type of permission.
+    :param type_name: The type name this permission applies to.
+    :param action: The permission actions allowed.
+    :param properties: The list of properties this permission applies to.
+    :param condition_data: Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic.
+    :param super_admin: Whether this permission grants super admin access.
+    :param organization_admin: Whether this permission grants organization admin access.
+    """
     permissions_role_id: UUID = field(default_factory=uuid7)
     permissions_role: Optional[PermissionsRoleEntity] = field(default=None)
     permission_type: PermissionType = PermissionType.None_

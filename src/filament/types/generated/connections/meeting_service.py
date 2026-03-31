@@ -11,5 +11,11 @@ __all__ = [
 
 @dataclass
 class MeetingUserConnection(EntityConnection):
+    """
+    Represents a connection between a meeting and a user, defining the relationship and properties of the connection.
+    
+    :param required: Is this user required in the meeting or optional?
+    :param responsible: Is this user responsible for the outcomes of this meeting or not?
+    """
     required: bool = field(default_factory=bool)
     responsible: bool = field(default_factory=bool)

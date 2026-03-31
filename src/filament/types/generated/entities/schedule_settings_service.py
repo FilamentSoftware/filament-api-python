@@ -13,6 +13,15 @@ __all__ = [
 
 @dataclass
 class ScheduleSettingsEntity(Entity):
+    """
+    Represents the settings for a schedule within the scheduling service.
+    
+    :param full_schedule: Run a new full schedule each time.
+    :param usage_smoothing_window: The number of days to smooth the usage data over.
+    :param hiring_delay: How long it will take to hire a new user.
+    :param create_placeholder_users: Whether the system should create placeholder users if there are no available users.
+                                     Even if this is false, if there are no users with all the required skills, placeholder users will be created.
+    """
     full_schedule: bool = field(default_factory=bool)
     usage_smoothing_window: int = 0
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -21,6 +30,19 @@ class ScheduleSettingsEntity(Entity):
 
 @dataclass
 class ScheduleScopeSettingsEntity(Entity):
+    """
+    Represents schedule settings that can be global or could be overridden at a scope level.
+    
+    :param duration_rounding_thresholds: Defines the thresholds used for rounding durations in the schedule.
+    :param near_buffer_distance: Represents the distance from the current time for the near buffer proportions.
+    :param near_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the near distance.
+    :param near_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the near distance.
+    :param near_buffer_max_proportion: The maximum proportion of a task's duration that should be used as buffer at the near distance.
+    :param far_buffer_distance: Represents the distance from the current time for the far min/max buffer proportions.
+    :param far_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the far distance.
+    :param far_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the far distance.
+    :param far_buffer_max_proportion: The maximum proportion of a task's duration that should be used as buffer at the far distance.
+    """
     duration_rounding_thresholds: list[datetime.timedelta] = field(default_factory=list)
     near_buffer_distance: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     near_buffer_min_proportion: float = 0.0

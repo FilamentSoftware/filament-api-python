@@ -12,4 +12,4 @@ __all__ = [
 
 @dataclass
 class SpecialtyDependencyConnection(TaskDependencyConnectionBase_2[SpecialtyEntity, SpecialtyEntity]):
-    pass
+    """Represents a dependency connection between two specialties."""

@@ -18,6 +18,18 @@ __all__ = [
 
 @dataclass
 class ScopeTemplateItemEntity(Entity):
+    """
+    A user entity that gives basic details about a user of the system..
+    
+    :param name: The given name this task type.
+    :param description: A description that describes what this task is.
+    :param has_dependent: Whether this template has tasks that are to be applied to a dependent item
+    :param category_id: A link to a specific category type for this template item (in VFX it might be
+                        "Shot" or "Asset")
+    :param category: A helper method for setting the category.
+    :param currency_id: The currency used for this scope template item's monetary values.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     has_dependent: bool = field(default_factory=bool)
@@ -29,4 +41,4 @@ class ScopeTemplateItemEntity(Entity):
 
 @dataclass
 class ScopeTemplateItemCustomComplexityEntity(GenericComplexityBase):
-    pass
+    """A user entity that gives basic details about a user of the system.."""

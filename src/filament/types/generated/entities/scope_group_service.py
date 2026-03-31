@@ -17,6 +17,17 @@ __all__ = [
 
 @dataclass
 class ScopeGroupLevelEntity(Entity):
+    """
+    Represents an entity defining a level within a scope group hierarchy.
+    The class provides properties to name and describe the hierarchy level,
+    identify its parent level, and manage comparisons and equality checks between entities.
+    
+    :param name: The name of the scope group level.
+    :param description: A brief description of the scope group level
+    :param parent_id: The parent scope group level of this group. This should be of the type ScopeGroupLevelEntity.
+                      Using the helper property will ensure this is the case.
+    :param parent: Represents the parent entity of the current scope group level entity.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     parent_id: Optional[UUID] = field(default=None)
@@ -25,6 +36,23 @@ class ScopeGroupLevelEntity(Entity):
 
 @dataclass
 class ScopeGroupEntity(Entity):
+    """
+    Represents a scope group entity in the system, which contains information about
+    the scope's name, description, parent group, and group level.
+    
+    :param name: The name of the scope group.
+    :param description: A brief description of the scope group
+    :param parent_id: The parent scope group of this group. This should be of the type ScopeGroupEntity. Using the helper
+                      property will ensure this is the case.
+    :param parent: A helper property for setting the parent ID.
+    :param group_level_id: A link to the scope group level
+    :param group_level: A helper property for setting the group level ID.
+    :param child_type: The type of children that this group can contain.
+    :param child_group_level_id: If <see cref="P:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupEntity.ChildType" /> is <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupChildType.Group" />, this is the id of the level that child groups should be.
+    :param child_group_level: If <see cref="P:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupEntity.ChildType" /> is <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupChildType.Group" />, this is the level that child groups should be.
+    :param child_item_category_ids: Represents the collection of category IDs associated with the child items of an entity.
+    :param child_item_categories: A collection representing the categories associated with the child items of an entity.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     parent_id: Optional[UUID] = field(default=None)

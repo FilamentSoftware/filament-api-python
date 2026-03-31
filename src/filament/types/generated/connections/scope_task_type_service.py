@@ -17,19 +17,24 @@ __all__ = [
 
 @dataclass
 class ScopeTaskTypeDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, ScopeTaskTypeEntity]):
-    pass
+    """Represents a dependency connection between two scope task types."""
 
 
 @dataclass
 class ScopeTaskTypeSpecialtyDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, SpecialtyEntity]):
-    pass
+    """Represents a dependency connection between a scope task type and a specialty."""
 
 
 @dataclass
 class ScopeTaskTypeSkillConnection(GenericTaskSkillConnection_1[ScopeTaskTypeEntity]):
-    pass
+    """Represents a connection between a scope task type and a skill."""
 
 
 @dataclass
 class ScopeTaskTypeOfficeLocationConnection(EntityConnection):
+    """
+    Represents a connection between a scope task type and an office location.
+    
+    :param priority: What is the priority order of offices that this task can be assigned to.
+    """
     priority: int = 0

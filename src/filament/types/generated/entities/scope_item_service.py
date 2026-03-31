@@ -20,6 +20,15 @@ __all__ = [
 
 @dataclass
 class ScopeItemNoteEntity(Entity):
+    """
+    Represents a note entity linked to a specific scope item, containing details such as the note's title,
+    content, and information about the associated user.
+    
+    :param title: The title of this note.
+    :param content: This note's content.
+    :param user_id: The id of the user entity that this note was created by.
+    :param user: A helper property for setting the user.
+    """
     title: str = field(default_factory=str)
     content: str = field(default_factory=str)
     user_id: UUID = field(default_factory=uuid7)
@@ -28,11 +37,37 @@ class ScopeItemNoteEntity(Entity):
 
 @dataclass
 class ScopeItemCustomComplexityEntity(GenericComplexityBase):
-    pass
+    """A user entity that gives basic details about a user of the system.."""
 
 
 @dataclass
 class ScopeItemEntity(Entity):
+    """
+    Represents a single item within a scope.
+    
+    :param name: The name of this scope item.
+    :param description: A short description of the item.
+    :param image_link: A link to an image to use when referencing this Scope Item
+    :param category_id: The category of this entity. E.g. Shot, Asset, Development.
+    :param category: A helper method for setting the category id.
+    :param size: The size of this item.   In film this might be the frame count.
+    :param size_multiplier: The multiplier based on the size and reference size of this item.
+    :param count: The total number of items in the collection.
+    :param task_duration_multiplier: This allows fine-grained control over task durations on a per item basis.
+    :param chargeable_multiplier: A multiplier on the chargeable cost for this item.  Used for discounting (or adding surplus) to
+                                  chargeable costs.
+    :param internal_note_id: A link to the internal note for this ScopeItem.
+    :param internal_note: A helper property for setting the internal note.
+    :param client_note_id: A link to the client note for this ScopeItem.
+    :param client_note: A helper property for setting the client note.
+    :param assumptions_calculated: This is a property that gets calculated using the connected task's complexity assumptions fields.
+    :param assumptions_manual: If a user decides to override the calculated assumptions entirely.
+    :param ignore_calculated_assumptions: Whether to ignore the calculated assumptions or use them
+    :param has_dependent: Whether this item has tasks that are to be applied to a dependent item
+    :param currency_id: The currency used for this scope item's monetary values.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    :param lock_upstream: Gets or sets a value indicating whether to lock upstream dependencies.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     image_link: Optional[str] = field(default=None)

@@ -16,6 +16,20 @@ __all__ = [
 
 @dataclass
 class ScopeMilestoneEntity(Entity):
+    """
+    Represents a milestone within a scope.
+    
+    :param name: The name of the milestone.
+    :param description: A description of the milestone.
+    :param instant: The moment in time this milestone begins or ends (depending on its Direction)
+                    If the Instant is null, then it if flexible and can be moved
+    :param direction: Is this a start milestone or a delivery milestone.  StartAfter means connected tasks must start
+                      after the milestone.  EndBefore means the tasks must be finished before this milestone.
+    :param automatically_assign: Automatically assign this milestone based on ScopeTaskTypeIds, ScopeTaskTypeStepIds, and ScopeGroupIds
+    :param scope_task_type_ids: A list of ScopeTaskType entity ids that this milestone should automatically be added to.
+    :param scope_task_type_step_ids: A list of ScopeTaskTypeStep entity ids that this milestone should automatically be added to.
+    :param scope_group_ids: A list of ScopeGroup entity ids that this milestone should automatically be added to.
+    """
     name: str = field(default_factory=str)
     description: str = field(default_factory=str)
     instant: Optional[datetime.datetime] = field(default=None)

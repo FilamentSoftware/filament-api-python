@@ -15,6 +15,14 @@ __all__ = [
 
 @dataclass
 class CastEntity(Entity):
+    """
+    An entity that is used to link together all tasks with the same skill requirements, and allows
+    all users who can work on these tasks to be linked to a single place.
+    
+    :param cast_key: String created from skill and office location data for easy lookup later.
+    :param specialty_id: The id of the specialty that this Cast is most associated with
+    :param specialty: A helper property for setting the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastEntity.SpecialtyId" /> property.
+    """
     cast_key: str = field(default_factory=str)
     specialty_id: UUID = field(default_factory=uuid7)
     specialty: Optional[SpecialtyEntity] = field(default=None)
