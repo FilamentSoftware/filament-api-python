@@ -305,7 +305,7 @@ def _convert_from_dict_value(
                 and issubclass(field_type, EntityBase)
             ):
                 resolved = _resolve_entity_type(data["$type"])
-                if resolved is not None:
+                if resolved is not None and issubclass(resolved, field_type):
                     concrete = resolved
             return from_dict(data, concrete)
         return data
@@ -428,7 +428,7 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
     # EntityBase $type dispatch: resolve concrete subclass if available
     if "$type" in data and isinstance(concrete_cls, type) and issubclass(concrete_cls, EntityBase):
         resolved = _resolve_entity_type(data["$type"])
-        if resolved is not None:
+        if resolved is not None and issubclass(resolved, concrete_cls):
             concrete_cls = resolved
 
     # concrete_cls is verified to be a dataclass class at this point.
