@@ -15,7 +15,7 @@ __all__ = [
     "CurrencyRateEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class CurrencyEntity(Entity):
     """
     An entity that represents a currency used within an organization.
@@ -33,7 +33,7 @@ class CurrencyEntity(Entity):
     status: CurrencyStatus = field(default=CurrencyStatus.Enabled)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CurrencyRateEntity(Entity):
     """
     An entity that represents an exchange rate for a currency at a specific point in time.

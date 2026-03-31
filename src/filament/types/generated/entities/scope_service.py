@@ -13,7 +13,7 @@ __all__ = [
     "ScopeEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeEntity(Entity):
     """
     Represents a specific entity with associated metadata and behaviors, categorized by its scope type.

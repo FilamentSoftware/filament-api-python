@@ -22,7 +22,7 @@ __all__ = [
     "UserCompensationEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class UserEntity(UserBaseEntity):
     """
     A user entity that gives basic details about a user of the system..
@@ -80,7 +80,7 @@ class UserEntity(UserBaseEntity):
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserAddressEntity(AddressEntityBase):
     """
     An address entity linked to a specific user.
@@ -94,7 +94,7 @@ class UserAddressEntity(AddressEntityBase):
     user_address_type: UserAddressType = field(default=UserAddressType.Other)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserPhoneEntity(PhoneEntityBase):
     """
     Phone number linked to a specific user.
@@ -108,7 +108,7 @@ class UserPhoneEntity(PhoneEntityBase):
     user_phone_type: UserPhoneType = field(default=UserPhoneType.Home)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserEmailEntity(EmailEntityBase):
     """
     An email addressed linked to a specific user.
@@ -122,7 +122,7 @@ class UserEmailEntity(EmailEntityBase):
     user_email_type: UserEmailType = field(default=UserEmailType.Home)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserCompensationEntity(Entity):
     """
     An email addressed linked to a specific user.

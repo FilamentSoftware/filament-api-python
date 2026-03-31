@@ -16,7 +16,7 @@ __all__ = [
     "ScopeCostEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeCostEntity(ReferenceEntityBase):
     """
     Represents a scope cost entity that includes chargeable and estimated costs,

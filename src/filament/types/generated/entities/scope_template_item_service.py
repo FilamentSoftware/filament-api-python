@@ -16,7 +16,7 @@ __all__ = [
     "ScopeTemplateItemCustomComplexityEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTemplateItemEntity(Entity):
     """
     A user entity that gives basic details about a user of the system..
@@ -39,6 +39,6 @@ class ScopeTemplateItemEntity(Entity):
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTemplateItemCustomComplexityEntity(GenericComplexityBase):
     """A user entity that gives basic details about a user of the system.."""

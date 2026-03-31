@@ -14,7 +14,7 @@ __all__ = [
     "PermissionEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class PermissionsRoleEntity(Entity):
     """
     Represents a role that defines permissions within the system.
@@ -32,7 +32,7 @@ class PermissionsRoleEntity(Entity):
     inferred_role_ids: list[UUID] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PermissionEntity(Entity):
     """
     Represents a permission entity.

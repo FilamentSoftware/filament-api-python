@@ -15,7 +15,7 @@ __all__ = [
     "EntityConnection_2",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityBase:
     """
     Base class for all entities in the system.
@@ -35,7 +35,7 @@ class EntityBase:
     scope_id: Optional[UUID] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Entity(EntityBase):
     """Base entity class for all non-specific entities."""
 
@@ -43,7 +43,7 @@ TFromEntity = TypeVar("TFromEntity", bound=Entity)
 TToEntity = TypeVar("TToEntity", bound=Entity)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConnectionBase(EntityBase):
     """
     Base class for entity connections.
@@ -59,7 +59,7 @@ class EntityConnectionBase(EntityBase):
     to_entity: Optional[Entity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConnection(EntityConnectionBase):
     """
     Represents a base class for entity connections. This abstract class provides the foundation for creating
@@ -67,7 +67,7 @@ class EntityConnection(EntityConnectionBase):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConnection_2(EntityConnection, Generic[TFromEntity, TToEntity]):
     """
     Defines a generic connection between two entity types, allowing for linking and retrieving "From" and "To" entities.

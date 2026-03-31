@@ -19,7 +19,7 @@ __all__ = [
     "GenericComplexityBase",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class AddressEntityBase(Entity):
     """
     An address entity linked to a specific user.
@@ -39,7 +39,7 @@ class AddressEntityBase(Entity):
     country: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserBaseEntity(Entity):
     """
     Represents the base entity for a user, effectively inheriting from the generic entity structure
@@ -50,7 +50,7 @@ class UserBaseEntity(Entity):
     login_status: UserStatusEnum = field(default=UserStatusEnum.Disabled)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PhoneEntityBase(Entity):
     """
     Phone number linked to a specific user.
@@ -62,7 +62,7 @@ class PhoneEntityBase(Entity):
     extension: Optional[str] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmailEntityBase(Entity):
     """
     An email addressed linked to a specific user.
@@ -72,7 +72,7 @@ class EmailEntityBase(Entity):
     email_address: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReferenceEntityBase(Entity):
     """
     Represents the base class for entities that maintain references
@@ -87,7 +87,7 @@ class ReferenceEntityBase(Entity):
     reference: Optional[EntityBase] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenericComplexityBase(Entity):
     """
     A user entity that gives basic details about a user of the system..

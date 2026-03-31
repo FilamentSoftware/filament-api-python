@@ -18,7 +18,7 @@ __all__ = [
     "ScopeItemEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemNoteEntity(Entity):
     """
     Represents a note entity linked to a specific scope item, containing details such as the note's title,
@@ -35,12 +35,12 @@ class ScopeItemNoteEntity(Entity):
     user: Optional[UserEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemCustomComplexityEntity(GenericComplexityBase):
     """A user entity that gives basic details about a user of the system.."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemEntity(Entity):
     """
     Represents a single item within a scope.

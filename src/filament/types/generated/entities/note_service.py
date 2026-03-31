@@ -14,7 +14,7 @@ __all__ = [
     "NoteEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class NoteEntity(Entity):
     """
     A note entity that can be attached to any other entity.

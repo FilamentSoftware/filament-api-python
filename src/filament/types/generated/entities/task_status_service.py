@@ -13,7 +13,7 @@ __all__ = [
     "TaskStatusEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskStatusEntity(Entity):
     """
     Represents the status entity for a task, defined as a sidecar entity

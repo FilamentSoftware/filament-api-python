@@ -18,7 +18,7 @@ __all__ = [
     "ScopeTaskTypeComplexityEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeEntity(Entity):
     """
     An entity that gives information about a task type that can be used within a scope.
@@ -54,7 +54,7 @@ class ScopeTaskTypeEntity(Entity):
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeStepEntity(Entity):
     """
     Represents a step in a scope task type, defining specific attributes and behaviors such as name, description, sort order,
@@ -83,7 +83,7 @@ class ScopeTaskTypeStepEntity(Entity):
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeComplexityEntity(GenericComplexityBase):
     """
     Represents the complexity entity for a specific scope task type, holding details such as scope task type, name, and description.

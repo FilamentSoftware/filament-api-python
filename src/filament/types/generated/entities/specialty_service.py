@@ -9,7 +9,7 @@ __all__ = [
     "SpecialtyEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class SpecialtyEntity(Entity):
     """
     Represents a specialty within an organization.

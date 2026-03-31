@@ -10,6 +10,6 @@ __all__ = [
     "ScopeTemplateItemTaskTypeConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTemplateItemTaskTypeConnection(GenericScopeTaskTypeConnection_2[ScopeTemplateItemEntity, ScopeTemplateItemCustomComplexityEntity]):
     """Represents a connection between a scope template item and a scope task type."""

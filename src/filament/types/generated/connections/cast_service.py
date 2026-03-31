@@ -14,7 +14,7 @@ __all__ = [
     "CastOfficeLocationConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class CastUserConnection(EntityConnection):
     """
     Represents a connection between a cast and a user with additional properties
@@ -31,7 +31,7 @@ class CastUserConnection(EntityConnection):
     skill_proportion_used: float = field(default=0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CastTaskConnection(EntityConnection):
     """
     Represents a connection between a <see cref="T:Filament.Services.CoreServices.Entities.CastService.CastEntity" /> and a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />
@@ -39,7 +39,7 @@ class CastTaskConnection(EntityConnection):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CastSkillConnection(GenericTaskSkillConnection_1[CastEntity]):
     """
     Represents a specific connection between a cast entity and a skill entity with task-related functionality.
@@ -47,7 +47,7 @@ class CastSkillConnection(GenericTaskSkillConnection_1[CastEntity]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CastOfficeLocationConnection(EntityConnection):
     """
     Represents the relationship between a cast entity and an office location entity.

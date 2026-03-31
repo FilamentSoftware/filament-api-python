@@ -9,7 +9,7 @@ __all__ = [
     "SkillTypeEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class SkillTypeEntity(Entity):
     """
     The SkillTypeEntity defines any potential type that the organization decides to use. These

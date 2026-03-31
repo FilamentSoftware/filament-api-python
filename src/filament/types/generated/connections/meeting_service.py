@@ -9,7 +9,7 @@ __all__ = [
     "MeetingUserConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class MeetingUserConnection(EntityConnection):
     """
     Represents a connection between a meeting and a user, defining the relationship and properties of the connection.

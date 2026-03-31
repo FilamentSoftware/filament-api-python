@@ -15,7 +15,7 @@ __all__ = [
     "TimeLogEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class TimeLogEntity(ReferenceEntityBase):
     """
     Represents a time log entry entity that records a time-related event for a user.

@@ -11,7 +11,7 @@ __all__ = [
     "ApiKeyEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ApiKeyEntity(Entity):
     """
     Represents an API key entity with business configuration for programmatic access.

@@ -11,7 +11,7 @@ __all__ = [
     "ScopeCategoryEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeCategoryEntity(Entity):
     """
     Represents a category of items in the system.

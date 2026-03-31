@@ -11,7 +11,7 @@ __all__ = [
     "ScheduleScopeSettingsEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScheduleSettingsEntity(Entity):
     """
     Represents the settings for a schedule within the scheduling service.
@@ -28,7 +28,7 @@ class ScheduleSettingsEntity(Entity):
     create_placeholder_users: bool = field(default=True)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScheduleScopeSettingsEntity(Entity):
     """
     Represents schedule settings that can be global or could be overridden at a scope level.

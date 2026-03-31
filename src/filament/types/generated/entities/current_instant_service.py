@@ -11,7 +11,7 @@ __all__ = [
     "CurrentInstantSettingsEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class CurrentInstantEntity(Entity):
     """
     Represents an entity that encapsulates the current instant in time.
@@ -23,7 +23,7 @@ class CurrentInstantEntity(Entity):
     current_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CurrentInstantSettingsEntity(Entity):
     """
     Represents settings for the Current Instant service.

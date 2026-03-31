@@ -18,7 +18,7 @@ __all__ = [
     "SkillLevelEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class SkillEntity(Entity):
     """
     Represents a skill entity with properties to define its characteristics, context, and behaviors.
@@ -59,7 +59,7 @@ class SkillEntity(Entity):
     training_material_duration: Optional[datetime.timedelta] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SkillTrainingMaterialEntity(Entity):
     """
     Represents training material for a skill.
@@ -74,7 +74,7 @@ class SkillTrainingMaterialEntity(Entity):
     skill: Optional[SkillEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SkillLevelEntity(Entity):
     """
     Represents a specific level of proficiency for a skill.

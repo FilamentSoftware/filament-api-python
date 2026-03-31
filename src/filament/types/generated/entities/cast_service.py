@@ -13,7 +13,7 @@ __all__ = [
     "CastEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class CastEntity(Entity):
     """
     An entity that is used to link together all tasks with the same skill requirements, and allows

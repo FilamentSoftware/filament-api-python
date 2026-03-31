@@ -17,12 +17,12 @@ __all__ = [
     "TaskOfficeLocationConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskDependencyConnection(EntityConnection):
     """Represents a connection that defines a dependency relationship between two task entities."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskGroupConnection(EntityConnection):
     """
     Represents a connection between a task entity and a task group entity.
@@ -32,17 +32,17 @@ class TaskGroupConnection(EntityConnection):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskGroupParentConnection(EntityConnection):
     """Represents a connection between a task group entity and its parent task group entity."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskGroupLevelParentConnection(EntityConnection):
     """Represents a connection between two instances of TaskGroupLevelEntity, establishing a parent-child relationship at the task group level."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskMilestoneConnection(EntityConnection):
     """
     Represents a connection between a TaskEntity and a TaskMilestoneEntity.
@@ -51,7 +51,7 @@ class TaskMilestoneConnection(EntityConnection):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskSkillConnection(GenericTaskSkillConnection_1[TaskEntity]):
     """
     Represents a specific connection between a task and a skill,
@@ -60,7 +60,7 @@ class TaskSkillConnection(GenericTaskSkillConnection_1[TaskEntity]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a task and an office location within the system, extending the EntityConnection functionality.

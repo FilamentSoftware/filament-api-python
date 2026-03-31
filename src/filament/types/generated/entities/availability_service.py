@@ -12,7 +12,7 @@ __all__ = [
     "AvailabilityEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class AvailabilityEntity(ReferenceEntityBase):
     """
     For storing availability information for a user. Multiple Availability entities can be stacked, using the

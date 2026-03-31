@@ -22,7 +22,7 @@ __all__ = [
     "ScheduleSegmentEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class PlaceholderUserEntity(Entity):
     """
     Represents a placeholder user entity with associated properties and behaviors,
@@ -53,7 +53,7 @@ class PlaceholderUserEntity(Entity):
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScheduleResultEntity(Entity):
     """
     Represents the results of a scheduling process within the scheduling service.
@@ -75,7 +75,7 @@ class ScheduleResultEntity(Entity):
     combined_score: float = field(default=0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScheduleMilestoneEntity(ReferenceEntityBase):
     """
     Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks.
@@ -95,7 +95,7 @@ class ScheduleMilestoneEntity(ReferenceEntityBase):
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScheduleSegmentEntity(ReferenceEntityBase):
     """
     Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships.

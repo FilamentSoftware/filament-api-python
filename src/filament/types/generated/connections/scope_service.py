@@ -9,7 +9,7 @@ __all__ = [
     "ScopeUserConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeUserConnection(EntityConnection):
     """
     Represents a connection between a scope and a user.

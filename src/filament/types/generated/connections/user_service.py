@@ -11,11 +11,11 @@ __all__ = [
     "UserPermissionsRoleConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class UserSkillConnection(GenericUserSkillConnection_1[UserEntity]):
     """Represents a connection between a user and a skill, including the user's proficiency level."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserPermissionsRoleConnection(PermissionsRoleConnectionBase_1[UserEntity]):
     """Represents a connection between a user and a permissions role within a specific context."""

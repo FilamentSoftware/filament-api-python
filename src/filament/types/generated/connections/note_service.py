@@ -10,7 +10,7 @@ __all__ = [
     "NoteUserConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class NoteUserConnection(EntityConnection):
     """
     Represents a connection between a note and a user, defining the relationship and properties of the connection.

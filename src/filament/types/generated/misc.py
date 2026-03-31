@@ -55,7 +55,7 @@ T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SwitchUserRequest:
     """
     Represents a request to switch the current user context in a client connection.
@@ -65,10 +65,10 @@ class SwitchUserRequest:
                     This property is required and is used to specify the user context
                     during authentication and client connection management.
     """
-    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    user_id: UUID
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SuccessOrErrorBase:
     """
     Abstract base class providing shared error-handling logic for <see cref="T:Filament.FSCore.Structs.SuccessOrError" />
@@ -85,7 +85,7 @@ class SuccessOrErrorBase:
     error_code: ErrorCodes = field(default=ErrorCodes.None_)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SetPermissionsRolesRequest:
     """
     Represents a request to override or reset the current user's permission roles.
@@ -97,7 +97,7 @@ class SetPermissionsRolesRequest:
     permissions_role_connections: Optional[list[UserPermissionsRoleConnection]] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPermission:
     """
     Represents permission settings for a single entity.
@@ -111,7 +111,7 @@ class EntityPermission:
     conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPropertyPermission:
     """
     Represents permission settings for a single entity property.
@@ -125,7 +125,7 @@ class EntityPropertyPermission:
     conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscriptionConfig:
     """
     Represents the configuration for a subscription within the system. This class encapsulates
@@ -166,12 +166,12 @@ class SubscriptionConfig:
     mode: SubscriptionMode = field(default=SubscriptionMode.None_)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StructBase:
     """Abstract base class for all struct types in the Filament system."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DbOrderLevel:
     """
     Represents a single level of database ordering.
@@ -183,7 +183,7 @@ class DbOrderLevel:
     property: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityTypePermissions:
     """
     Represents permissions for an entity type, including entity-level and property-level permissions.
@@ -191,11 +191,11 @@ class EntityTypePermissions:
     :param entity_permissions: Gets or sets the permission actions for the entity type.
     :param properties: Gets or sets the dictionary of property-level permissions, keyed by property name.
     """
-    entity_permissions: PermissionAction = field(default=PermissionAction.None_)
+    entity_permissions: PermissionAction
     properties: dict[str, PermissionAction] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PreviewDataRequest:
     """
     Represents a request to preview data before committing changes to the database.
@@ -215,7 +215,7 @@ class PreviewDataRequest:
     apply_pending_requests: bool = field(default=True)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataPreview:
     """
     Represents a preview of service data containing entities and connections organized by type name.
@@ -225,7 +225,7 @@ class ServiceDataPreview:
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatusData:
     """
     Represents status data containing information about the status, associated message, timestamp, services, and version.
@@ -249,7 +249,7 @@ class StatusData:
     version: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityServiceDataUpdate:
     """
     Represents a collection of entity changes including created, updated, and deleted entities.
@@ -263,12 +263,12 @@ class EntityServiceDataUpdate:
     deleted: list[EntityBase] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SuccessOrError(SuccessOrErrorBase):
     """The SuccessOrError type is used to return either success, or an error message."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ValueOrError_1(SuccessOrErrorBase, Generic[T]):
     """
     The ValueOrError type is used to return either a valid value, or an error message, along with a flag to determine
@@ -279,7 +279,7 @@ class ValueOrError_1(SuccessOrErrorBase, Generic[T]):
     data: Optional[T] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPermissions:
     """
     Represents a collection of entity permissions keyed by entity name.
@@ -289,7 +289,7 @@ class EntityPermissions:
     entities: dict[str, EntityPermission] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPropertyPermissions:
     """
     Represents a collection of entity property permissions keyed by property name.
@@ -299,27 +299,27 @@ class EntityPropertyPermissions:
     properties: dict[str, EntityPropertyPermission] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscriptionId(StructBase):
     """
     Represents a unique identifier for a subscription.
     
     :param id: Gets the underlying GUID value of the subscription identifier.
     """
-    id: UUID = field(default_factory=lambda: UUID('019d453b-5f40-7841-afff-efd4191a20f9'))
+    id: UUID = field(default_factory=uuid7)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RequestId(StructBase):
     """
     Represents a unique identifier for a request operation.
     
     :param id: Gets the underlying GUID value of the request identifier.
     """
-    id: UUID = field(default_factory=lambda: UUID('019d453b-5f41-77af-9f82-97b0140cb393'))
+    id: UUID = field(default_factory=uuid7)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UpdatedEntityServiceData_1(StructBase, Generic[T_EntityBase]):
     """
     Represents service data for an entity that has been updated along with the set of properties that were modified.
@@ -327,11 +327,11 @@ class UpdatedEntityServiceData_1(StructBase, Generic[T_EntityBase]):
     :param entity: Gets the updated entity.
     :param updated_properties: Gets the set of property names that were updated on the entity.
     """
-    entity: Optional[T_EntityBase] = field(default=None)
-    updated_properties: list[str] = field(default_factory=list)
+    entity: Optional[T_EntityBase]
+    updated_properties: list[str]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DbOrderInstance:
     """
     Represents an instance of database ordering, comprising a sequence of order levels.
@@ -341,7 +341,7 @@ class DbOrderInstance:
     levels: list[DbOrderLevel] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SuccessOrErrorPublic(SuccessOrError):
     """
     Represents a public-facing version of the <see cref="T:Filament.FSCore.Structs.SuccessOrError" /> class.
@@ -350,10 +350,10 @@ class SuccessOrErrorPublic(SuccessOrError):
     :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
                      This identifier can be used for logging, debugging, or correlation purposes.
     """
-    error_id: Optional[UUID] = field(default=None)
+    error_id: Optional[UUID]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
     """
     Represents a public-facing abstraction derived from <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
@@ -363,10 +363,10 @@ class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
     :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
                      This identifier can be used for logging, debugging, or correlation purposes.
     """
-    error_id: Optional[UUID] = field(default=None)
+    error_id: Optional[UUID]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedEntity:
     """
     Wraps an entity with additional metadata for tracking permissions and pending operations.
@@ -377,14 +377,14 @@ class WrappedEntity:
     :param pending_update_request_ids: Gets or sets the collection of request identifiers for pending update operations.
     :param pending_update_add_request_id: Gets or sets the request identifier for a pending update-add operation.
     """
-    entity: EntityBase = field(default=None)
+    entity: EntityBase
     permissions: Optional[EntityTypePermissions] = field(default=None)
     pending_create_request_id: Optional[RequestId] = field(default=None)
     pending_update_request_ids: Optional[list[RequestId]] = field(default=None)
     pending_update_add_request_id: Optional[RequestId] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModifyDataRequest(StructBase):
     """
     Represents a request to modify data within a specific scenario.
@@ -418,7 +418,7 @@ class ModifyDataRequest(StructBase):
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcessingStatus:
     """
     Represents the status of a processing operation.
@@ -432,7 +432,7 @@ class ProcessingStatus:
     message: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataUpdate:
     """
     Represents a data update structure for a service. Instances of this class
@@ -460,7 +460,7 @@ class ServiceDataUpdate:
     :param sequence_idx: Represents the sequential index associated with the update operation,
                          used to track and order service data updates consistently.
     """
-    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    scenario_id: UUID
     status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
     request_ids: list[RequestId] = field(default_factory=list)
     subscription_id: SubscriptionId = field(default_factory=SubscriptionId)
@@ -470,7 +470,7 @@ class ServiceDataUpdate:
     sequence_idx: int = field(default=0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadDataTypeRequest:
     """
     Represents a request to read data of a specific type from the database.
@@ -494,7 +494,7 @@ class ReadDataTypeRequest:
     apply_pending_requests: bool = field(default=True)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadConnectedDataTypeRequest:
     """
     Represents a request to read data that is connected through a connection type.
@@ -527,7 +527,7 @@ class ReadConnectedDataTypeRequest:
     apply_pending_requests: bool = field(default=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataRead:
     """
     Represents a data structure used for service data being returned from a read request,
@@ -556,7 +556,7 @@ class ServiceDataRead:
     more_data: bool = field(default=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedConnectedEntityWithPermissions:
     """
     Represents a wrapped entity with its connection and associated permissions.
@@ -564,35 +564,35 @@ class WrappedConnectedEntityWithPermissions:
     :param connection: Gets or sets the wrapped connection entity.
     :param entity: Gets or sets the wrapped entity.
     """
-    connection: WrappedEntity = field(default=None)
-    entity: WrappedEntity = field(default=None)
+    connection: WrappedEntity
+    entity: WrappedEntity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadDataRequest(StructBase):
     """
     Represents a request to read data with an optional scenario context.
     
-    :param scenario_id: The optional scenario ID to scope the data read operation.
     :param request: The underlying read data type request containing the query details.
+    :param scenario_id: The optional scenario ID to scope the data read operation.
     """
+    request: ReadDataTypeRequest
     scenario_id: Optional[UUID] = field(default=None)
-    request: ReadDataTypeRequest = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadConnectedDataRequest(StructBase):
     """
     Represents a request to read connected data with an optional scenario context.
     
-    :param scenario_id: The optional scenario ID to scope the connected data read operation.
     :param request: The underlying read connected data type request containing the query details.
+    :param scenario_id: The optional scenario ID to scope the connected data read operation.
     """
+    request: ReadConnectedDataTypeRequest
     scenario_id: Optional[UUID] = field(default=None)
-    request: ReadConnectedDataTypeRequest = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataReadConnected:
     """
     Represents the result of reading connected entities including their connections, permissions, and pending operations.
@@ -605,8 +605,8 @@ class ServiceDataReadConnected:
     :param pending_update_removed_data: Gets or sets the dictionary of pending update operations that would remove data, keyed by entity identifier.
     :param pending_delete_data: Gets or sets the dictionary of pending delete operations, keyed by entity identifier.
     """
-    connection_type_name: str = field(default=None)
-    entity_type_name: str = field(default=None)
+    connection_type_name: str
+    entity_type_name: str
     connection_permissions: Optional[EntityTypePermissions] = field(default=None)
     entity_permissions: Optional[EntityTypePermissions] = field(default=None)
     data: list[WrappedConnectedEntityWithPermissions] = field(default_factory=list)

@@ -14,7 +14,7 @@ __all__ = [
     "ScopeMilestoneEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeMilestoneEntity(Entity):
     """
     Represents a milestone within a scope.

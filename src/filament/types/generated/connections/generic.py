@@ -31,7 +31,7 @@ TCustomComplexityEntity = TypeVar("TCustomComplexityEntity", bound=GenericComple
 
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskDependencyConnectionBase_2(EntityConnection, Generic[TFromEntity, TToEntity]):
     """
     Represents a base class for task dependency connections.
@@ -46,7 +46,7 @@ class TaskDependencyConnectionBase_2(EntityConnection, Generic[TFromEntity, TToE
     overlap_proportion: float = field(default=0.0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PermissionsRoleConnectionBase_1(EntityConnection, Generic[TFromEntity]):
     """
     Abstract base class for connections between an entity and a permissions role within a specific context.
@@ -62,7 +62,7 @@ class PermissionsRoleConnectionBase_1(EntityConnection, Generic[TFromEntity]):
     context: Optional[ScopeEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenericSkillConnection_1(EntityConnection, Generic[TEntity]):
     """
     Represents a generic connection between an entity and a skill entity.
@@ -74,7 +74,7 @@ class GenericSkillConnection_1(EntityConnection, Generic[TEntity]):
     contexts: Optional[list[SkillEntity]] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TCustomComplexityEntity]):
     """
     Represents a connection between a generic scope entity and a task type entity.
@@ -95,7 +95,7 @@ class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TC
     custom_complexity: Optional[TCustomComplexityEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskDependencyOverrideConnectionBase_2(TaskDependencyConnectionBase_2[TFromEntity, TToEntity], Generic[TFromEntity, TToEntity]):
     """
     Represents a base class for task dependency override connections.
@@ -107,7 +107,7 @@ class TaskDependencyOverrideConnectionBase_2(TaskDependencyConnectionBase_2[TFro
     overlap_state: TaskDependencyOverrideOverlapState = field(default=TaskDependencyOverrideOverlapState.Default)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenericUserSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TEntity]):
     """
     Represents a generic connection between an entity and a skill entity with user-related functionality.
@@ -117,7 +117,7 @@ class GenericUserSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TE
     level: int = field(default=0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenericTaskSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TEntity]):
     """
     Represents a generic connection between an entity and a skill entity with task-related functionality.

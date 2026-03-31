@@ -15,22 +15,22 @@ __all__ = [
     "ScopeTaskTypeOfficeLocationConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, ScopeTaskTypeEntity]):
     """Represents a dependency connection between two scope task types."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeSpecialtyDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, SpecialtyEntity]):
     """Represents a dependency connection between a scope task type and a specialty."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeSkillConnection(GenericTaskSkillConnection_1[ScopeTaskTypeEntity]):
     """Represents a connection between a scope task type and a skill."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a scope task type and an office location.

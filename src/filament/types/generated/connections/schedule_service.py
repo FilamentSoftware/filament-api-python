@@ -10,7 +10,7 @@ __all__ = [
     "PlaceholderUserSkillConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class PlaceholderUserSkillConnection(GenericUserSkillConnection_1[PlaceholderUserEntity]):
     """
     Represents a connection between a PlaceholderUserEntity and a skill,

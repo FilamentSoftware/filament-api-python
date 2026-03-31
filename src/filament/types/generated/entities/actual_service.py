@@ -15,7 +15,7 @@ __all__ = [
     "ActualEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ActualEntity(ReferenceEntityBase):
     """
     Defines actual time and cost spent on a task and details of when it was started and finished.

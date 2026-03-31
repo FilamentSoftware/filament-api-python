@@ -15,7 +15,7 @@ __all__ = [
     "ScopeGroupEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeGroupLevelEntity(Entity):
     """
     Represents an entity defining a level within a scope group hierarchy.
@@ -34,7 +34,7 @@ class ScopeGroupLevelEntity(Entity):
     parent: Optional[ScopeGroupLevelEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeGroupEntity(Entity):
     """
     Represents a scope group entity in the system, which contains information about

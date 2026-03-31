@@ -20,7 +20,7 @@ __all__ = [
     "ChangedEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ErrorEntity(Entity):
     """
     Represents an error that has occurred, including details such as message, error code, and stack trace.
@@ -42,7 +42,7 @@ class ErrorEntity(Entity):
     stack_trace: Optional[str] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RequestEntity(Entity):
     """
     Represents a request entity in the system.
@@ -62,7 +62,7 @@ class RequestEntity(Entity):
     request_data: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EventLogEntity(Entity):
     """
     Represents an event log entry created when data is processed.
@@ -80,7 +80,7 @@ class EventLogEntity(Entity):
     property_names: Optional[list[str]] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScenarioEntity(Entity):
     """
     Represents a scenario entity.
@@ -102,7 +102,7 @@ class ScenarioEntity(Entity):
     parent: Optional[ScenarioEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScenarioServiceEntity(Entity):
     """
     Represents a specialized entity that encompasses the properties and behavior
@@ -115,7 +115,7 @@ class ScenarioServiceEntity(Entity):
     service_type: ScenarioServiceTypeEnum = field(default=ScenarioServiceTypeEnum.None_)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScenarioEventEntity(Entity):
     """
     Represents an event that is part of a scenario, providing contextual information
@@ -151,7 +151,7 @@ class ScenarioEventEntity(Entity):
     data: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChangedEntity(Entity):
     """
     Represents a changed entity in the system.

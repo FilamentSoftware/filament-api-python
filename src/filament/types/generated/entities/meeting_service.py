@@ -15,7 +15,7 @@ __all__ = [
     "MeetingAgendaItemEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class MeetingEntity(Entity):
     """
     Represents a meeting entity, including details such as name, description, duration, owner,
@@ -44,7 +44,7 @@ class MeetingEntity(Entity):
     include_review_task_users: bool = field(default=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeetingAgendaItemEntity(Entity):
     """
     Represents an agenda item within a meeting.

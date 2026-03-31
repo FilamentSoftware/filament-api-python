@@ -19,7 +19,7 @@ __all__ = [
     "TaskEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskGroupLevelEntity(ReferenceEntityBase):
     """
     Represents an entity for a task group level that defines the hierarchical structure and metadata for task groupings.
@@ -31,7 +31,7 @@ class TaskGroupLevelEntity(ReferenceEntityBase):
     description: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskMilestoneEntity(ReferenceEntityBase):
     """
     A TaskMilestoneEntity is created from a ScopeMilestoneEntity.
@@ -48,7 +48,7 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskGroupEntity(ReferenceEntityBase):
     """
     Represents a task group entity that provides a structured grouping of tasks within a defined scope.
@@ -97,7 +97,7 @@ class TaskGroupEntity(ReferenceEntityBase):
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskEntity(ReferenceEntityBase):
     """
     A TaskEntity is created from scope entities and is then used by the scheduler.

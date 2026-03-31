@@ -21,7 +21,7 @@ __all__ = [
     "ScopeItemTaskTypeOverrideConnection",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemDependencyConnection(EntityConnection):
     """
     Represents a dependency connection between two scope items.
@@ -31,7 +31,7 @@ class ScopeItemDependencyConnection(EntityConnection):
     size_multiplier: float = field(default=1)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemMilestoneConnection(EntityConnection):
     """
     Represents a connection between a scope item and a scope milestone.
@@ -45,12 +45,12 @@ class ScopeItemMilestoneConnection(EntityConnection):
     task_combine_key: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemGroupConnection(EntityConnection):
     """Represents a connection between a scope item and a scope group."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a <see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemEntity" /> and an <see cref="T:Filament.Services.CoreServices.Entities.OrganizationService.OfficeLocationEntity" />.
@@ -75,7 +75,7 @@ class ScopeItemOfficeLocationConnection(EntityConnection):
     scope_template_item_context: Optional[ScopeTemplateItemEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemTemplateItemConnection(EntityConnection):
     """
     Represents a connection between a scope item and a scope template item.
@@ -85,7 +85,7 @@ class ScopeItemTemplateItemConnection(EntityConnection):
     size_multiplier: float = field(default=1)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeItemTaskTypeOverrideConnection(GenericScopeTaskTypeConnection_2[ScopeItemEntity, ScopeItemCustomComplexityEntity]):
     """
     Represents a connection that overrides a task type for a specific scope item.

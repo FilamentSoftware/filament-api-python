@@ -19,7 +19,7 @@ __all__ = [
     "OrganizationContactEntity",
 ]
 
-@dataclass
+@dataclass(kw_only=True)
 class OrganizationEntity(Entity):
     """
     An entity that represents an organization.
@@ -39,7 +39,7 @@ class OrganizationEntity(Entity):
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaxCreditLocationEntity(Entity):
     """
     A geographic or political location defined by its inclusion in a tax credit policy.
@@ -61,7 +61,7 @@ class TaxCreditLocationEntity(Entity):
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OfficeLocationEntity(AddressEntityBase):
     """
     An entity that describes any office locations this company has.  This is distinct
@@ -89,7 +89,7 @@ class OfficeLocationEntity(AddressEntityBase):
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OrganizationContactEntity(Entity):
     """
     A contact entity linked to a specific organization.
