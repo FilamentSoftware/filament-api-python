@@ -157,8 +157,6 @@ _NONE_WIRE = "None"
 
 def _enum_to_wire(data: Any) -> Any:
     """Convert an enum member to its wire representation (int value)."""
-    if hasattr(data, "name") and data.name == _NONE_MEMBER:
-        return data.value
     return data.value
 
 
