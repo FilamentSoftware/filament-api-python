@@ -281,6 +281,7 @@ class TestRoundTrip:
             success=True,
             message="",
             error_code=ErrorCodes.None_,
+            error_id=None,
             data=SubscriptionId(id=uuid7()),
         )
         serialized = to_dict(original)
