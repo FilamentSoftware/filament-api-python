@@ -105,7 +105,7 @@ def _resolve_type_hints(cls: type[Any]) -> dict[str, Any]:
 
     try:
         return typing.get_type_hints(cls)
-    except Exception:
+    except (NameError, AttributeError):
         return {}
 
 
