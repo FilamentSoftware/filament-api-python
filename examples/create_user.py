@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import asyncio
 
-from uuid_utils import UUID
-
 import filament
 from filament.types import (
     DataRequestAction,
@@ -32,7 +30,6 @@ async def main() -> None:
     ) as f:
         result = await f.modify_data(
             ModifyDataRequest(
-                scenario_id=UUID(int=0),
                 action=DataRequestAction.Create,
                 data={"UserEntity": [user]},
             ),

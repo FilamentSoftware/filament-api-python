@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import asyncio
 
-from uuid_utils import UUID
-
 import filament
 from filament import Condition
 from filament.types import (
@@ -55,7 +53,6 @@ async def main() -> None:
     ) as f:
         result = await f.subscribe(
             SubscriptionConfig(
-                scenario_id=UUID(int=0),
                 status=DataProcessingStatus.All,
                 type_name="UserEntity",
                 mode=SubscriptionMode.Data,

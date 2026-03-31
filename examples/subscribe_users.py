@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import asyncio
 
-from uuid_utils import UUID
-
 import filament
 from filament.types import (
     DataProcessingStatus,
