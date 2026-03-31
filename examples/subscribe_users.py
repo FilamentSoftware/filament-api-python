@@ -16,6 +16,7 @@ from filament.types import (
 
 
 def on_user_updated(update: ServiceDataUpdate) -> None:
+    print(f"  Status: {update.status.name}")
     for changes in update.modified_entities.values():
         for entity in changes.created:
             user = filament.as_entity(entity, UserEntity)
@@ -47,7 +48,6 @@ async def main() -> None:
     ) as f:
         result = await f.subscribe(
             SubscriptionConfig(
-                scenario_id=UUID(int=0),
                 status=DataProcessingStatus.All,
                 type_name="UserEntity",
                 mode=SubscriptionMode.Data,
