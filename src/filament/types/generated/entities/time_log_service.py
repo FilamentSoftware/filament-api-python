@@ -37,10 +37,10 @@ class TimeLogEntity(ReferenceEntityBase):
     """
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: Optional[datetime.datetime] = field(default=None)
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
     user_end_proportion: Optional[float] = field(default=None)
     actual_end_proportion: Optional[float] = field(default=None)
     required_duration_remaining: Optional[datetime.timedelta] = field(default=None)
-    status: TimeLogStatusEnum = TimeLogStatusEnum.Pending
-    mode: TimeLogModeEnum = TimeLogModeEnum.Work
+    status: TimeLogStatusEnum = field(default=TimeLogStatusEnum.Pending)
+    mode: TimeLogModeEnum = field(default=TimeLogModeEnum.Work)

@@ -32,16 +32,16 @@ class MeetingEntity(Entity):
     :param review_task_groups: A list of all review tasks group that this meeting will use to auto generate a task review list.
     :param include_review_task_users: Should the users who created content to be reviewed be automatically invited to the meeting?
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    owner_user_id: UUID = field(default_factory=uuid7)
+    owner_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     owner_user: Optional[UserEntity] = field(default=None)
     earliest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     latest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
-    date_time_zone: str = field(default_factory=str)
+    date_time_zone: str = field(default='UTC')
     review_task_groups: list[str] = field(default_factory=list)
-    include_review_task_users: bool = field(default_factory=bool)
+    include_review_task_users: bool = field(default=False)
 
 
 @dataclass
@@ -55,8 +55,8 @@ class MeetingAgendaItemEntity(Entity):
     :param description: A more detailed description of the agenda item.
     :param priority: The priority of this item in the agenda.
     """
-    meeting_id: UUID = field(default_factory=uuid7)
+    meeting_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     meeting: Optional[MeetingEntity] = field(default=None)
-    title: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    priority: int = 0
+    title: str = field(default='')
+    description: str = field(default='')
+    priority: int = field(default=1)

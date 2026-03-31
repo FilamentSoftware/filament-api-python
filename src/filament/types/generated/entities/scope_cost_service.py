@@ -39,13 +39,13 @@ class ScopeCostEntity(ReferenceEntityBase):
                         Determined from the currency of the item the cost is for.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    context_type: str = field(default_factory=str)
-    context_id: UUID = field(default_factory=uuid7)
-    instance: bool = field(default_factory=bool)
+    context_type: str = field(default='')
+    context_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    instance: bool = field(default=False)
     context: Optional[Union[ScopeGroupEntity, ScopeItemEntity, ScopeTemplateItemEntity]] = field(default=None)
-    chargeable_direct: float = 0.0
-    chargeable_dependent: float = 0.0
-    estimated_cost_direct: float = 0.0
-    estimated_cost_dependent: float = 0.0
-    currency_id: UUID = field(default_factory=uuid7)
+    chargeable_direct: float = field(default=0)
+    chargeable_dependent: float = field(default=0)
+    estimated_cost_direct: float = field(default=0)
+    estimated_cost_dependent: float = field(default=0)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)

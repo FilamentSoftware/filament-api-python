@@ -18,5 +18,5 @@ class NoteUserConnection(EntityConnection):
     :param has_read: Has this user read the note?
     :param type: What type of connection is this?  To or Cc?
     """
-    has_read: bool = field(default_factory=bool)
-    type: NoteUserConnectionType = NoteUserConnectionType.To
+    has_read: bool = field(default=False)
+    type: NoteUserConnectionType = field(default=NoteUserConnectionType.To)

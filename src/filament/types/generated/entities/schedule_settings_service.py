@@ -22,10 +22,10 @@ class ScheduleSettingsEntity(Entity):
     :param create_placeholder_users: Whether the system should create placeholder users if there are no available users.
                                      Even if this is false, if there are no users with all the required skills, placeholder users will be created.
     """
-    full_schedule: bool = field(default_factory=bool)
-    usage_smoothing_window: int = 0
+    full_schedule: bool = field(default=False)
+    usage_smoothing_window: int = field(default=0)
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    create_placeholder_users: bool = field(default_factory=bool)
+    create_placeholder_users: bool = field(default=True)
 
 
 @dataclass
@@ -45,10 +45,10 @@ class ScheduleScopeSettingsEntity(Entity):
     """
     duration_rounding_thresholds: list[datetime.timedelta] = field(default_factory=list)
     near_buffer_distance: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    near_buffer_min_proportion: float = 0.0
-    near_buffer_initial_proportion: float = 0.0
-    near_buffer_max_proportion: float = 0.0
+    near_buffer_min_proportion: float = field(default=0)
+    near_buffer_initial_proportion: float = field(default=0)
+    near_buffer_max_proportion: float = field(default=0)
     far_buffer_distance: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    far_buffer_min_proportion: float = 0.0
-    far_buffer_initial_proportion: float = 0.0
-    far_buffer_max_proportion: float = 0.0
+    far_buffer_min_proportion: float = field(default=0.05)
+    far_buffer_initial_proportion: float = field(default=0.1)
+    far_buffer_max_proportion: float = field(default=0.15)

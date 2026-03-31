@@ -30,11 +30,11 @@ class ScopeMilestoneEntity(Entity):
     :param scope_task_type_step_ids: A list of ScopeTaskTypeStep entity ids that this milestone should automatically be added to.
     :param scope_group_ids: A list of ScopeGroup entity ids that this milestone should automatically be added to.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     instant: Optional[datetime.datetime] = field(default=None)
-    direction: ScopeMilestoneDirectionEnum = ScopeMilestoneDirectionEnum.StartAfter
-    automatically_assign: bool = field(default_factory=bool)
+    direction: ScopeMilestoneDirectionEnum = field(default=ScopeMilestoneDirectionEnum.StartAfter)
+    automatically_assign: bool = field(default=False)
     scope_task_type_ids: list[UUID] = field(default_factory=list)
     scope_task_type_step_ids: list[UUID] = field(default_factory=list)
     scope_group_ids: list[UUID] = field(default_factory=list)

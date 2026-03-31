@@ -24,10 +24,10 @@ class ScopeCategoryEntity(Entity):
     :param allowed_downstream_category_ids: The categories that are allowed to be downstream of this category.
     :param allow_add_to_dependent: Whether this category allows tasks to be added to a dependent item.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    reference_size: float = 0.0
-    reference_size_units: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
+    reference_size: float = field(default=1)
+    reference_size_units: str = field(default='')
     allowed_upstream_category_ids: list[UUID] = field(default_factory=list)
     allowed_downstream_category_ids: list[UUID] = field(default_factory=list)
-    allow_add_to_dependent: bool = field(default_factory=bool)
+    allow_add_to_dependent: bool = field(default=True)

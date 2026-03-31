@@ -30,12 +30,12 @@ class ScopeTemplateItemEntity(Entity):
     :param currency_id: The currency used for this scope template item's monetary values.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    has_dependent: bool = field(default_factory=bool)
-    category_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    description: str = field(default='')
+    has_dependent: bool = field(default=False)
+    category_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     category: Optional[ScopeCategoryEntity] = field(default=None)
-    currency_id: UUID = field(default_factory=uuid7)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 

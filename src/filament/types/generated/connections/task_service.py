@@ -69,4 +69,4 @@ class TaskOfficeLocationConnection(EntityConnection):
                      This value determines the priority level associated with the connection
                      between a task and an office location.
     """
-    priority: int = 0
+    priority: int = field(default=1)

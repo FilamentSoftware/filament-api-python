@@ -26,11 +26,11 @@ class CurrencyEntity(Entity):
     :param symbol_position: Whether the currency symbol appears before or after the amount.
     :param status: Whether the currency is enabled or disabled.
     """
-    symbol: str = field(default_factory=str)
-    code: str = field(default_factory=str)
-    decimal_points: int = 0
-    symbol_position: CurrencySymbolPosition = CurrencySymbolPosition.Before
-    status: CurrencyStatus = CurrencyStatus.Disabled
+    symbol: str = field(default='')
+    code: str = field(default='')
+    decimal_points: int = field(default=2)
+    symbol_position: CurrencySymbolPosition = field(default=CurrencySymbolPosition.Before)
+    status: CurrencyStatus = field(default=CurrencyStatus.Enabled)
 
 
 @dataclass
@@ -46,7 +46,7 @@ class CurrencyRateEntity(Entity):
                  but if it is not, then the relationship between a currency and the organization's
                  default currency will be calculated.
     """
-    currency_id: UUID = field(default_factory=uuid7)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    rate: float = 0.0
+    rate: float = field(default=1.0)

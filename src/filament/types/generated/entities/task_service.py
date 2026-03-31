@@ -27,8 +27,8 @@ class TaskGroupLevelEntity(ReferenceEntityBase):
     :param name: The name of the task group level entity.
     :param description: The description of the task group level entity.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
 
 
 @dataclass
@@ -42,10 +42,10 @@ class TaskMilestoneEntity(ReferenceEntityBase):
                     If the Instant is null, the milestone is flexible and can be moved
     :param direction: Should tasks start after this milestone, or end before it?
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     instant: Optional[datetime.datetime] = field(default=None)
-    direction: TaskMilestoneDirectionEnum = TaskMilestoneDirectionEnum.StartAfter
+    direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
 
 
 @dataclass
@@ -81,13 +81,13 @@ class TaskGroupEntity(ReferenceEntityBase):
                             This property is used to establish relationships between task groups in a hierarchical structure,
                             identifying all ancestor groups for the current entity.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    context_type: str = field(default_factory=str)
-    context_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    description: str = field(default='')
+    context_type: str = field(default='')
+    context_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     context: Optional[Union[ScopeEntity, ScopeItemEntity]] = field(default=None)
-    context_key: str = field(default_factory=str)
-    group_level_id: UUID = field(default_factory=uuid7)
+    context_key: str = field(default='')
+    group_level_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     group_level: Optional[TaskGroupLevelEntity] = field(default=None)
     parent_group_level_ids: list[UUID] = field(default_factory=list)
     parent_group_levels: Optional[list[TaskGroupLevelEntity]] = field(default=None)
@@ -119,11 +119,11 @@ class TaskEntity(ReferenceEntityBase):
                             identifying all ancestor groups for the current entity.
     """
     contexts: dict[str, str] = field(default_factory=dict)
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    user_count: int = 0
-    requires_review: bool = field(default_factory=bool)
+    user_count: int = field(default=1)
+    requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     ancestor_group_ids: list[UUID] = field(default_factory=list)
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)

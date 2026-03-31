@@ -56,27 +56,27 @@ class UserEntity(UserBaseEntity):
     :param currency_id: The currency this user's monetary values are denominated in.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    schedule_status: UserStatusEnum = UserStatusEnum.Disabled
-    user_type: UserTypeEnum = UserTypeEnum.Internal
-    given_name: str = field(default_factory=str)
+    schedule_status: UserStatusEnum = field(default=UserStatusEnum.Disabled)
+    user_type: UserTypeEnum = field(default=UserTypeEnum.Internal)
+    given_name: str = field(default='')
     middle_names: Optional[str] = field(default=None)
-    family_name: str = field(default_factory=str)
+    family_name: str = field(default='')
     preferred_name: Optional[str] = field(default=None)
-    name_display_order: NameOrder = NameOrder.GivenNameFirst
-    user_name: str = field(default_factory=str)
+    name_display_order: NameOrder = field(default=NameOrder.GivenNameFirst)
+    user_name: str = field(default='')
     password: Optional[str] = field(default=None)
-    email_address: str = field(default_factory=str)
-    pronouns: str = field(default_factory=str)
+    email_address: str = field(default='')
+    pronouns: str = field(default='')
     image_link: Optional[str] = field(default=None)
-    name: str = field(default_factory=str)
-    tax_credit_location_id: UUID = field(default_factory=uuid7)
-    office_location_id: UUID = field(default_factory=uuid7)
+    name: str = field(default=' ')
+    tax_credit_location_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    office_location_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     tax_credit_location: Optional[TaxCreditLocationEntity] = field(default=None)
     office_location: Optional[OfficeLocationEntity] = field(default=None)
-    primary_specialty_id: UUID = field(default_factory=uuid7)
+    primary_specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     primary_specialty: Optional[SpecialtyEntity] = field(default=None)
-    compensation_per_hour_suggested: float = 0.0
-    currency_id: UUID = field(default_factory=uuid7)
+    compensation_per_hour_suggested: float = field(default=0)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
@@ -89,9 +89,9 @@ class UserAddressEntity(AddressEntityBase):
     :param user: A helper method for setting the UserId property.  Pass in a UserEntity.
     :param user_address_type: The address for this address. One of Home, Business or Other.
     """
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
-    user_address_type: UserAddressType = UserAddressType.Home
+    user_address_type: UserAddressType = field(default=UserAddressType.Other)
 
 
 @dataclass
@@ -103,9 +103,9 @@ class UserPhoneEntity(PhoneEntityBase):
     :param user: A helper method for setting the UserId property. Pass in a UserEntity.
     :param user_phone_type: The type of phone number. Home, Business or Other.
     """
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
-    user_phone_type: UserPhoneType = UserPhoneType.Home
+    user_phone_type: UserPhoneType = field(default=UserPhoneType.Home)
 
 
 @dataclass
@@ -117,9 +117,9 @@ class UserEmailEntity(EmailEntityBase):
     :param user: A helper method for setting the UserId property.  Pass in a UserEntity type.
     :param user_email_type: This describes the type of email address this is. Home, Work or Other.
     """
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
-    user_email_type: UserEmailType = UserEmailType.Home
+    user_email_type: UserEmailType = field(default=UserEmailType.Home)
 
 
 @dataclass
@@ -135,9 +135,9 @@ class UserCompensationEntity(Entity):
     :param currency_id: The currency this compensation is denominated in.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
-    compensation_per_hour: float = 0.0
+    compensation_per_hour: float = field(default=0)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    currency_id: UUID = field(default_factory=uuid7)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)

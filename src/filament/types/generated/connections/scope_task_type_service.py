@@ -37,4 +37,4 @@ class ScopeTaskTypeOfficeLocationConnection(EntityConnection):
     
     :param priority: What is the priority order of offices that this task can be assigned to.
     """
-    priority: int = 0
+    priority: int = field(default=1)

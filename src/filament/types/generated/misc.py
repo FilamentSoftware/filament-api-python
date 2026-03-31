@@ -65,7 +65,7 @@ class SwitchUserRequest:
                     This property is required and is used to specify the user context
                     during authentication and client connection management.
     """
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
 
 
 @dataclass
@@ -82,7 +82,7 @@ class SuccessOrErrorBase:
     success: bool = field(default_factory=bool)
     message: str = field(default_factory=str)
     stack_trace: Optional[str] = field(default=None)
-    error_code: ErrorCodes = ErrorCodes.None_
+    error_code: ErrorCodes = field(default=ErrorCodes.None_)
 
 
 @dataclass
@@ -107,7 +107,7 @@ class EntityPermission:
                                 Each key is an individual permission action, and the value is the combined condition
                                 (OR'd together if multiple conditions apply) that must be satisfied for that action.
     """
-    actions: PermissionAction = PermissionAction.None_
+    actions: PermissionAction = field(default=PermissionAction.None_)
     conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
 
 
@@ -121,7 +121,7 @@ class EntityPropertyPermission:
                                 Each key is an individual permission action, and the value is the combined condition
                                 (OR'd together if multiple conditions apply) that must be satisfied for that action.
     """
-    actions: PermissionAction = PermissionAction.None_
+    actions: PermissionAction = field(default=PermissionAction.None_)
     conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
 
 
@@ -159,11 +159,11 @@ class SubscriptionConfig:
                  Use this property to configure the behavior of the subscription mechanism
                  to process data or monitor progress according to specific requirements.
     """
-    scenario_id: UUID = field(default_factory=uuid7)
-    status: DataProcessingStatus = DataProcessingStatus.Unknown
-    type_name: str = field(default_factory=str)
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
+    type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
-    mode: SubscriptionMode = SubscriptionMode.None_
+    mode: SubscriptionMode = field(default=SubscriptionMode.None_)
 
 
 @dataclass
@@ -179,8 +179,8 @@ class DbOrderLevel:
     :param direction: The ordering direction.
     :param property: The property to order by.
     """
-    direction: DbOrderDirection = DbOrderDirection.Ascending
-    property: str = field(default_factory=str)
+    direction: DbOrderDirection = field(default=DbOrderDirection.Ascending)
+    property: str = field(default='')
 
 
 @dataclass
@@ -191,7 +191,7 @@ class EntityTypePermissions:
     :param entity_permissions: Gets or sets the permission actions for the entity type.
     :param properties: Gets or sets the dictionary of property-level permissions, keyed by property name.
     """
-    entity_permissions: PermissionAction = PermissionAction.None_
+    entity_permissions: PermissionAction = field(default=PermissionAction.None_)
     properties: dict[str, PermissionAction] = field(default_factory=dict)
 
 
@@ -208,11 +208,11 @@ class PreviewDataRequest:
     :param apply_pending_requests: Gets or sets whether to apply pending requests before previewing the data. Default is true.
     """
     scenario_id: Optional[UUID] = field(default=None)
-    service_name: str = field(default_factory=str)
+    service_name: str = field(default='')
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
     existing_data: dict[str, list[UUID]] = field(default_factory=dict)
     options: dict[str, DataOption] = field(default_factory=dict)
-    apply_pending_requests: bool = field(default_factory=bool)
+    apply_pending_requests: bool = field(default=True)
 
 
 @dataclass
@@ -242,11 +242,11 @@ class StatusData:
     :param version: Represents the version of the backend.
                     This property is used to indicate the current version of the backend.
     """
-    status: bool = field(default_factory=bool)
-    message: str = field(default_factory=str)
+    status: bool = field(default=False)
+    message: str = field(default='')
     timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     services: list[str] = field(default_factory=list)
-    version: str = field(default_factory=str)
+    version: str = field(default='')
 
 
 @dataclass
@@ -306,7 +306,7 @@ class SubscriptionId(StructBase):
     
     :param id: Gets the underlying GUID value of the subscription identifier.
     """
-    id: UUID = field(default_factory=uuid7)
+    id: UUID = field(default_factory=lambda: UUID('019d453b-5f40-7841-afff-efd4191a20f9'))
 
 
 @dataclass
@@ -316,7 +316,7 @@ class RequestId(StructBase):
     
     :param id: Gets the underlying GUID value of the request identifier.
     """
-    id: UUID = field(default_factory=uuid7)
+    id: UUID = field(default_factory=lambda: UUID('019d453b-5f41-77af-9f82-97b0140cb393'))
 
 
 @dataclass
@@ -377,7 +377,7 @@ class WrappedEntity:
     :param pending_update_request_ids: Gets or sets the collection of request identifiers for pending update operations.
     :param pending_update_add_request_id: Gets or sets the request identifier for a pending update-add operation.
     """
-    entity: EntityBase = field(default_factory=EntityBase)
+    entity: EntityBase = field(default=None)
     permissions: Optional[EntityTypePermissions] = field(default=None)
     pending_create_request_id: Optional[RequestId] = field(default=None)
     pending_update_request_ids: Optional[list[RequestId]] = field(default=None)
@@ -409,11 +409,11 @@ class ModifyDataRequest(StructBase):
                  This property is used to store and manage collections of entity instances
                  that are involved in the modification request.
     """
-    scenario_id: UUID = field(default_factory=uuid7)
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user_id: Optional[UUID] = field(default=None)
     requested_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     request_id: RequestId = field(default_factory=RequestId)
-    action: DataRequestAction = DataRequestAction.Unknown
+    action: DataRequestAction = field(default=DataRequestAction.Unknown)
     update_properties: Optional[list[str]] = field(default=None)
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
 
@@ -427,9 +427,9 @@ class ProcessingStatus:
     :param request_ids: Gets or sets the collection of request identifiers associated with this processing status.
     :param message: Gets or sets the message describing the current processing status.
     """
-    scenario_id: UUID = field(default_factory=uuid7)
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     request_ids: list[RequestId] = field(default_factory=list)
-    message: str = field(default_factory=str)
+    message: str = field(default='')
 
 
 @dataclass
@@ -460,14 +460,14 @@ class ServiceDataUpdate:
     :param sequence_idx: Represents the sequential index associated with the update operation,
                          used to track and order service data updates consistently.
     """
-    scenario_id: UUID = field(default_factory=uuid7)
-    status: DataProcessingStatus = DataProcessingStatus.Unknown
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
     request_ids: list[RequestId] = field(default_factory=list)
     subscription_id: SubscriptionId = field(default_factory=SubscriptionId)
     modified_entities: dict[str, EntityServiceDataUpdate] = field(default_factory=dict)
-    progress: bool = field(default_factory=bool)
-    progress_amount: float = 0.0
-    sequence_idx: int = 0
+    progress: bool = field(default=False)
+    progress_amount: float = field(default=0)
+    sequence_idx: int = field(default=0)
 
 
 @dataclass
@@ -484,14 +484,14 @@ class ReadDataTypeRequest:
     :param properties: The list of properties to include in the results. Required when Mode is Distinct.
     :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is true.
     """
-    type_name: str = field(default_factory=str)
+    type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
     order: Optional[DbOrderInstance] = field(default=None)
-    mode: ReadMode = ReadMode.Data
-    limit: int = 0
-    offset: int = 0
+    mode: ReadMode = field(default=ReadMode.Data)
+    limit: int = field(default=100000)
+    offset: int = field(default=0)
     properties: Optional[list[str]] = field(default=None)
-    apply_pending_requests: bool = field(default_factory=bool)
+    apply_pending_requests: bool = field(default=True)
 
 
 @dataclass
@@ -513,18 +513,18 @@ class ReadConnectedDataTypeRequest:
     :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is false,
                                    as this is not currently supported on ReadConnectedData.
     """
-    connection_type_name: str = field(default_factory=str)
-    entity_type_name: str = field(default_factory=str)
+    connection_type_name: str = field(default='')
+    entity_type_name: str = field(default='')
     entity_ids: Optional[list[UUID]] = field(default=None)
     connection_condition: Optional[DbConditionInstance] = field(default=None)
     entity_condition: Optional[DbConditionInstance] = field(default=None)
     order: Optional[DbOrderInstance] = field(default=None)
-    limit: int = 0
-    offset: int = 0
-    reverse_connection: bool = field(default_factory=bool)
+    limit: int = field(default=0)
+    offset: int = field(default=0)
+    reverse_connection: bool = field(default=False)
     connection_properties: Optional[list[str]] = field(default=None)
     entity_properties: Optional[list[str]] = field(default=None)
-    apply_pending_requests: bool = field(default_factory=bool)
+    apply_pending_requests: bool = field(default=False)
 
 
 @dataclass
@@ -547,13 +547,13 @@ class ServiceDataRead:
     :param more_data: Indicates whether there is additional data available that was not read due to the limit
                       of the number of records requested.
     """
-    type_name: str = field(default_factory=str)
+    type_name: str = field(default='')
     permissions: Optional[EntityTypePermissions] = field(default=None)
     data: list[WrappedEntity] = field(default_factory=list)
     pending_update_remove_request_ids: Optional[dict[UUID, RequestId]] = field(default=None)
     pending_delete_request_ids: Optional[dict[UUID, RequestId]] = field(default=None)
-    entity_count: int = 0
-    more_data: bool = field(default_factory=bool)
+    entity_count: int = field(default=0)
+    more_data: bool = field(default=False)
 
 
 @dataclass
@@ -564,8 +564,8 @@ class WrappedConnectedEntityWithPermissions:
     :param connection: Gets or sets the wrapped connection entity.
     :param entity: Gets or sets the wrapped entity.
     """
-    connection: WrappedEntity = field(default_factory=WrappedEntity)
-    entity: WrappedEntity = field(default_factory=WrappedEntity)
+    connection: WrappedEntity = field(default=None)
+    entity: WrappedEntity = field(default=None)
 
 
 @dataclass
@@ -577,7 +577,7 @@ class ReadDataRequest(StructBase):
     :param request: The underlying read data type request containing the query details.
     """
     scenario_id: Optional[UUID] = field(default=None)
-    request: ReadDataTypeRequest = field(default_factory=ReadDataTypeRequest)
+    request: ReadDataTypeRequest = field(default=None)
 
 
 @dataclass
@@ -589,7 +589,7 @@ class ReadConnectedDataRequest(StructBase):
     :param request: The underlying read connected data type request containing the query details.
     """
     scenario_id: Optional[UUID] = field(default=None)
-    request: ReadConnectedDataTypeRequest = field(default_factory=ReadConnectedDataTypeRequest)
+    request: ReadConnectedDataTypeRequest = field(default=None)
 
 
 @dataclass
@@ -605,8 +605,8 @@ class ServiceDataReadConnected:
     :param pending_update_removed_data: Gets or sets the dictionary of pending update operations that would remove data, keyed by entity identifier.
     :param pending_delete_data: Gets or sets the dictionary of pending delete operations, keyed by entity identifier.
     """
-    connection_type_name: str = field(default_factory=str)
-    entity_type_name: str = field(default_factory=str)
+    connection_type_name: str = field(default=None)
+    entity_type_name: str = field(default=None)
     connection_permissions: Optional[EntityTypePermissions] = field(default=None)
     entity_permissions: Optional[EntityTypePermissions] = field(default=None)
     data: list[WrappedConnectedEntityWithPermissions] = field(default_factory=list)

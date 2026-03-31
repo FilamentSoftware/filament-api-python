@@ -17,5 +17,5 @@ class MeetingUserConnection(EntityConnection):
     :param required: Is this user required in the meeting or optional?
     :param responsible: Is this user responsible for the outcomes of this meeting or not?
     """
-    required: bool = field(default_factory=bool)
-    responsible: bool = field(default_factory=bool)
+    required: bool = field(default=False)
+    responsible: bool = field(default=False)

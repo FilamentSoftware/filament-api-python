@@ -27,8 +27,8 @@ class ApiKeyEntity(Entity):
     :param expiry_instant: The instant at which this API key expires.
     :param rate_limit_per_minute: The maximum number of requests per minute allowed for this API key.
     """
-    name: str = field(default_factory=str)
+    name: str = field(default='')
     key: Optional[str] = field(default=None)
     cidr_list: list[str] = field(default_factory=list)
     expiry_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    rate_limit_per_minute: int = 0
+    rate_limit_per_minute: int = field(default=300)

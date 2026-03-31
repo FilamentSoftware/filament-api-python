@@ -28,8 +28,8 @@ class ScopeGroupLevelEntity(Entity):
                       Using the helper property will ensure this is the case.
     :param parent: Represents the parent entity of the current scope group level entity.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     parent_id: Optional[UUID] = field(default=None)
     parent: Optional[ScopeGroupLevelEntity] = field(default=None)
 
@@ -53,13 +53,13 @@ class ScopeGroupEntity(Entity):
     :param child_item_category_ids: Represents the collection of category IDs associated with the child items of an entity.
     :param child_item_categories: A collection representing the categories associated with the child items of an entity.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     parent_id: Optional[UUID] = field(default=None)
     parent: Optional[ScopeGroupEntity] = field(default=None)
-    group_level_id: UUID = field(default_factory=uuid7)
+    group_level_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     group_level: Optional[ScopeGroupLevelEntity] = field(default=None)
-    child_type: ScopeGroupChildType = ScopeGroupChildType.Group
+    child_type: ScopeGroupChildType = field(default=ScopeGroupChildType.Group)
     child_group_level_id: Optional[UUID] = field(default=None)
     child_group_level: Optional[ScopeGroupLevelEntity] = field(default=None)
     child_item_category_ids: list[UUID] = field(default_factory=list)

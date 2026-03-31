@@ -44,10 +44,10 @@ class PlaceholderUserEntity(Entity):
     :param end_instant: Specifies the end point in time for the placeholder user's schedule or availability.
                         This property is typically updated based on task data associated with the entity.
     """
-    name: str = field(default_factory=str)
-    office_location_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    office_location_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     office_location: Optional[OfficeLocationEntity] = field(default=None)
-    primary_specialty_id: UUID = field(default_factory=uuid7)
+    primary_specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     primary_specialty: Optional[SpecialtyEntity] = field(default=None)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -72,7 +72,7 @@ class ScheduleResultEntity(Entity):
     milestones_missed: dict[UUID, datetime.timedelta] = field(default_factory=dict)
     early_placeholder_users: dict[UUID, datetime.datetime] = field(default_factory=dict)
     scores: dict[str, float] = field(default_factory=dict)
-    combined_score: float = 0.0
+    combined_score: float = field(default=0)
 
 
 @dataclass
@@ -88,11 +88,11 @@ class ScheduleMilestoneEntity(ReferenceEntityBase):
                        or this milestone does not have a specific instant.
     :param direction: Should tasks start after this milestone or end before it?
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     instant: Optional[datetime.datetime] = field(default=None)
     delayed_by: Optional[datetime.timedelta] = field(default=None)
-    direction: TaskMilestoneDirectionEnum = TaskMilestoneDirectionEnum.StartAfter
+    direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
 
 
 @dataclass
@@ -125,15 +125,15 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param time_log: The time log entry associated with this schedule segment.
                      Used to conveniently link a segment to its source time log.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    reasons_data: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
+    reasons_data: str = field(default='')
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    user_type: str = field(default_factory=str)
-    user_id: UUID = field(default_factory=uuid7)
+    user_type: str = field(default='')
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[Union[PlaceholderUserEntity, UserEntity]] = field(default=None)
-    mode: ScheduleSegmentModeEnum = ScheduleSegmentModeEnum.Unknown
+    mode: ScheduleSegmentModeEnum = field(default=ScheduleSegmentModeEnum.Unknown)
     parent_ids: list[UUID] = field(default_factory=list)
     parents: Optional[list[ScheduleSegmentEntity]] = field(default=None)
     time_log_id: Optional[UUID] = field(default=None)

@@ -28,11 +28,11 @@ class NoteEntity(Entity):
     :param on_type: The type of the entity this note is on.
     :param on: The entity this note is on.
     """
-    from_user_id: UUID = field(default_factory=uuid7)
+    from_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     from_user: Optional[UserEntity] = field(default=None)
-    title: str = field(default_factory=str)
-    content: str = field(default_factory=str)
+    title: str = field(default='')
+    content: str = field(default='')
     checklist: list[str] = field(default_factory=list)
-    on_id: UUID = field(default_factory=uuid7)
-    on_type: str = field(default_factory=str)
+    on_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    on_type: str = field(default='')
     on: Optional[TaskEntity] = field(default=None)

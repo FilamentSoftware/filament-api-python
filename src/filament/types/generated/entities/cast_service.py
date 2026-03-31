@@ -23,6 +23,6 @@ class CastEntity(Entity):
     :param specialty_id: The id of the specialty that this Cast is most associated with
     :param specialty: A helper property for setting the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastEntity.SpecialtyId" /> property.
     """
-    cast_key: str = field(default_factory=str)
-    specialty_id: UUID = field(default_factory=uuid7)
+    cast_key: str = field(default='')
+    specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     specialty: Optional[SpecialtyEntity] = field(default=None)

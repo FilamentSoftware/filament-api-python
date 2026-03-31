@@ -29,9 +29,9 @@ class ScopeItemNoteEntity(Entity):
     :param user_id: The id of the user entity that this note was created by.
     :param user: A helper property for setting the user.
     """
-    title: str = field(default_factory=str)
-    content: str = field(default_factory=str)
-    user_id: UUID = field(default_factory=uuid7)
+    title: str = field(default='')
+    content: str = field(default='')
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
 
 
@@ -68,24 +68,24 @@ class ScopeItemEntity(Entity):
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     :param lock_upstream: Gets or sets a value indicating whether to lock upstream dependencies.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     image_link: Optional[str] = field(default=None)
-    category_id: UUID = field(default_factory=uuid7)
+    category_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     category: Optional[ScopeCategoryEntity] = field(default=None)
-    size: float = 0.0
-    size_multiplier: float = 0.0
-    count: int = 0
-    task_duration_multiplier: float = 0.0
-    chargeable_multiplier: float = 0.0
+    size: float = field(default=1)
+    size_multiplier: float = field(default=1)
+    count: int = field(default=1)
+    task_duration_multiplier: float = field(default=1)
+    chargeable_multiplier: float = field(default=1)
     internal_note_id: Optional[UUID] = field(default=None)
     internal_note: Optional[ScopeItemNoteEntity] = field(default=None)
     client_note_id: Optional[UUID] = field(default=None)
     client_note: Optional[ScopeItemNoteEntity] = field(default=None)
     assumptions_calculated: list[str] = field(default_factory=list)
     assumptions_manual: list[str] = field(default_factory=list)
-    ignore_calculated_assumptions: bool = field(default_factory=bool)
-    has_dependent: bool = field(default_factory=bool)
-    currency_id: UUID = field(default_factory=uuid7)
+    ignore_calculated_assumptions: bool = field(default=False)
+    has_dependent: bool = field(default=False)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
-    lock_upstream: bool = field(default_factory=bool)
+    lock_upstream: bool = field(default=False)

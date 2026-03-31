@@ -39,18 +39,18 @@ class ScopeTaskTypeEntity(Entity):
     :param currency_id: The currency used for this task type's monetary values.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    combine_default: bool = field(default_factory=bool)
-    scale_factor: float = 0.0
-    chargeable_per_hour: float = 0.0
-    estimated_cost_per_hour: float = 0.0
-    default_estimated_cost_per_hour: float = 0.0
-    deliverable: bool = field(default_factory=bool)
-    specialty_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    description: str = field(default='')
+    combine_default: bool = field(default=False)
+    scale_factor: float = field(default=1)
+    chargeable_per_hour: float = field(default=0)
+    estimated_cost_per_hour: float = field(default=0)
+    default_estimated_cost_per_hour: float = field(default=0)
+    deliverable: bool = field(default=False)
+    specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     specialty: Optional[SpecialtyEntity] = field(default=None)
-    sort_order: int = 0
-    currency_id: UUID = field(default_factory=uuid7)
+    sort_order: int = field(default=0)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
@@ -72,14 +72,14 @@ class ScopeTaskTypeStepEntity(Entity):
     :param requires_review: If this tasks needs to go into reviews once it is done.
     :param default_processing_duration: The default duration allocated for processing this step.
     """
-    scope_task_type_id: UUID = field(default_factory=uuid7)
+    scope_task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    sort_order: int = 0
-    time_weight: float = 0.0
+    name: str = field(default='')
+    description: str = field(default='')
+    sort_order: int = field(default=0)
+    time_weight: float = field(default=1)
     deliverables: list[str] = field(default_factory=list)
-    requires_review: bool = field(default_factory=bool)
+    requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
 
 
@@ -93,7 +93,7 @@ class ScopeTaskTypeComplexityEntity(GenericComplexityBase):
     :param name: The given name this task complexity type (easy? medium? pure insanity?).
     :param description: A description that describes what this task complexity is.
     """
-    scope_task_type_id: UUID = field(default_factory=uuid7)
+    scope_task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')

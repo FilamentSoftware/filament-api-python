@@ -18,6 +18,6 @@ class SpecialtyEntity(Entity):
     :param description: A description of what this specialty covers.
     :param sort_order: Represents the ordering of the specialty entity in the context of sorting operations.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    sort_order: int = 0
+    name: str = field(default='')
+    description: str = field(default='')
+    sort_order: int = field(default=0)

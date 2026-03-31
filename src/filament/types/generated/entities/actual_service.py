@@ -34,14 +34,14 @@ class ActualEntity(ReferenceEntityBase):
     :param start_instant: The instant (UTC) when work on the task started.
     :param end_instant: The instant (UTC) when work on the task finished.
     """
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    proportion: float = 0.0
+    proportion: float = field(default=0)
     costs_by_currency_rate_id: dict[UUID, float] = field(default_factory=dict)
-    currency_id: UUID = field(default_factory=uuid7)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
-    total_reference_cost: float = 0.0
+    total_reference_cost: float = field(default=0)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)

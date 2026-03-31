@@ -25,10 +25,10 @@ class PermissionsRoleEntity(Entity):
     :param level: The level of this role, which can be used to determine whether a user has permission to assign it
     :param inferred_role_ids: A list of role identifiers that are inferred based on the context or hierarchy of the current role.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     context_type: Optional[str] = field(default=None)
-    level: int = 0
+    level: int = field(default=0)
     inferred_role_ids: list[UUID] = field(default_factory=list)
 
 
@@ -47,12 +47,12 @@ class PermissionEntity(Entity):
     :param super_admin: Whether this permission grants super admin access.
     :param organization_admin: Whether this permission grants organization admin access.
     """
-    permissions_role_id: UUID = field(default_factory=uuid7)
+    permissions_role_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     permissions_role: Optional[PermissionsRoleEntity] = field(default=None)
-    permission_type: PermissionType = PermissionType.None_
-    type_name: str = field(default_factory=str)
-    action: PermissionAction = PermissionAction.None_
+    permission_type: PermissionType = field(default=PermissionType.None_)
+    type_name: str = field(default='')
+    action: PermissionAction = field(default=PermissionAction.None_)
     properties: list[str] = field(default_factory=list)
     condition_data: Optional[str] = field(default=None)
-    super_admin: bool = field(default_factory=bool)
-    organization_admin: bool = field(default_factory=bool)
+    super_admin: bool = field(default=False)
+    organization_admin: bool = field(default=False)

@@ -31,13 +31,13 @@ class AvailabilityEntity(ReferenceEntityBase):
                        <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.RepeatCount" /> property, so if the number of repeats has not finished when this time is reached,
                        repeating will finish anyway.
     """
-    priority: int = 0
-    availability_mode: AvailabilityModeEnum = AvailabilityModeEnum.Unknown
+    priority: int = field(default=0)
+    availability_mode: AvailabilityModeEnum = field(default=AvailabilityModeEnum.Unknown)
     start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
-    date_time_zone: str = field(default_factory=str)
-    outside: bool = field(default_factory=bool)
-    repeat_mode: AvailabilityRepeatModeEnum = AvailabilityRepeatModeEnum.None_
-    repeat_days: AvailabilityRepeatDaysEnum = AvailabilityRepeatDaysEnum.None_
-    repeat_count: int = 0
+    date_time_zone: str = field(default='UTC')
+    outside: bool = field(default=False)
+    repeat_mode: AvailabilityRepeatModeEnum = field(default=AvailabilityRepeatModeEnum.None_)
+    repeat_days: AvailabilityRepeatDaysEnum = field(default=AvailabilityRepeatDaysEnum.None_)
+    repeat_count: int = field(default=0)
     repeat_end: Optional[datetime.datetime] = field(default=None)

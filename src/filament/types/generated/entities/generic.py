@@ -32,11 +32,11 @@ class AddressEntityBase(Entity):
     :param country: The country this address is in.
     """
     address_parts: list[str] = field(default_factory=list)
-    city: str = field(default_factory=str)
-    county: str = field(default_factory=str)
-    region: str = field(default_factory=str)
-    post_code: str = field(default_factory=str)
-    country: str = field(default_factory=str)
+    city: str = field(default='')
+    county: str = field(default='')
+    region: str = field(default='')
+    post_code: str = field(default='')
+    country: str = field(default='')
 
 
 @dataclass
@@ -47,7 +47,7 @@ class UserBaseEntity(Entity):
     
     :param login_status: Represents whether the user is able to login or not.
     """
-    login_status: UserStatusEnum = UserStatusEnum.Disabled
+    login_status: UserStatusEnum = field(default=UserStatusEnum.Disabled)
 
 
 @dataclass
@@ -58,7 +58,7 @@ class PhoneEntityBase(Entity):
     :param phone_number: The phone number including country code.
     :param extension: The phone extension.
     """
-    phone_number: str = field(default_factory=str)
+    phone_number: str = field(default='')
     extension: Optional[str] = field(default=None)
 
 
@@ -69,7 +69,7 @@ class EmailEntityBase(Entity):
     
     :param email_address: The email address.
     """
-    email_address: str = field(default_factory=str)
+    email_address: str = field(default='')
 
 
 @dataclass
@@ -82,8 +82,8 @@ class ReferenceEntityBase(Entity):
     :param reference_id: The id of the referenced entity
     :param reference: Represents a linked entity instance.
     """
-    reference_type: str = field(default_factory=str)
-    reference_id: UUID = field(default_factory=uuid7)
+    reference_type: str = field(default='')
+    reference_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     reference: Optional[EntityBase] = field(default=None)
 
 
@@ -102,6 +102,6 @@ class GenericComplexityBase(Entity):
     """
     assumptions: list[str] = field(default_factory=list)
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    user_count: int = 0
-    max_skill_level_adjustment: int = 0
-    min_skill_level_adjustment: int = 0
+    user_count: int = field(default=1)
+    max_skill_level_adjustment: int = field(default=0)
+    min_skill_level_adjustment: int = field(default=0)

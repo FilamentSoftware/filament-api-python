@@ -36,9 +36,9 @@ class ErrorEntity(Entity):
                         Typically used for debugging purposes to trace the sequence of method calls
                         that led to the error, providing insight into its origin and context.
     """
-    original_tenant_id: UUID = field(default_factory=uuid7)
-    message: str = field(default_factory=str)
-    error_code: ErrorCodes = ErrorCodes.None_
+    original_tenant_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    message: str = field(default='')
+    error_code: ErrorCodes = field(default=ErrorCodes.None_)
     stack_trace: Optional[str] = field(default=None)
 
 
@@ -54,12 +54,12 @@ class RequestEntity(Entity):
     :param affected_entities: List of affected entity IDs.
     :param request_data: The serialized request data associated with this entity.
     """
-    sequence: int = 0
+    sequence: int = field(default=0)
     requested_at: datetime.datetime = field(default_factory=datetime.datetime.now)
-    status: RequestStatus = RequestStatus.Unknown
+    status: RequestStatus = field(default=RequestStatus.Unknown)
     error_message: Optional[str] = field(default=None)
     affected_entities: list[str] = field(default_factory=list)
-    request_data: str = field(default_factory=str)
+    request_data: str = field(default='')
 
 
 @dataclass
@@ -73,9 +73,9 @@ class EventLogEntity(Entity):
     :param entity_ids: The IDs of the entities that were affected.
     :param property_names: The names of the properties that were modified (for Update actions).
     """
-    sequence: int = 0
-    entity_type_name: str = field(default_factory=str)
-    action: DataRequestAction = DataRequestAction.Unknown
+    sequence: int = field(default=0)
+    entity_type_name: str = field(default='')
+    action: DataRequestAction = field(default=DataRequestAction.Unknown)
     entity_ids: list[UUID] = field(default_factory=list)
     property_names: Optional[list[str]] = field(default=None)
 
@@ -93,12 +93,12 @@ class ScenarioEntity(Entity):
     :param parent_id: The parent scenario ID.
     :param parent: Represents the parent scenario entity linked to this entity.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    status: ScenarioStatus = ScenarioStatus.Creating
-    owner_user_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    description: str = field(default='')
+    status: ScenarioStatus = field(default=ScenarioStatus.Creating)
+    owner_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     shared_user_ids: list[UUID] = field(default_factory=list)
-    parent_id: UUID = field(default_factory=uuid7)
+    parent_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     parent: Optional[ScenarioEntity] = field(default=None)
 
 
@@ -111,8 +111,8 @@ class ScenarioServiceEntity(Entity):
     :param service_name: The name of the service associated with the scenario.
     :param service_type: Specifies the type of the service associated with the scenario.
     """
-    service_name: str = field(default_factory=str)
-    service_type: ScenarioServiceTypeEnum = ScenarioServiceTypeEnum.None_
+    service_name: str = field(default='')
+    service_type: ScenarioServiceTypeEnum = field(default=ScenarioServiceTypeEnum.None_)
 
 
 @dataclass
@@ -142,13 +142,13 @@ class ScenarioEventEntity(Entity):
     :param data: Stores serialized JSON data representing a collection of entities or
                  other relevant information for processing in a scenario event.
     """
-    service_name: str = field(default_factory=str)
-    primary_entity_type_name: str = field(default_factory=str)
-    entity_type_name: str = field(default_factory=str)
-    user_id: UUID = field(default_factory=uuid7)
-    is_connection: bool = field(default_factory=bool)
-    action: ScenarioEventAction = ScenarioEventAction.Unknown
-    data: str = field(default_factory=str)
+    service_name: str = field(default='')
+    primary_entity_type_name: str = field(default='')
+    entity_type_name: str = field(default='')
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    is_connection: bool = field(default=False)
+    action: ScenarioEventAction = field(default=ScenarioEventAction.Unknown)
+    data: str = field(default='')
 
 
 @dataclass
@@ -166,12 +166,12 @@ class ChangedEntity(Entity):
     :param updated_properties: List of updated property names.
     :param is_new: Whether this entity is new.
     """
-    primary_entity_type_name: str = field(default_factory=str)
-    entity_type_name: str = field(default_factory=str)
-    is_connection: bool = field(default_factory=bool)
-    from_id: UUID = field(default_factory=uuid7)
-    to_id: UUID = field(default_factory=uuid7)
+    primary_entity_type_name: str = field(default='')
+    entity_type_name: str = field(default='')
+    is_connection: bool = field(default=False)
+    from_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    to_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     entity_data: Optional[str] = field(default=None)
-    status: ChangedEntityStatus = ChangedEntityStatus.Unknown
+    status: ChangedEntityStatus = field(default=ChangedEntityStatus.Unknown)
     updated_properties: Optional[list[str]] = field(default=None)
-    is_new: bool = field(default_factory=bool)
+    is_new: bool = field(default=False)

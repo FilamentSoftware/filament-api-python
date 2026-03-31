@@ -18,5 +18,5 @@ class ScopeUserConnection(EntityConnection):
     :param responsible: Is this user responsible over all for this scope entity? Will they review it? Will they
                         approve it?
     """
-    role: str = field(default_factory=str)
-    responsible: bool = field(default_factory=bool)
+    role: str = field(default='')
+    responsible: bool = field(default=True)

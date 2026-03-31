@@ -53,8 +53,8 @@ class EntityConnectionBase(EntityBase):
     :param from_entity: A helper function to set <see cref="P:Filament.FSCore.Entities.EntityConnectionBase.FromId">FromId</see> from an entity.
     :param to_entity: A helper function to set <see cref="P:Filament.FSCore.Entities.EntityConnectionBase.ToId">ToId</see> from an entity.
     """
-    from_id: UUID = field(default_factory=uuid7)
-    to_id: UUID = field(default_factory=uuid7)
+    from_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    to_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     from_entity: Optional[Entity] = field(default=None)
     to_entity: Optional[Entity] = field(default=None)
 

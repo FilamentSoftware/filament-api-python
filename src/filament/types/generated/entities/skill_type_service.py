@@ -24,7 +24,7 @@ class SkillTypeEntity(Entity):
     :param context: If this type is a context, set to True. If not, leave False.
     :param taskable: If this type is taskable, set to True. If not, leave False.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    context: bool = field(default_factory=bool)
-    taskable: bool = field(default_factory=bool)
+    name: str = field(default='')
+    description: str = field(default='')
+    context: bool = field(default=False)
+    taskable: bool = field(default=False)

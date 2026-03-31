@@ -31,7 +31,7 @@ class TaskStatusEntity(Entity):
                                  slot, but will instead find the first review slot that matches one of these tags.
     :param processing_duration: Represents the estimated processing duration required until the task is finished.
     """
-    status: TaskStatusEnum = TaskStatusEnum.InProgress
+    status: TaskStatusEnum = field(default=TaskStatusEnum.InProgress)
     block_user_ids: dict[UUID, BlockUserReasonEnum] = field(default_factory=dict)
     override_review_tags: list[str] = field(default_factory=list)
     processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())

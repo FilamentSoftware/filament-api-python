@@ -32,10 +32,10 @@ class OrganizationEntity(Entity):
                         in this currency unless overridden at a more specific level.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    industry: Industry = Industry.VisualEffects
-    currency_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    description: str = field(default='')
+    industry: Industry = field(default=Industry.VisualEffects)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
@@ -53,11 +53,11 @@ class TaxCreditLocationEntity(Entity):
     :param currency_id: The currency used at this tax credit location.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    organization_id: UUID = field(default_factory=uuid7)
+    organization_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     organization: Optional[OrganizationEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    code: str = field(default_factory=str)
-    currency_id: UUID = field(default_factory=uuid7)
+    name: str = field(default='')
+    code: str = field(default='')
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
@@ -78,14 +78,14 @@ class OfficeLocationEntity(AddressEntityBase):
     :param currency_id: The currency used at this office location.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
-    organization_id: UUID = field(default_factory=uuid7)
+    organization_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     organization: Optional[OrganizationEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    code: str = field(default_factory=str)
-    date_time_zone: str = field(default_factory=str)
-    location_minimum_wage_per_hour: float = 0.0
+    name: str = field(default='')
+    code: str = field(default='')
+    date_time_zone: str = field(default='UTC')
+    location_minimum_wage_per_hour: float = field(default=0)
     standard_working_day_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    currency_id: UUID = field(default_factory=uuid7)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
@@ -101,9 +101,9 @@ class OrganizationContactEntity(Entity):
     :param phone_number: The phone number for this contact.
     :param contact_type: What type of contact is this?
     """
-    organization_id: UUID = field(default_factory=uuid7)
+    organization_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     organization: Optional[OrganizationEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    email_address: str = field(default_factory=str)
-    phone_number: str = field(default_factory=str)
-    contact_type: ContactType = ContactType.General
+    name: str = field(default='')
+    email_address: str = field(default='')
+    phone_number: str = field(default='')
+    contact_type: ContactType = field(default=ContactType.General)

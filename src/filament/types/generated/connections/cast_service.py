@@ -25,10 +25,10 @@ class CastUserConnection(EntityConnection):
     :param ref_skill_distance: Represents the distance between the skill of the user and the reference skill of the cast.
     :param skill_proportion_used: The proportion of the user's skills that are used by the cast.
     """
-    duration_multiplier: float = 0.0
-    over_qualified: bool = field(default_factory=bool)
-    ref_skill_distance: float = 0.0
-    skill_proportion_used: float = 0.0
+    duration_multiplier: float = field(default=0)
+    over_qualified: bool = field(default=False)
+    ref_skill_distance: float = field(default=0)
+    skill_proportion_used: float = field(default=0)
 
 
 @dataclass
@@ -56,4 +56,4 @@ class CastOfficeLocationConnection(EntityConnection):
     
     :param priority: Represents the priority level assigned to the connection between a CastEntity and an OfficeLocationEntity.
     """
-    priority: int = 0
+    priority: int = field(default=0)

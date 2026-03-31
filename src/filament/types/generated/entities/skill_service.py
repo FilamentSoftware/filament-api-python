@@ -44,17 +44,17 @@ class SkillEntity(Entity):
     :param training_material_duration: If there is training material available for this skill this is the amount of time a user is expected
                                        to need in order to absorb that material.
     """
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     default_context_ids: Optional[list[UUID]] = field(default=None)
     default_contexts: Optional[list[SkillEntity]] = field(default=None)
     allowed_context_ids: Optional[list[UUID]] = field(default=None)
     allowed_contexts: Optional[list[SkillEntity]] = field(default=None)
-    skill_type_id: UUID = field(default_factory=uuid7)
+    skill_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     skill_type: Optional[SkillTypeEntity] = field(default=None)
     specialty_id: Optional[UUID] = field(default=None)
     specialty: Optional[SpecialtyEntity] = field(default=None)
-    training_method: TrainingType = TrainingType.OnTheJob
+    training_method: TrainingType = field(default=TrainingType.OnTheJob)
     mentor_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     training_material_duration: Optional[datetime.timedelta] = field(default=None)
 
@@ -69,8 +69,8 @@ class SkillTrainingMaterialEntity(Entity):
     :param skill_id: A link to the skill entity this is connected to.
     :param skill: A helper method for setting the skill.
     """
-    material_path: str = field(default_factory=str)
-    skill_id: UUID = field(default_factory=uuid7)
+    material_path: str = field(default='')
+    skill_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     skill: Optional[SkillEntity] = field(default=None)
 
 
@@ -94,9 +94,9 @@ class SkillLevelEntity(Entity):
                                   suggested total compensation for a user.
     """
     skill: Optional[SkillEntity] = field(default=None)
-    skill_id: UUID = field(default_factory=uuid7)
-    level: int = 0
-    reference: bool = field(default_factory=bool)
-    description: str = field(default_factory=str)
-    duration_multiplier: float = 0.0
-    compensation_per_hour: float = 0.0
+    skill_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    level: int = field(default=1)
+    reference: bool = field(default=False)
+    description: str = field(default='')
+    duration_multiplier: float = field(default=1)
+    compensation_per_hour: float = field(default=0)

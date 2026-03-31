@@ -28,7 +28,7 @@ class ScopeItemDependencyConnection(EntityConnection):
     
     :param size_multiplier: Fine grain control over the task size.
     """
-    size_multiplier: float = 0.0
+    size_multiplier: float = field(default=1)
 
 
 @dataclass
@@ -42,7 +42,7 @@ class ScopeItemMilestoneConnection(EntityConnection):
     """
     scope_task_type_step_id: Optional[UUID] = field(default=None)
     scope_task_type_step: Optional[ScopeTaskTypeStepEntity] = field(default=None)
-    task_combine_key: str = field(default_factory=str)
+    task_combine_key: str = field(default='')
 
 
 @dataclass
@@ -68,7 +68,7 @@ class ScopeItemOfficeLocationConnection(EntityConnection):
     """
     scope_task_type_id: Optional[UUID] = field(default=None)
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
-    priority: int = 0
+    priority: int = field(default=1)
     scope_item_context_id: Optional[UUID] = field(default=None)
     scope_item_context: Optional[ScopeItemEntity] = field(default=None)
     scope_template_item_context_id: Optional[UUID] = field(default=None)
@@ -82,7 +82,7 @@ class ScopeItemTemplateItemConnection(EntityConnection):
     
     :param size_multiplier: Fine grain control over the task size.
     """
-    size_multiplier: float = 0.0
+    size_multiplier: float = field(default=1)
 
 
 @dataclass
@@ -105,5 +105,5 @@ class ScopeItemTaskTypeOverrideConnection(GenericScopeTaskTypeConnection_2[Scope
     scope_item_context: Optional[ScopeItemEntity] = field(default=None)
     scope_template_item_context_id: Optional[UUID] = field(default=None)
     scope_template_item_context: Optional[ScopeTemplateItemEntity] = field(default=None)
-    task_combine_key: str = field(default_factory=str)
-    remove: bool = field(default_factory=bool)
+    task_combine_key: str = field(default='')
+    remove: bool = field(default=False)

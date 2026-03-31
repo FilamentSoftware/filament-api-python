@@ -43,7 +43,7 @@ class TaskDependencyConnectionBase_2(EntityConnection, Generic[TFromEntity, TToE
                                Filament would connect step 3 of the lighting task to step 1 of the compositing task (assuming the
                                dependency chain was: Lighting ---(0.5)--- Compositing ).
     """
-    overlap_proportion: float = 0.0
+    overlap_proportion: float = field(default=0.0)
 
 
 @dataclass
@@ -88,7 +88,7 @@ class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TC
     :param custom_complexity: A helper method for setting the custom complexity id.
     """
     add_to_dependent: bool = field(default_factory=bool)
-    complexity_source: ScopeTaskTypeComplexitySource = ScopeTaskTypeComplexitySource.None_
+    complexity_source: ScopeTaskTypeComplexitySource = field(default=ScopeTaskTypeComplexitySource.None_)
     complexity_id: Optional[UUID] = field(default=None)
     complexity: Optional[ScopeTaskTypeComplexityEntity] = field(default=None)
     custom_complexity_id: Optional[UUID] = field(default=None)
@@ -103,8 +103,8 @@ class TaskDependencyOverrideConnectionBase_2(TaskDependencyConnectionBase_2[TFro
     :param include_state: Should this connection be included?
     :param overlap_state: Does this connection contain a custom overlap that should be applied?
     """
-    include_state: TaskDependencyOverrideIncludeState = TaskDependencyOverrideIncludeState.Default
-    overlap_state: TaskDependencyOverrideOverlapState = TaskDependencyOverrideOverlapState.Default
+    include_state: TaskDependencyOverrideIncludeState = field(default=TaskDependencyOverrideIncludeState.Default)
+    overlap_state: TaskDependencyOverrideOverlapState = field(default=TaskDependencyOverrideOverlapState.Default)
 
 
 @dataclass
@@ -114,7 +114,7 @@ class GenericUserSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TE
     
     :param level: The level of the user's skill.
     """
-    level: int = 0
+    level: int = field(default=0)
 
 
 @dataclass
@@ -127,6 +127,6 @@ class GenericTaskSkillConnection_1(GenericSkillConnection_1[TEntity], Generic[TE
     :param primary_skill: Is this the primary skill used for the task? Used to determine what skills are being fed back
                           on by the machine learning system.
     """
-    min_skill_level: int = 0
-    max_skill_level: int = 0
+    min_skill_level: int = field(default=0)
+    max_skill_level: int = field(default=0)
     primary_skill: bool = field(default_factory=bool)
