@@ -1,17 +1,19 @@
 """Async Filament API client over SignalR."""
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import inspect
 import logging
 from collections.abc import Awaitable, Callable
 from types import TracebackType
 from typing import Any, Optional, Type, Union
 
-from signalr_async.netcore import Hub, Client
-from signalr_async.netcore.protocols import JsonProtocol
+from pysignalr.client import SignalRClient
+from pysignalr.messages import CompletionMessage
 from uuid_utils import UUID, uuid7
 
-from filament._exceptions import FilamentAuthenticationError
+from filament._exceptions import FilamentAuthenticationError, FilamentConnectionError
 from filament._serialization import from_dict, to_dict
 from filament.types.generated.misc import (
     EntityPermissions,
@@ -37,6 +39,7 @@ Callback = Union[Callable[..., Any], Callable[..., Awaitable[Any]]]
 _DEFAULT_SERVER = "https://backend.filament-software.com"
 _DEFAULT_PORT = 7076
 _DEFAULT_PATH = "api/v0"
+_DEFAULT_CONNECTION_TIMEOUT = 10.0
 
 
 class FilamentClient:
@@ -58,6 +61,7 @@ class FilamentClient:
         server: str = _DEFAULT_SERVER,
         port: int = _DEFAULT_PORT,
         path: str = _DEFAULT_PATH,
+        connection_timeout: float = _DEFAULT_CONNECTION_TIMEOUT,
     ) -> None:
         """Initialise the client.
 
@@ -67,10 +71,13 @@ class FilamentClient:
         :param server: Base URL of the Filament backend server.
         :param port: Port number the backend listens on.
         :param path: URL path prefix for the SignalR hub endpoint.
+        :param connection_timeout: Timeout in seconds for the initial
+            connection to the server (default 10).
         """
         self._api_key_name = api_key_name
         self._authentication_failed = False
         self._auth_message: Optional[str] = None
+        self._connection_timeout = connection_timeout
 
         # Subscription routing — supports multiple callbacks per backend
         # subscription.  The backend returns the same subscription ID when
@@ -91,32 +98,37 @@ class FilamentClient:
         self._on_processing_failed_callbacks: list[Callback] = []
 
         # Build SignalR connection
-        url = f"{server}:{port}"
-        self._hub: Hub = Hub(path)
-
-        # Register internal event handlers
-        self._hub.on("AuthenticationFailed", self._handle_authentication_failed)
-        self._hub.on("DataUpdated", self._handle_data_updated)
-        self._hub.on("ProcessingStarted", self._handle_processing_started)
-        self._hub.on("ProcessingCompleted", self._handle_processing_completed)
-        self._hub.on("ProcessingFailed", self._handle_processing_failed)
-        self._hub.on("KeepAlive", self._handle_keep_alive)
+        self._url = f"{server}:{port}/{path}"
 
         headers = {
             "X-Api-Key-Name": api_key_name,
             "X-Api-Key": api_key,
             "X-Organization-Id": organization_id,
         }
-        self._client: Client = Client(
-            url,
-            self._hub,
-            keepalive_interval=3600,
-            connection_options={
-                "protocol": JsonProtocol(),
-                "http_client_options": {"headers": headers},
-                "ws_client_options": {"headers": headers, "timeout": 1.0},
-            },
+        self._signalr_client: SignalRClient = SignalRClient(
+            url=self._url,
+            headers=headers,
+            connection_timeout=int(connection_timeout),
+            ping_interval=3600,
         )
+
+        # Register internal event handlers.  pysignalr passes
+        # message.arguments (a list) to on() callbacks, so we wrap
+        # each handler to unpack the arguments list.
+        self._signalr_client.on("AuthenticationFailed", self._wrap_handler(self._handle_authentication_failed))
+        self._signalr_client.on("DataUpdated", self._wrap_handler(self._handle_data_updated))
+        self._signalr_client.on("ProcessingStarted", self._wrap_handler(self._handle_processing_started))
+        self._signalr_client.on("ProcessingCompleted", self._wrap_handler(self._handle_processing_completed))
+        self._signalr_client.on("ProcessingFailed", self._wrap_handler(self._handle_processing_failed))
+        self._signalr_client.on("KeepAlive", self._wrap_handler(self._handle_keep_alive))
+
+        # pysignalr requires an error callback to avoid RuntimeError
+        # when a server invocation returns an error.
+        self._signalr_client.on_error(self._handle_signalr_error)
+
+        # Background task for pysignalr's run() loop
+        self._run_task: Optional[asyncio.Task[None]] = None
+        self._connected: Optional[asyncio.Event] = None
 
     # ------------------------------------------------------------------
     # Context manager
@@ -125,12 +137,48 @@ class FilamentClient:
     async def __aenter__(self) -> FilamentClient:
         """Open the SignalR connection.
 
-        Raises :class:`FilamentAuthenticationError` if the server rejects
-        the API key during the connection handshake.
+        Raises :class:`FilamentConnectionError` if the server cannot be
+        reached, and :class:`FilamentAuthenticationError` if the server
+        rejects the API key during the connection handshake.
         """
-        await self._client.__aenter__()
+        self._connected = asyncio.Event()
+        self._signalr_client.on_open(self._on_open)
+
+        self._run_task = asyncio.create_task(self._signalr_client.run())
+
+        # Wait for either: connection established, run() failing, or timeout
+        wait_connected = asyncio.ensure_future(self._connected.wait())
+        done, pending = await asyncio.wait(
+            {wait_connected, self._run_task},
+            timeout=self._connection_timeout,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        # Cancel the wait future if still pending
+        for fut in pending:
+            if fut is wait_connected:
+                fut.cancel()
+
+        if wait_connected not in done:
+            # Either run_task failed or we timed out
+            self._run_task.cancel()
+            try:
+                await self._run_task
+            except Exception as exc:
+                raise FilamentConnectionError(
+                    f"Failed to connect to {self._url}: {exc}"
+                ) from None
+            except asyncio.CancelledError:
+                pass
+
+            raise FilamentConnectionError(
+                f"Failed to connect to {self._url}: connection timed out"
+            ) from None
+
         if self._authentication_failed:
-            await self._client.__aexit__(None, None, None)
+            self._run_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._run_task
             raise FilamentAuthenticationError(
                 self._auth_message or "Authentication failed"
             )
@@ -143,17 +191,71 @@ class FilamentClient:
         exc_tb: Optional[TracebackType],
     ) -> None:
         """Close the SignalR connection."""
-        await self._client.__aexit__(exc_type, exc_val, exc_tb)
+        if self._run_task is not None:
+            self._run_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._run_task
+
+    # ------------------------------------------------------------------
+    # SignalR invoke helper
+    # ------------------------------------------------------------------
+
+    async def _invoke(self, method: str, *args: Any) -> Any:
+        """Send a hub invocation and await the server's response.
+
+        Wraps pysignalr's fire-and-forget ``send()`` with a
+        :class:`asyncio.Future` so callers can ``await`` the result.
+        """
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[Any] = loop.create_future()
+
+        async def on_completion(message: CompletionMessage) -> None:
+            if future.done():
+                return
+            if message.error:
+                future.set_exception(Exception(message.error))
+            else:
+                future.set_result(message.result)
+
+        await self._signalr_client.send(method, list(args), on_invocation=on_completion)
+        return await future
 
     # ------------------------------------------------------------------
     # Internal event handlers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _wrap_handler(
+        handler: Callable[..., Awaitable[Any]],
+    ) -> Callable[[Any], Awaitable[None]]:
+        """Wrap an event handler to unpack pysignalr's arguments list."""
+        async def wrapper(arguments: Any) -> None:
+            if isinstance(arguments, list):
+                await handler(*arguments)
+            else:
+                await handler(arguments)
+        return wrapper
+
+    async def _on_open(self) -> None:
+        """Called when the SignalR connection is established."""
+        # Brief yield to let immediate server messages (e.g.
+        # AuthenticationFailed) arrive before we signal ready.
+        await asyncio.sleep(0.1)
+        if self._connected is not None:
+            self._connected.set()
+
+    async def _handle_signalr_error(self, message: CompletionMessage) -> None:
+        """Handle invocation errors from the server."""
+        logger.error("SignalR invocation error: %s", message.error)
 
     async def _handle_authentication_failed(self, message: str = "") -> None:
         """Record an ``AuthenticationFailed`` event from the server."""
         logger.error("Authentication failed: %s", message)
         self._authentication_failed = True
         self._auth_message = message
+        # Signal connected so __aenter__ can check the flag and raise
+        if self._connected is not None:
+            self._connected.set()
 
     async def _handle_data_updated(self, data: Any) -> None:
         """Deserialize a ``DataUpdated`` event and fan out to all matching callbacks."""
@@ -254,7 +356,7 @@ class FilamentClient:
         self,
     ) -> ValueOrErrorPublic_1[EntityPermissions]:
         """Retrieve entity-level permissions for the authenticated user."""
-        result_dict: Any = await self._hub.invoke("GetEntityPermissions")
+        result_dict: Any = await self._invoke("GetEntityPermissions")
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPermissions])
         except (TypeError, ValueError, KeyError):
@@ -268,7 +370,7 @@ class FilamentClient:
         entity_type_name: str,
     ) -> ValueOrErrorPublic_1[EntityPropertyPermissions]:
         """Retrieve property-level permissions for a given entity type."""
-        result_dict: Any = await self._hub.invoke(
+        result_dict: Any = await self._invoke(
             "GetEntityPropertyPermissions", entity_type_name
         )
         try:
@@ -285,7 +387,7 @@ class FilamentClient:
     ) -> ValueOrErrorPublic_1[ServiceDataRead]:
         """Read entity data from the server."""
         request_dict = to_dict(request)
-        result_dict: Any = await self._hub.invoke("ReadData", request_dict)
+        result_dict: Any = await self._invoke("ReadData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
         except (TypeError, ValueError, KeyError):
@@ -300,7 +402,7 @@ class FilamentClient:
     ) -> ValueOrErrorPublic_1[RequestId]:
         """Create, update, or delete entity data."""
         request_dict = to_dict(request)
-        result_dict: Any = await self._hub.invoke("ModifyData", request_dict)
+        result_dict: Any = await self._invoke("ModifyData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
         except (TypeError, ValueError, KeyError):
@@ -327,7 +429,7 @@ class FilamentClient:
         sent when the last client subscription sharing a backend ID is removed.
         """
         subscription_dict = to_dict(subscription)
-        result_dict: Any = await self._hub.invoke("Subscribe", subscription_dict)
+        result_dict: Any = await self._invoke("Subscribe", subscription_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[SubscriptionId])
         except (TypeError, ValueError, KeyError):
@@ -377,7 +479,7 @@ class FilamentClient:
                     # Last client for this backend subscription — tell backend
                     del self._backend_to_client[backend_id]
                     backend_sub = SubscriptionId(id=backend_id)
-                    result_dict = await self._hub.invoke(
+                    result_dict = await self._invoke(
                         "Unsubscribe", to_dict(backend_sub),
                     )
                     result = from_dict(result_dict, SuccessOrErrorPublic)
@@ -396,7 +498,7 @@ class FilamentClient:
 
     async def unsubscribe_all(self) -> SuccessOrErrorPublic:
         """Cancel all active subscriptions."""
-        result_dict = await self._hub.invoke("UnsubscribeAll")
+        result_dict = await self._invoke("UnsubscribeAll")
         self._backend_to_client.clear()
         self._client_callbacks.clear()
         self._client_to_backend.clear()
