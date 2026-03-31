@@ -295,19 +295,12 @@ def _convert_from_dict_value(
             return option_from_dict(data)
         return data
 
-    # Dataclass -> recurse
-    if _is_dataclass_type(field_type):
+    # Dataclass -> recurse (also handles parameterised generics like
+    # UpdatedEntityServiceData_1[EntityBase])
+    origin = get_origin(field_type)
+    if _is_dataclass_type(field_type) or (origin is not None and _is_dataclass_type(origin)):
         if isinstance(data, dict):
-            concrete: Any = field_type
-            if (
-                "$type" in data
-                and isinstance(field_type, type)
-                and issubclass(field_type, EntityBase)
-            ):
-                resolved = _resolve_entity_type(data["$type"])
-                if resolved is not None and issubclass(resolved, field_type):
-                    concrete = resolved
-            return from_dict(data, concrete)
+            return from_dict(data, field_type)
         return data
 
     # list[X]
@@ -442,6 +435,11 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
 
         camel_key = camel_case_from_snake_case(f.name)
         if camel_key not in data and f.name not in data:
+            # Default missing Optional fields to None so dataclasses
+            # without explicit defaults still construct correctly.
+            field_type = hints.get(f.name, f.type)
+            if f.name not in dataclass_data and _is_optional(field_type):
+                dataclass_data[f.name] = None
             continue
 
         raw_value = data.get(camel_key, data.get(f.name))
