@@ -33,6 +33,8 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f00Z"
 
 def camel_case_from_snake_case(s: str) -> str:
     """Convert ``snake_case`` to ``camelCase``."""
+    if not s:
+        return s
     return s[0].lower() + "".join(word.title() for word in s.split("_"))[1:]
 
 
