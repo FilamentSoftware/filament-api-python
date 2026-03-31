@@ -300,6 +300,64 @@ class TestRoundTrip:
 
 
 class TestEntityBaseRoundTrip:
+    def test_entity_tracks_specified_properties(self) -> None:
+        """Direct construction records only the explicitly passed kwargs."""
+        user = UserEntity(given_name="Alice", family_name="Smith")
+        props = getattr(user, "specified_properties", None)
+        assert props is not None
+        assert "given_name" in props
+        assert "family_name" in props
+        assert "created_at" not in props
+        assert "created_by_id" not in props
+        assert "updated_at" not in props
+        assert "updated_by_id" not in props
+
+    def test_specified_properties_includes_id(self) -> None:
+        """``id`` is always present even when not explicitly passed."""
+        user = UserEntity(given_name="Alice")
+        props = getattr(user, "specified_properties", None)
+        assert props is not None
+        assert "id" in props
+
+    def test_explicit_id_not_duplicated(self) -> None:
+        """Passing ``id`` explicitly does not create a duplicate entry."""
+        my_id = uuid7()
+        user = UserEntity(id=my_id, given_name="Alice")
+        props = getattr(user, "specified_properties", None)
+        assert props is not None
+        assert props.count("id") == 1
+
+    def test_to_dict_filters_to_specified_properties(self) -> None:
+        """Audit fields are excluded from serialized output."""
+        user = UserEntity(given_name="Alice", family_name="Smith")
+        result = to_dict(user)
+        assert result is not None
+        assert "givenName" in result
+        assert "familyName" in result
+        assert "id" in result
+        assert "$type" in result
+        assert "createdAt" not in result
+        assert "createdById" not in result
+        assert "updatedAt" not in result
+        assert "updatedById" not in result
+
+    def test_from_dict_clears_specified_properties(self) -> None:
+        """Deserialized entities have specified_properties=None so all fields serialize."""
+        data = {
+            "$type": "UserEntity",
+            "id": str(uuid7()),
+            "givenName": "Alice",
+            "familyName": "Smith",
+            "createdAt": "2025-01-15T10:30:45.12345600Z",
+        }
+        restored = from_dict(data, EntityBase)
+        assert restored is not None
+        assert getattr(restored, "specified_properties", "missing") is None
+        # Re-serializing should include all fields (no filtering)
+        reserialized = to_dict(restored)
+        assert reserialized is not None
+        assert "createdAt" in reserialized
+
     def test_entity_base_type_dispatch(self) -> None:
         """to_dict writes $type; from_dict with EntityBase target uses it to restore
         the concrete subclass."""
