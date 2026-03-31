@@ -79,7 +79,13 @@ def _value_to_wire(value: Any) -> Optional[str]:
 
 
 def _values_to_wire(values: Sequence[Any]) -> list[Optional[str]]:
-    """Convert a sequence of typed values to wire format."""
+    """Convert a sequence of typed values to wire format.
+
+    :raises TypeError: If *values* is a scalar string or bytes instead of a
+        sequence of individual values.
+    """
+    if isinstance(values, (str, bytes)):
+        raise TypeError("Expected a sequence of values, not a scalar string")
     return [_value_to_wire(v) for v in values]
 
 
@@ -387,11 +393,18 @@ class DbConditionDictProperty(Generic[TKey, TValue]):
         self._wire_name = wire_name
 
     def key(self, key_value: TKey) -> DbConditionProperty[TValue]:
-        """Access a specific dictionary key (mode=DictionaryValue)."""
+        """Access a specific dictionary key (mode=DictionaryValue).
+
+        :param key_value: The dictionary key to match against.
+        :raises ValueError: If *key_value* is ``None``.
+        """
+        wire_key = _value_to_wire(key_value)
+        if wire_key is None:
+            raise ValueError("Dictionary key must not be None")
         return DbConditionProperty[TValue](
             self._wire_name,
             mode=DbConditionMode.DictionaryValue,
-            key=_value_to_wire(key_value),
+            key=wire_key,
         )
 
     def keys(self) -> DbConditionListProperty[TKey]:
