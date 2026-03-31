@@ -7,7 +7,6 @@ companion ``_mypy_plugin``).
 from __future__ import annotations
 
 import datetime
-import sys
 import types
 from collections.abc import Sequence
 from dataclasses import fields as dc_fields
