@@ -75,7 +75,9 @@ def _value_to_wire(value: Any) -> Optional[str]:
         return value.strftime(DATETIME_FORMAT)
     if isinstance(value, datetime.timedelta):
         return str(value.total_seconds())
-    return str(value)
+    raise TypeError(
+        f"Unsupported value type {type(value).__name__!r} for condition wire format"
+    )
 
 
 def _values_to_wire(values: Sequence[Any]) -> list[Optional[str]]:
