@@ -38,7 +38,7 @@ f = filament.FilamentClient(
     organization_id="my-org",
     api_key_name="my-key",
     api_key="secret",
-    server="https://dev.backend.filament-software.com",
+    server="https://backend.filament-software.com",
     port=1234,
     path="api/v1",
 )
@@ -149,9 +149,12 @@ async def main() -> None:
 Register callbacks for processing lifecycle events:
 
 ```python
-f.on_processing_started(lambda status: print("Started:", status.scenario_id))
-f.on_processing_completed(lambda status: print("Done:", status.scenario_id))
-f.on_processing_failed(lambda status: print("Failed:", status.message))
+async with filament.FilamentClient(
+    organization_id="my-org", api_key_name="my-key", api_key="secret",
+) as f:
+    f.on_processing_started(lambda status: print("Started:", status.scenario_id))
+    f.on_processing_completed(lambda status: print("Done:", status.scenario_id))
+    f.on_processing_failed(lambda status: print("Failed:", status.message))
 ```
 
 ## Development
