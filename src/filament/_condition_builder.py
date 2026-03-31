@@ -444,7 +444,9 @@ class Condition(Generic[TEntity]):
         """
         self._entity_cls = entity_cls
 
-    def prop(self, name: str) -> DbConditionProperty[Any]:
+    def prop(
+        self, name: str,
+    ) -> Union[DbConditionProperty[Any], DbConditionDictProperty[Any, Any]]:
         """Return a typed property wrapper for the named field.
 
         At runtime, validates that the field exists and classifies its type.
@@ -458,7 +460,7 @@ class Condition(Generic[TEntity]):
         if category == "list":
             return DbConditionListProperty[Any](wire_name)
         if category == "dict":
-            return DbConditionDictProperty[Any, Any](wire_name)  # type: ignore[return-value]
+            return DbConditionDictProperty[Any, Any](wire_name)
         return DbConditionProperty[Any](wire_name)
 
     @staticmethod
