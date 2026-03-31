@@ -195,11 +195,11 @@ def _convert_to_dict_value(
             return None
         return _convert_to_dict_value(data, inner, None, convert_uuid)
 
-    # TypeVar -> use the resolved generic arg
+    # TypeVar -> use the resolved generic arg, or infer from runtime value
     if isinstance(field_type, TypeVar):
         if generic_type_arg is not None:
             return _convert_to_dict_value(data, generic_type_arg, None, convert_uuid)
-        return data
+        return _convert_to_dict_value(data, type(data), None, convert_uuid)
 
     # DbConditionInstance -> custom polymorphic serialization
     if _is_condition_type(field_type):
