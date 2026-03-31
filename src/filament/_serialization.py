@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import datetime
 import re
-import sys
 import types
 from collections.abc import Sequence as ABCSequence
 from dataclasses import fields, is_dataclass
@@ -131,24 +130,19 @@ def _is_dict_like(tp: Any) -> bool:
 
 
 def _resolve_type_hints(cls: Any) -> dict[str, Any]:
-    """Resolve string annotations to real types for a dataclass class."""
+    """Resolve string annotations to real types for a dataclass class.
+
+    Does NOT pass ``globalns`` so that Python resolves each base class's
+    annotations using its own module globals (required when the MRO spans
+    multiple modules with different imports).
+    """
+    import typing
     try:
-        mod = sys.modules.get(cls.__module__, None)
-        globalns = vars(mod) if mod else None
-        return _get_type_hints_safe(cls, globalns=globalns)
+        return typing.get_type_hints(cls)
     except Exception:
         # Fall back to raw field.type (will be strings if __future__ annotations
         # is used, but at least we don't crash).
         return {}
-
-
-def _get_type_hints_safe(
-    cls: Any,
-    globalns: Optional[dict[str, Any]] = None,
-) -> dict[str, Any]:
-    """Wrapper around typing.get_type_hints that handles common failures."""
-    import typing
-    return typing.get_type_hints(cls, globalns=globalns)
 
 
 # ---------------------------------------------------------------------------
