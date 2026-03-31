@@ -1,6 +1,6 @@
 """Tests for the FilamentClient class.
 
-These tests mock the signalr-async Hub/Client to verify method dispatch,
+These tests mock the pysignalr SignalRClient to verify method dispatch,
 serialization, and subscription routing without a live server.
 """
 from __future__ import annotations
@@ -33,36 +33,28 @@ from filament.types.generated.misc import (
 
 def _make_client(**kwargs: Any) -> FilamentClient:
     """Create a FilamentClient with mocked SignalR internals."""
-    with patch("filament._client.Hub") as mock_hub_cls, \
-         patch("filament._client.Client"):
-        mock_hub = MagicMock()
-        mock_hub.on = MagicMock()
-        mock_hub.invoke = AsyncMock()
-        mock_hub_cls.return_value = mock_hub
-
+    with patch("filament._client.SignalRClient"):
         client = FilamentClient(
             organization_id="test-org",
             api_key_name="test-key",
             api_key="test-secret",
             **kwargs,
         )
-        # Store mock for test access
-        client._hub = mock_hub
+        # Mock _invoke for testing API methods
+        client._invoke = AsyncMock()
         return client
 
 
 class TestClientConstruction:
     def test_default_url(self) -> None:
-        with patch("filament._client.Hub"), \
-             patch("filament._client.Client") as mock_client_cls:
+        with patch("filament._client.SignalRClient") as mock_cls:
             FilamentClient(organization_id="org", api_key_name="k", api_key="s")
-            call_args = mock_client_cls.call_args
-            assert call_args is not None
-            assert call_args[0][0] == "https://backend.filament-software.com:7076"
+            call_kwargs = mock_cls.call_args
+            assert call_kwargs is not None
+            assert call_kwargs[1]["url"] == "https://backend.filament-software.com:7076/api/v0"
 
     def test_custom_url(self) -> None:
-        with patch("filament._client.Hub"), \
-             patch("filament._client.Client") as mock_client_cls:
+        with patch("filament._client.SignalRClient") as mock_cls:
             FilamentClient(
                 organization_id="org",
                 api_key_name="k",
@@ -71,17 +63,16 @@ class TestClientConstruction:
                 port=9999,
                 path="api/v1",
             )
-            call_args = mock_client_cls.call_args
-            assert call_args is not None
-            assert call_args[0][0] == "https://dev.example.com:9999"
+            call_kwargs = mock_cls.call_args
+            assert call_kwargs is not None
+            assert call_kwargs[1]["url"] == "https://dev.example.com:9999/api/v1"
 
     def test_registers_event_handlers(self) -> None:
-        with patch("filament._client.Hub") as mock_hub_cls, \
-             patch("filament._client.Client"):
-            mock_hub = MagicMock()
-            mock_hub_cls.return_value = mock_hub
+        with patch("filament._client.SignalRClient") as mock_cls:
+            mock_client = MagicMock()
+            mock_cls.return_value = mock_client
             FilamentClient(organization_id="org", api_key_name="k", api_key="s")
-            registered = {call[0][0] for call in mock_hub.on.call_args_list}
+            registered = {call[0][0] for call in mock_client.on.call_args_list}
             assert "DataUpdated" in registered
             assert "ProcessingStarted" in registered
             assert "ProcessingCompleted" in registered
@@ -89,12 +80,26 @@ class TestClientConstruction:
             assert "AuthenticationFailed" in registered
             assert "KeepAlive" in registered
 
+    def test_headers_passed(self) -> None:
+        with patch("filament._client.SignalRClient") as mock_cls:
+            FilamentClient(
+                organization_id="my-org",
+                api_key_name="my-key",
+                api_key="my-secret",
+            )
+            call_kwargs = mock_cls.call_args
+            assert call_kwargs is not None
+            headers = call_kwargs[1]["headers"]
+            assert headers["X-Api-Key-Name"] == "my-key"
+            assert headers["X-Api-Key"] == "my-secret"
+            assert headers["X-Organization-Id"] == "my-org"
+
 
 class TestReadData:
     @pytest.mark.asyncio
     async def test_read_data_invokes_hub(self) -> None:
         client = _make_client()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -112,8 +117,8 @@ class TestReadData:
         )
         result = await client.read_data(request)
 
-        client._hub.invoke.assert_called_once()
-        call_args = client._hub.invoke.call_args
+        client._invoke.assert_called_once()
+        call_args = client._invoke.call_args
         assert call_args is not None
         assert call_args[0][0] == "ReadData"
         assert result.success is True
@@ -124,7 +129,7 @@ class TestSubscriptionRouting:
     async def test_subscribe_stores_callback(self) -> None:
         client = _make_client()
         backend_id = uuid7()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -157,7 +162,7 @@ class TestSubscriptionRouting:
         """Multiple subscribes returning the same backend ID get separate client IDs."""
         client = _make_client()
         backend_id = uuid7()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -186,7 +191,7 @@ class TestSubscriptionRouting:
         """DataUpdated events are dispatched to all callbacks for that backend ID."""
         client = _make_client()
         backend_id = uuid7()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -245,7 +250,7 @@ class TestSubscriptionRouting:
         """Unsubscribing the last client for a backend ID calls backend Unsubscribe."""
         client = _make_client()
         backend_id = uuid7()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -266,7 +271,7 @@ class TestSubscriptionRouting:
         client_id = result.data.id
 
         # Reset mock to track unsubscribe call
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -275,8 +280,8 @@ class TestSubscriptionRouting:
         await client.unsubscribe(SubscriptionId(id=client_id))
 
         # Backend should have been called
-        client._hub.invoke.assert_called_once()
-        call_args = client._hub.invoke.call_args
+        client._invoke.assert_called_once()
+        call_args = client._invoke.call_args
         assert call_args is not None
         assert call_args[0][0] == "Unsubscribe"
         assert client_id not in client._client_callbacks
@@ -287,7 +292,7 @@ class TestSubscriptionRouting:
         """Unsubscribing when other clients remain does NOT call backend."""
         client = _make_client()
         backend_id = uuid7()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -309,12 +314,12 @@ class TestSubscriptionRouting:
         assert result2.data is not None
 
         # Reset mock to track unsubscribe
-        client._hub.invoke = AsyncMock()
+        client._invoke = AsyncMock()
 
         await client.unsubscribe(SubscriptionId(id=result1.data.id))
 
         # Backend should NOT have been called
-        client._hub.invoke.assert_not_called()
+        client._invoke.assert_not_called()
         # Second callback should still be registered
         assert result2.data.id in client._client_callbacks
         assert len(client._backend_to_client[backend_id]) == 1
@@ -323,7 +328,7 @@ class TestSubscriptionRouting:
     async def test_unsubscribe_all_clears_callbacks(self) -> None:
         client = _make_client()
         backend_id = uuid7()
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
@@ -339,7 +344,7 @@ class TestSubscriptionRouting:
         await client.subscribe(sub_config, callback=MagicMock())
         await client.subscribe(sub_config, callback=MagicMock())
 
-        client._hub.invoke = AsyncMock(return_value={
+        client._invoke = AsyncMock(return_value={
             "success": True,
             "message": "",
             "errorCode": 0,
