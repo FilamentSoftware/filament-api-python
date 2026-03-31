@@ -59,7 +59,7 @@ def _is_optional(tp: Any) -> bool:
 
 def _unwrap_optional(tp: Any) -> Any:
     """Extract the inner type from ``Optional[X]``."""
-    return next(a for a in get_args(tp) if a is not type(None))
+    return next((a for a in get_args(tp) if a is not type(None)), tp)
 
 
 def _is_uuid_type(tp: Any) -> bool:
