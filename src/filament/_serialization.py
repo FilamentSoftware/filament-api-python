@@ -141,7 +141,7 @@ def _resolve_type_hints(cls: Any) -> dict[str, Any]:
     import typing
     try:
         return typing.get_type_hints(cls)
-    except Exception:
+    except (NameError, AttributeError):
         # Fall back to raw field.type (will be strings if __future__ annotations
         # is used, but at least we don't crash).
         return {}
