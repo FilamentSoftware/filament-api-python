@@ -305,7 +305,11 @@ def _convert_from_dict_value(
     if _is_dataclass_type(field_type):
         if isinstance(data, dict):
             concrete: Any = field_type
-            if "$type" in data:
+            if (
+                "$type" in data
+                and isinstance(field_type, type)
+                and issubclass(field_type, EntityBase)
+            ):
                 resolved = _resolve_entity_type(data["$type"])
                 if resolved is not None:
                     concrete = resolved
