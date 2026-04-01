@@ -90,9 +90,10 @@ class TestClientConstruction:
             call_kwargs = mock_cls.call_args
             assert call_kwargs is not None
             headers = call_kwargs[1]["headers"]
-            assert headers["X-Api-Key-Name"] == "my-key"
-            assert headers["X-Api-Key"] == "my-secret"
-            assert headers["X-Organization-Id"] == "my-org"
+            # Single Authorization header with base64-encoded token
+            import base64
+            expected_token = base64.b64encode(b"my-key:my-org:my-secret").decode()
+            assert headers["Authorization"] == f"ApiKey {expected_token}"
 
 
 class TestReadData:
