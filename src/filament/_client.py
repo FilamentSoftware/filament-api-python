@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import inspect
 import logging
@@ -100,10 +101,10 @@ class FilamentClient:
         # Build SignalR connection
         self._url = f"{server}:{port}/{path}"
 
+        token_raw = f"{api_key_name}:{organization_id}:{api_key}"
+        token = base64.b64encode(token_raw.encode()).decode()
         headers = {
-            "X-Api-Key-Name": api_key_name,
-            "X-Api-Key": api_key,
-            "X-Organization-Id": organization_id,
+            "Authorization": f"ApiKey {token}",
         }
         self._signalr_client: SignalRClient = SignalRClient(
             url=self._url,
