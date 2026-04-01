@@ -6,11 +6,28 @@ from dataclasses import dataclass, field
 
 from ..base.base import Entity
 
-@dataclass
+__all__ = [
+    "CurrentInstantEntity",
+    "CurrentInstantSettingsEntity",
+]
+
+@dataclass(kw_only=True)
 class CurrentInstantEntity(Entity):
+    """
+    Represents an entity that encapsulates the current instant in time.
+    
+    :param current_instant: Represents the current instant in time associated with the entity.
+                            This property is used to capture a specific point in time, typically for
+                            tracking or temporal comparisons.
+    """
     current_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CurrentInstantSettingsEntity(Entity):
+    """
+    Represents settings for the Current Instant service.
+    
+    :param update_period: The period at which the current instant should be updated.
+    """
     update_period: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())

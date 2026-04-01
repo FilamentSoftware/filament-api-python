@@ -12,39 +12,88 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import GenericComplexityBase
 from ..entities.specialty_service import SpecialtyEntity
 
-@dataclass
+__all__ = [
+    "ScopeTaskTypeEntity",
+    "ScopeTaskTypeStepEntity",
+    "ScopeTaskTypeComplexityEntity",
+]
+
+@dataclass(kw_only=True)
 class ScopeTaskTypeEntity(Entity):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    combine_default: bool = field(default_factory=bool)
-    scale_factor: float = 0.0
-    chargeable_per_hour: float = 0.0
-    estimated_cost_per_hour: float = 0.0
-    default_estimated_cost_per_hour: float = 0.0
-    deliverable: bool = field(default_factory=bool)
-    specialty_id: UUID = field(default_factory=uuid7)
+    """
+    An entity that gives information about a task type that can be used within a scope.
+    
+    :param name: The given name this task type.
+    :param description: A description that describes what this task is.
+    :param combine_default: A combine flag. This is true if the scheduling system can combine all tasks of this type into a
+                            single task when scheduling.
+    :param scale_factor: Factor to scale task duration by based on the size of the task needing to be done.
+    :param chargeable_per_hour: How much can this task type be charged out at per hour (this is to create the bid charge amounts.)
+    :param estimated_cost_per_hour: How much this task is estimated to cost per hour (this is to create the bid cost amounts.)
+    :param default_estimated_cost_per_hour: Default value if there are no users available to calculate the estimated cost per hour.
+    :param deliverable: Whether this task type is one that can be delivered externally,
+                        or is only required for downstream internal tasks
+    :param specialty_id: A link to a specific specialty for this template item.
+    :param specialty: A helper method for setting the specialty.
+    :param sort_order: Determines the relative order of this entity when sorted.
+    :param currency_id: The currency used for this task type's monetary values.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    combine_default: bool = field(default=False)
+    scale_factor: float = field(default=1)
+    chargeable_per_hour: float = field(default=0)
+    estimated_cost_per_hour: float = field(default=0)
+    default_estimated_cost_per_hour: float = field(default=0)
+    deliverable: bool = field(default=False)
+    specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     specialty: Optional[SpecialtyEntity] = field(default=None)
-    sort_order: int = 0
-    currency_id: UUID = field(default_factory=uuid7)
+    sort_order: int = field(default=0)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeStepEntity(Entity):
-    scope_task_type_id: UUID = field(default_factory=uuid7)
+    """
+    Represents a step in a scope task type, defining specific attributes and behaviors such as name, description, sort order,
+    time weight, deliverables, review requirements, and default processing duration. This class provides a structured way
+    to organize and manage task type steps as part of a broader scope task management system.
+    
+    :param scope_task_type_id: The task type entity that this stage belongs to.
+    :param scope_task_type: Represents the associated ScopeTaskTypeEntity for a ScopeTaskTypeStepEntity,
+                            allowing the linkage between the entity and its corresponding identifier within the system.
+    :param name: The given name this task type.
+    :param description: A description that describes what this task is.
+    :param sort_order: The order this stage will be created and scheduled.
+    :param time_weight: The weighted amount of the total time available for the task that this stage takes.
+    :param deliverables: Deliverables expected for this stage to be complete.
+    :param requires_review: If this tasks needs to go into reviews once it is done.
+    :param default_processing_duration: The default duration allocated for processing this step.
+    """
+    scope_task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    sort_order: int = 0
-    time_weight: float = 0.0
+    name: str = field(default='')
+    description: str = field(default='')
+    sort_order: int = field(default=0)
+    time_weight: float = field(default=1)
     deliverables: list[str] = field(default_factory=list)
-    requires_review: bool = field(default_factory=bool)
+    requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeComplexityEntity(GenericComplexityBase):
-    scope_task_type_id: UUID = field(default_factory=uuid7)
+    """
+    Represents the complexity entity for a specific scope task type, holding details such as scope task type, name, and description.
+    
+    :param scope_task_type_id: The task type entity that this complexity belongs to.
+    :param scope_task_type: A helper property for setting the scope task type.
+    :param name: The given name this task complexity type (easy? medium? pure insanity?).
+    :param description: A description that describes what this task complexity is.
+    """
+    scope_task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')

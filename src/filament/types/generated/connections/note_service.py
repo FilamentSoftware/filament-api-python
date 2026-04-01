@@ -6,7 +6,17 @@ from dataclasses import dataclass, field
 from ..base.base import EntityConnection
 from ..enums import NoteUserConnectionType
 
-@dataclass
+__all__ = [
+    "NoteUserConnection",
+]
+
+@dataclass(kw_only=True)
 class NoteUserConnection(EntityConnection):
-    has_read: bool = field(default_factory=bool)
-    type: NoteUserConnectionType = NoteUserConnectionType.To
+    """
+    Represents a connection between a note and a user, defining the relationship and properties of the connection.
+    
+    :param has_read: Has this user read the note?
+    :param type: What type of connection is this?  To or Cc?
+    """
+    has_read: bool = field(default=False)
+    type: NoteUserConnectionType = field(default=NoteUserConnectionType.To)

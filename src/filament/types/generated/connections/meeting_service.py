@@ -5,7 +5,17 @@ from dataclasses import dataclass, field
 
 from ..base.base import EntityConnection
 
-@dataclass
+__all__ = [
+    "MeetingUserConnection",
+]
+
+@dataclass(kw_only=True)
 class MeetingUserConnection(EntityConnection):
-    required: bool = field(default_factory=bool)
-    responsible: bool = field(default_factory=bool)
+    """
+    Represents a connection between a meeting and a user, defining the relationship and properties of the connection.
+    
+    :param required: Is this user required in the meeting or optional?
+    :param responsible: Is this user responsible for the outcomes of this meeting or not?
+    """
+    required: bool = field(default=False)
+    responsible: bool = field(default=False)

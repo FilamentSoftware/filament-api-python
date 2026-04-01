@@ -9,23 +9,50 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import PermissionAction, PermissionType
 
-@dataclass
+__all__ = [
+    "PermissionsRoleEntity",
+    "PermissionEntity",
+]
+
+@dataclass(kw_only=True)
 class PermissionsRoleEntity(Entity):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    """
+    Represents a role that defines permissions within the system.
+    
+    :param name: The role's name, used to uniquely identify the role within the system.
+    :param description: Additional details or explanation about the role's purpose or usage.
+    :param context_type: The type of the context entity that this role should be associated with.
+    :param level: The level of this role, which can be used to determine whether a user has permission to assign it
+    :param inferred_role_ids: A list of role identifiers that are inferred based on the context or hierarchy of the current role.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
     context_type: Optional[str] = field(default=None)
-    level: int = 0
+    level: int = field(default=0)
     inferred_role_ids: list[UUID] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PermissionEntity(Entity):
-    permissions_role_id: UUID = field(default_factory=uuid7)
+    """
+    Represents a permission entity.
+    
+    :param permissions_role_id: Identifier for the associated PermissionsRoleEntity, linking a permission to a specific role.
+    :param permissions_role: Represents the associated role for a specific permission in the system.
+    :param permission_type: The type of permission.
+    :param type_name: The type name this permission applies to.
+    :param action: The permission actions allowed.
+    :param properties: The list of properties this permission applies to.
+    :param condition_data: Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic.
+    :param super_admin: Whether this permission grants super admin access.
+    :param organization_admin: Whether this permission grants organization admin access.
+    """
+    permissions_role_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     permissions_role: Optional[PermissionsRoleEntity] = field(default=None)
-    permission_type: PermissionType = PermissionType.None_
-    type_name: str = field(default_factory=str)
-    action: PermissionAction = PermissionAction.None_
+    permission_type: PermissionType = field(default=PermissionType.None_)
+    type_name: str = field(default='')
+    action: PermissionAction = field(default=PermissionAction.None_)
     properties: list[str] = field(default_factory=list)
     condition_data: Optional[str] = field(default=None)
-    super_admin: bool = field(default_factory=bool)
-    organization_admin: bool = field(default_factory=bool)
+    super_admin: bool = field(default=False)
+    organization_admin: bool = field(default=False)

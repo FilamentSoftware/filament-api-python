@@ -6,6 +6,14 @@ from dataclasses import dataclass, field
 from ..connections.generic import GenericUserSkillConnection_1
 from ..entities.schedule_service import PlaceholderUserEntity
 
-@dataclass
+__all__ = [
+    "PlaceholderUserSkillConnection",
+]
+
+@dataclass(kw_only=True)
 class PlaceholderUserSkillConnection(GenericUserSkillConnection_1[PlaceholderUserEntity]):
-    pass
+    """
+    Represents a connection between a PlaceholderUserEntity and a skill,
+    inheriting functionality from the GenericUserSkillConnection class.
+    This class is used to associate a PlaceholderUserEntity with a specific skill and manage the relationship.
+    """

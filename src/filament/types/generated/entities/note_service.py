@@ -10,13 +10,29 @@ from ..base.base import Entity
 from ..entities.task_service import TaskEntity
 from ..entities.user_service import UserEntity
 
-@dataclass
+__all__ = [
+    "NoteEntity",
+]
+
+@dataclass(kw_only=True)
 class NoteEntity(Entity):
-    from_user_id: UUID = field(default_factory=uuid7)
+    """
+    A note entity that can be attached to any other entity.
+    
+    :param from_user_id: The unique identifier of the user who this note is from.
+    :param from_user: The user who this note is from.
+    :param title: The title of the note.
+    :param content: The content of the note.
+    :param checklist: A list of checklist items for this note.
+    :param on_id: The id of the entity this note is on.
+    :param on_type: The type of the entity this note is on.
+    :param on: The entity this note is on.
+    """
+    from_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     from_user: Optional[UserEntity] = field(default=None)
-    title: str = field(default_factory=str)
-    content: str = field(default_factory=str)
+    title: str = field(default='')
+    content: str = field(default='')
     checklist: list[str] = field(default_factory=list)
-    on_id: UUID = field(default_factory=uuid7)
-    on_type: str = field(default_factory=str)
+    on_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    on_type: str = field(default='')
     on: Optional[TaskEntity] = field(default=None)

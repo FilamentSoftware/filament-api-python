@@ -11,14 +11,36 @@ from ..entities.generic import ReferenceEntityBase
 from ..entities.user_service import UserEntity
 from ..enums import TimeLogModeEnum, TimeLogStatusEnum
 
-@dataclass
+__all__ = [
+    "TimeLogEntity",
+]
+
+@dataclass(kw_only=True)
 class TimeLogEntity(ReferenceEntityBase):
+    """
+    Represents a time log entry entity that records a time-related event for a user.
+    A time log entry will always have <see cref="P:Filament.FSCore.Entities.ReferenceEntityBase.Reference" /> pointing to a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
+    
+    :param start_instant: The start instant of the time log entry.
+    :param end_instant: The end instant of the time log entry.
+                        A null value indicates the time log is still in progress and should be treated as Pending.
+    :param user_id: The unique identifier of the user associated with the time log entry.
+    :param user: Represents the associated user entity linked to the time log entry.
+    :param user_end_proportion: Represents the proportion of the total task time that the user considers themselves
+                                to have completed.
+    :param actual_end_proportion: Represents the actual proportion of the task that a supervisor considers complete.
+    :param required_duration_remaining: The remaining duration of time required to complete the task.
+    :param status: The status of the time log entry.
+                   Only time logs with Status = Submitted are processed by the scheduler.
+    :param mode: The mode of the time log entry, indicating whether this is work time or a break.
+                 Work mode creates schedule segments, while Break mode only marks time as unavailable.
+    """
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: Optional[datetime.datetime] = field(default=None)
-    user_id: UUID = field(default_factory=uuid7)
+    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user: Optional[UserEntity] = field(default=None)
     user_end_proportion: Optional[float] = field(default=None)
     actual_end_proportion: Optional[float] = field(default=None)
     required_duration_remaining: Optional[datetime.timedelta] = field(default=None)
-    status: TimeLogStatusEnum = TimeLogStatusEnum.Pending
-    mode: TimeLogModeEnum = TimeLogModeEnum.Work
+    status: TimeLogStatusEnum = field(default=TimeLogStatusEnum.Pending)
+    mode: TimeLogModeEnum = field(default=TimeLogModeEnum.Work)

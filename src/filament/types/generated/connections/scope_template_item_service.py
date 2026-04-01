@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from ..connections.generic import GenericScopeTaskTypeConnection_2
 from ..entities.scope_template_item_service import ScopeTemplateItemCustomComplexityEntity, ScopeTemplateItemEntity
 
-@dataclass
+__all__ = [
+    "ScopeTemplateItemTaskTypeConnection",
+]
+
+@dataclass(kw_only=True)
 class ScopeTemplateItemTaskTypeConnection(GenericScopeTaskTypeConnection_2[ScopeTemplateItemEntity, ScopeTemplateItemCustomComplexityEntity]):
-    pass
+    """Represents a connection between a scope template item and a scope task type."""

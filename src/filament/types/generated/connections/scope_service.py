@@ -5,7 +5,18 @@ from dataclasses import dataclass, field
 
 from ..base.base import EntityConnection
 
-@dataclass
+__all__ = [
+    "ScopeUserConnection",
+]
+
+@dataclass(kw_only=True)
 class ScopeUserConnection(EntityConnection):
-    role: str = field(default_factory=str)
-    responsible: bool = field(default_factory=bool)
+    """
+    Represents a connection between a scope and a user.
+    
+    :param role: What role this user has.
+    :param responsible: Is this user responsible over all for this scope entity? Will they review it? Will they
+                        approve it?
+    """
+    role: str = field(default='')
+    responsible: bool = field(default=True)

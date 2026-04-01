@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from ..connections.generic import TaskDependencyConnectionBase_2
 from ..entities.specialty_service import SpecialtyEntity
 
-@dataclass
+__all__ = [
+    "SpecialtyDependencyConnection",
+]
+
+@dataclass(kw_only=True)
 class SpecialtyDependencyConnection(TaskDependencyConnectionBase_2[SpecialtyEntity, SpecialtyEntity]):
-    pass
+    """Represents a dependency connection between two specialties."""

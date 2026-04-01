@@ -10,18 +10,43 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import CurrencyStatus, CurrencySymbolPosition
 
-@dataclass
+__all__ = [
+    "CurrencyEntity",
+    "CurrencyRateEntity",
+]
+
+@dataclass(kw_only=True)
 class CurrencyEntity(Entity):
-    symbol: str = field(default_factory=str)
-    code: str = field(default_factory=str)
-    decimal_points: int = 0
-    symbol_position: CurrencySymbolPosition = CurrencySymbolPosition.Before
-    status: CurrencyStatus = CurrencyStatus.Disabled
+    """
+    An entity that represents a currency used within an organization.
+    
+    :param symbol: The symbol used to represent this currency (e.g., $, EUR, GBP).
+    :param code: The ISO 4217 currency code (e.g., USD, EUR, GBP).
+    :param decimal_points: The number of decimal points used when displaying amounts in this currency.
+    :param symbol_position: Whether the currency symbol appears before or after the amount.
+    :param status: Whether the currency is enabled or disabled.
+    """
+    symbol: str = field(default='')
+    code: str = field(default='')
+    decimal_points: int = field(default=2)
+    symbol_position: CurrencySymbolPosition = field(default=CurrencySymbolPosition.Before)
+    status: CurrencyStatus = field(default=CurrencyStatus.Enabled)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CurrencyRateEntity(Entity):
-    currency_id: UUID = field(default_factory=uuid7)
+    """
+    An entity that represents an exchange rate for a currency at a specific point in time.
+    
+    :param currency_id: A link to the currency this rate applies to.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    :param start_instant: The instant from which this rate is effective.
+    :param rate: The exchange rate relative to an arbitrary fixed point.
+                 This is most likely to be relative to the organization's default currency,
+                 but if it is not, then the relationship between a currency and the organization's
+                 default currency will be calculated.
+    """
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    rate: float = 0.0
+    rate: float = field(default=1.0)

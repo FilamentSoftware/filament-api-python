@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from ..connections.generic import PermissionsRoleConnectionBase_1
 from ..entities.api_key_service import ApiKeyEntity
 
-@dataclass
+__all__ = [
+    "ApiKeyPermissionsRoleConnection",
+]
+
+@dataclass(kw_only=True)
 class ApiKeyPermissionsRoleConnection(PermissionsRoleConnectionBase_1[ApiKeyEntity]):
-    pass
+    """Represents a connection between an authenticated API key and a permissions role within a specific context."""

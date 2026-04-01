@@ -7,12 +7,27 @@ from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
 
-@dataclass
+__all__ = [
+    "ScopeCategoryEntity",
+]
+
+@dataclass(kw_only=True)
 class ScopeCategoryEntity(Entity):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    reference_size: float = 0.0
-    reference_size_units: str = field(default_factory=str)
+    """
+    Represents a category of items in the system.
+    
+    :param name: The name of this scope category
+    :param description: The description of this scope category
+    :param reference_size: The reference size of all items of this category
+    :param reference_size_units: The units used to specify the size of the reference element.
+    :param allowed_upstream_category_ids: The categories that are allowed to be upstream of this category.
+    :param allowed_downstream_category_ids: The categories that are allowed to be downstream of this category.
+    :param allow_add_to_dependent: Whether this category allows tasks to be added to a dependent item.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    reference_size: float = field(default=1)
+    reference_size_units: str = field(default='')
     allowed_upstream_category_ids: list[UUID] = field(default_factory=list)
     allowed_downstream_category_ids: list[UUID] = field(default_factory=list)
-    allow_add_to_dependent: bool = field(default_factory=bool)
+    allow_add_to_dependent: bool = field(default=True)

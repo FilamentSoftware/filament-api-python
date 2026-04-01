@@ -6,11 +6,16 @@ from dataclasses import dataclass, field
 from ..connections.generic import GenericUserSkillConnection_1, PermissionsRoleConnectionBase_1
 from ..entities.user_service import UserEntity
 
-@dataclass
+__all__ = [
+    "UserSkillConnection",
+    "UserPermissionsRoleConnection",
+]
+
+@dataclass(kw_only=True)
 class UserSkillConnection(GenericUserSkillConnection_1[UserEntity]):
-    pass
+    """Represents a connection between a user and a skill, including the user's proficiency level."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UserPermissionsRoleConnection(PermissionsRoleConnectionBase_1[UserEntity]):
-    pass
+    """Represents a connection between a user and a permissions role within a specific context."""

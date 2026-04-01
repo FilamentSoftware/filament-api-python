@@ -9,12 +9,30 @@ from uuid_utils import UUID, uuid7
 from ..base.base import Entity
 from ..enums import ScopeType
 
-@dataclass
+__all__ = [
+    "ScopeEntity",
+]
+
+@dataclass(kw_only=True)
 class ScopeEntity(Entity):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    scope_type: ScopeType = ScopeType.Film
+    """
+    Represents a specific entity with associated metadata and behaviors, categorized by its scope type.
+    
+    :param name: The name of the scope/project.
+    :param description: A description of the scope/project.
+    :param scope_type: The type of project this is.  This will be used to auto set up some aspects of the project.
+    :param image_link: A link to an image to use when referencing this Scope
+    :param task_duration_multiplier: An overall multiplier that applies to all task durations. This allows a project to effectively
+                                     adjust the duration of all tasks in one place.
+    :param chargeable_multiplier: An overall multiplier on chargeable costs. This is used to set global discounts for an entire project.
+    :param currency_id: The currency used for this scope's monetary values.
+                        This is not an EntityLinkProperty because this type is in FSCore, and CurrencyEntity
+                        is in CoreServices.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    scope_type: ScopeType = field(default=ScopeType.Film)
     image_link: Optional[str] = field(default=None)
-    task_duration_multiplier: float = 0.0
-    chargeable_multiplier: float = 0.0
-    currency_id: UUID = field(default_factory=uuid7)
+    task_duration_multiplier: float = field(default=1)
+    chargeable_multiplier: float = field(default=1)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

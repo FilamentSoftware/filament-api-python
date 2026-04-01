@@ -5,8 +5,19 @@ from dataclasses import dataclass, field
 
 from ..base.base import Entity
 
-@dataclass
+__all__ = [
+    "SpecialtyEntity",
+]
+
+@dataclass(kw_only=True)
 class SpecialtyEntity(Entity):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    sort_order: int = 0
+    """
+    Represents a specialty within an organization.
+    
+    :param name: A single word name for the specialty. This is analogous to a department name.
+    :param description: A description of what this specialty covers.
+    :param sort_order: Represents the ordering of the specialty entity in the context of sorting operations.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    sort_order: int = field(default=0)

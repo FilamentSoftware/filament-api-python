@@ -6,9 +6,28 @@ from dataclasses import dataclass, field
 from typing import Generic, Optional, TypeVar
 
 from uuid_utils import UUID, uuid7
+from filament._specified_properties import SpecifiedPropertiesBase
 
-@dataclass
-class EntityBase:
+__all__ = [
+    "EntityBase",
+    "Entity",
+    "EntityConnectionBase",
+    "EntityConnection",
+    "EntityConnection_2",
+]
+
+@dataclass(kw_only=True)
+class EntityBase(SpecifiedPropertiesBase):
+    """
+    Base class for all entities in the system.
+    
+    :param id: The unique identifier for this entity.
+    :param created_at: When this entity was created.
+    :param created_by_id: The ID of the user who created this entity.
+    :param updated_at: When this entity was last updated.
+    :param updated_by_id: The ID of the user who last updated this entity.
+    :param scope_id: The scope ID this entity belongs to.
+    """
     id: UUID = field(default_factory=uuid7)
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     created_by_id: Optional[UUID] = field(default=None)
@@ -17,28 +36,48 @@ class EntityBase:
     scope_id: Optional[UUID] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Entity(EntityBase):
-    pass
+    """Base entity class for all non-specific entities."""
 
 TFromEntity = TypeVar("TFromEntity", bound=Entity)
 TToEntity = TypeVar("TToEntity", bound=Entity)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConnectionBase(EntityBase):
-    from_id: UUID = field(default_factory=uuid7)
-    to_id: UUID = field(default_factory=uuid7)
+    """
+    Base class for entity connections.
+    
+    :param from_id: The ID of the entity linked from.
+    :param to_id: The ID of the entity linked to.
+    :param from_entity: A helper function to set <see cref="P:Filament.FSCore.Entities.EntityConnectionBase.FromId">FromId</see> from an entity.
+    :param to_entity: A helper function to set <see cref="P:Filament.FSCore.Entities.EntityConnectionBase.ToId">ToId</see> from an entity.
+    """
+    from_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    to_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     from_entity: Optional[Entity] = field(default=None)
     to_entity: Optional[Entity] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConnection(EntityConnectionBase):
-    pass
+    """
+    Represents a base class for entity connections. This abstract class provides the foundation for creating
+    connections between entities in a system, where each connection links a "From" entity to a "To" entity.
+    """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConnection_2(EntityConnection, Generic[TFromEntity, TToEntity]):
+    """
+    Defines a generic connection between two entity types, allowing for linking and retrieving "From" and "To" entities.
+    This class also includes type-specific functionality for accessing related entities in an entity cache.
+    
+    :param from_entity: Represents the originating entity in a connection, providing the source or "From" context
+                        for the relationship between two entities.
+    :param to_entity: Represents the target entity in a connection, defining the entity that is on the "to" side
+                      of the relationship between two entities.
+    """
     from_entity: Optional[TFromEntity] = field(default=None)
     to_entity: Optional[TToEntity] = field(default=None)

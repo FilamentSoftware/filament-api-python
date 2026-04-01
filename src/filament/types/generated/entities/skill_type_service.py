@@ -5,9 +5,26 @@ from dataclasses import dataclass, field
 
 from ..base.base import Entity
 
-@dataclass
+__all__ = [
+    "SkillTypeEntity",
+]
+
+@dataclass(kw_only=True)
 class SkillTypeEntity(Entity):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    context: bool = field(default_factory=bool)
-    taskable: bool = field(default_factory=bool)
+    """
+    The SkillTypeEntity defines any potential type that the organization decides to use. These
+    can be either/or a context and/or taskable. A context type generally refers to the software
+    a skill requires knowledge of. Taskable skill types can have tasks created by the TaskService
+    and scheduled by the ScheduleService. Skill types will generally be either taskable or context
+    but not both, however there may be cases where both are required.
+    
+    :param name: The name of this skill type (eg. Taskable,
+    :param description: A reasonable description of what this skill type represents. For example
+                        a type called "Maya" might be "The skill is assumed to use the Maya software package"
+    :param context: If this type is a context, set to True. If not, leave False.
+    :param taskable: If this type is taskable, set to True. If not, leave False.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    context: bool = field(default=False)
+    taskable: bool = field(default=False)

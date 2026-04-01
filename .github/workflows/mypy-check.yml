@@ -33,9 +33,11 @@ jobs:
 
       - run: poetry self add poetry-plugin-export
 
-      - run: poetry export --without-hashes --with types --format=requirements.txt > requirements-types.txt
-
-      - uses: jpetrucciani/mypy-check@1.19.1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: src
-          requirements_file: requirements-types.txt
+          python-version: "3.12"
+
+      - run: poetry install --with types
+
+      - run: poetry run mypy --show-column-numbers --hide-error-context src

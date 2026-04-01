@@ -8,21 +8,33 @@ from ..connections.generic import GenericTaskSkillConnection_1, TaskDependencyOv
 from ..entities.scope_task_type_service import ScopeTaskTypeEntity
 from ..entities.specialty_service import SpecialtyEntity
 
-@dataclass
+__all__ = [
+    "ScopeTaskTypeDependencyConnection",
+    "ScopeTaskTypeSpecialtyDependencyConnection",
+    "ScopeTaskTypeSkillConnection",
+    "ScopeTaskTypeOfficeLocationConnection",
+]
+
+@dataclass(kw_only=True)
 class ScopeTaskTypeDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, ScopeTaskTypeEntity]):
-    pass
+    """Represents a dependency connection between two scope task types."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeSpecialtyDependencyConnection(TaskDependencyOverrideConnectionBase_2[ScopeTaskTypeEntity, SpecialtyEntity]):
-    pass
+    """Represents a dependency connection between a scope task type and a specialty."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeSkillConnection(GenericTaskSkillConnection_1[ScopeTaskTypeEntity]):
-    pass
+    """Represents a connection between a scope task type and a skill."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScopeTaskTypeOfficeLocationConnection(EntityConnection):
-    priority: int = 0
+    """
+    Represents a connection between a scope task type and an office location.
+    
+    :param priority: What is the priority order of offices that this task can be assigned to.
+    """
+    priority: int = field(default=1)

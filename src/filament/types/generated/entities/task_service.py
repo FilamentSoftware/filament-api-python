@@ -12,29 +12,82 @@ from ..entities.scope_item_service import ScopeItemEntity
 from ..entities.scope_service import ScopeEntity
 from ..enums import TaskMilestoneDirectionEnum
 
-@dataclass
+__all__ = [
+    "TaskGroupLevelEntity",
+    "TaskMilestoneEntity",
+    "TaskGroupEntity",
+    "TaskEntity",
+]
+
+@dataclass(kw_only=True)
 class TaskGroupLevelEntity(ReferenceEntityBase):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    """
+    Represents an entity for a task group level that defines the hierarchical structure and metadata for task groupings.
+    
+    :param name: The name of the task group level entity.
+    :param description: The description of the task group level entity.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskMilestoneEntity(ReferenceEntityBase):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    """
+    A TaskMilestoneEntity is created from a ScopeMilestoneEntity.
+    
+    :param name: The given name for this milestone.
+    :param description: The description of this milestone
+    :param instant: The moment in time this milestone is due.
+                    If the Instant is null, the milestone is flexible and can be moved
+    :param direction: Should tasks start after this milestone, or end before it?
+    """
+    name: str = field(default='')
+    description: str = field(default='')
     instant: Optional[datetime.datetime] = field(default=None)
-    direction: TaskMilestoneDirectionEnum = TaskMilestoneDirectionEnum.StartAfter
+    direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskGroupEntity(ReferenceEntityBase):
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
-    context_type: str = field(default_factory=str)
-    context_id: UUID = field(default_factory=uuid7)
+    """
+    Represents a task group entity that provides a structured grouping of tasks within a defined scope.
+    This class extends the functionality of ReferenceEntityBase and incorporates additional properties
+    for contextual identification and operational details.
+    
+    :param name: The given name for this task.
+    :param description: The description of this task
+    :param context_type: Represents the type of the context associated with the TaskGroupEntity.
+                         This property is automatically set when an associated context entity is assigned,
+                         capturing the type name of the related entity.
+    :param context_id: Represents the unique identifier for the associated context entity
+                       linked to this TaskGroupEntity.
+    :param context: Represents the context related to the TaskGroupEntity. When set,
+                    it assigns the context type and context identifier based on the
+                    provided entity instance.
+    :param context_key: Represents a unique key or identifier that provides additional context
+                        for a TaskGroupEntity within a specific application domain or workflow.
+    :param group_level_id: Represents the identifier of the associated TaskGroupLevelEntity,
+                           linking a task group to its corresponding hierarchical structure or level metadata.
+    :param group_level: Represents the associated level of the group, linking to a corresponding
+                        TaskGroupLevelEntity instance and setting its identifier as a reference.
+    :param parent_group_level_ids: Represents the ids of the parent group levels associated with the current task group entity.
+    :param parent_group_levels: Represents the parent group levels associated with the current task group entity.
+    :param child_group_level_ids: Represents the ids of the child group levels associated with the current task group entity.
+    :param child_group_levels: Represents the child group levels associated with the current task group entity.
+    :param ancestor_group_ids: Identifies the IDs of all ancestor task groups in the hierarchy that are related to this
+                               instance of <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />.
+    :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task group.
+                            This property is used to establish relationships between task groups in a hierarchical structure,
+                            identifying all ancestor groups for the current entity.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    context_type: str = field(default='')
+    context_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     context: Optional[Union[ScopeEntity, ScopeItemEntity]] = field(default=None)
-    context_key: str = field(default_factory=str)
-    group_level_id: UUID = field(default_factory=uuid7)
+    context_key: str = field(default='')
+    group_level_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     group_level: Optional[TaskGroupLevelEntity] = field(default=None)
     parent_group_level_ids: list[UUID] = field(default_factory=list)
     parent_group_levels: Optional[list[TaskGroupLevelEntity]] = field(default=None)
@@ -44,14 +97,33 @@ class TaskGroupEntity(ReferenceEntityBase):
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TaskEntity(ReferenceEntityBase):
+    """
+    A TaskEntity is created from scope entities and is then used by the scheduler.
+    
+    :param contexts: A dictionary of context key-value pairs associated with the task. This property is used to store and retrieve
+                     contextual information relevant to the task. The keys represent the context identifiers, and the values
+                     contain their corresponding details as strings.
+    :param name: The given name for this task.
+    :param description: The description of this task
+    :param duration: This task's duration.
+    :param user_count: How many users can simultaneously work on this task.
+    :param requires_review: If this task needs to go into reviews once it is done.
+    :param default_processing_duration: The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions.
+                                        This will be used as the default processing duration to be filled in on <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity" />.
+    :param ancestor_group_ids: Identifies the IDs of all ancestor task groups in the hierarchy that are related to this
+                               instance of <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
+    :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task.
+                            This property is used to establish relationships between task groups in a hierarchical structure,
+                            identifying all ancestor groups for the current entity.
+    """
     contexts: dict[str, str] = field(default_factory=dict)
-    name: str = field(default_factory=str)
-    description: str = field(default_factory=str)
+    name: str = field(default='')
+    description: str = field(default='')
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    user_count: int = 0
-    requires_review: bool = field(default_factory=bool)
+    user_count: int = field(default=1)
+    requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     ancestor_group_ids: list[UUID] = field(default_factory=list)
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)

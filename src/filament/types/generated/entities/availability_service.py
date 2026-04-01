@@ -8,15 +8,36 @@ from typing import Optional
 from ..entities.generic import ReferenceEntityBase
 from ..enums import AvailabilityModeEnum, AvailabilityRepeatDaysEnum, AvailabilityRepeatModeEnum
 
-@dataclass
+__all__ = [
+    "AvailabilityEntity",
+]
+
+@dataclass(kw_only=True)
 class AvailabilityEntity(ReferenceEntityBase):
-    priority: int = 0
-    availability_mode: AvailabilityModeEnum = AvailabilityModeEnum.Unknown
+    """
+    For storing availability information for a user. Multiple Availability entities can be stacked, using the
+    <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.Priority" /> property to determine the relative priorities.
+    
+    :param priority: The priority of this Availability entity. The higher the priority, the more this entity takes precedence.
+    :param availability_mode: Whether this Availability entity sets the availability to be Available, Unavailable or AvailableIfRequired.
+    :param start_date_time: The start time (in local time) of this Availability block.
+    :param end_date_time: The end time (in local time) of this Availability block.
+    :param date_time_zone: The time zone that local times should be calculated based on.
+    :param outside: Whether the availability mode should be applied between the start and end times, or outside of this range.
+    :param repeat_mode: Whether this availability should be repeating, every day, week, month, or year (or with no repeating).
+    :param repeat_days: If the <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.RepeatMode" /> is Week, which days of the week it should be repeated on.
+    :param repeat_count: If it is a repeating entity, how many times to repeat for. 0 means to repeat indefinitely.
+    :param repeat_end: If it is a repeating entity, when to finish repeating. This property takes precedence over the
+                       <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.RepeatCount" /> property, so if the number of repeats has not finished when this time is reached,
+                       repeating will finish anyway.
+    """
+    priority: int = field(default=0)
+    availability_mode: AvailabilityModeEnum = field(default=AvailabilityModeEnum.Unknown)
     start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
-    date_time_zone: str = field(default_factory=str)
-    outside: bool = field(default_factory=bool)
-    repeat_mode: AvailabilityRepeatModeEnum = AvailabilityRepeatModeEnum.None_
-    repeat_days: AvailabilityRepeatDaysEnum = AvailabilityRepeatDaysEnum.None_
-    repeat_count: int = 0
+    date_time_zone: str = field(default='UTC')
+    outside: bool = field(default=False)
+    repeat_mode: AvailabilityRepeatModeEnum = field(default=AvailabilityRepeatModeEnum.None_)
+    repeat_days: AvailabilityRepeatDaysEnum = field(default=AvailabilityRepeatDaysEnum.None_)
+    repeat_count: int = field(default=0)
     repeat_end: Optional[datetime.datetime] = field(default=None)

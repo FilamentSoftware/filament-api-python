@@ -13,249 +13,600 @@ from .base.base import EntityBase
 from .connections.user_service import UserPermissionsRoleConnection
 from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, SubscriptionMode
 
+__all__ = [
+    "SwitchUserRequest",
+    "SuccessOrErrorBase",
+    "SetPermissionsRolesRequest",
+    "EntityPermission",
+    "EntityPropertyPermission",
+    "SubscriptionConfig",
+    "StructBase",
+    "DbOrderLevel",
+    "EntityTypePermissions",
+    "PreviewDataRequest",
+    "ServiceDataPreview",
+    "StatusData",
+    "EntityServiceDataUpdate",
+    "SuccessOrError",
+    "ValueOrError_1",
+    "EntityPermissions",
+    "EntityPropertyPermissions",
+    "SubscriptionId",
+    "RequestId",
+    "UpdatedEntityServiceData_1",
+    "DbOrderInstance",
+    "SuccessOrErrorPublic",
+    "ValueOrErrorPublic_1",
+    "WrappedEntity",
+    "ModifyDataRequest",
+    "ProcessingStatus",
+    "ServiceDataUpdate",
+    "ReadDataTypeRequest",
+    "ReadConnectedDataTypeRequest",
+    "ServiceDataRead",
+    "WrappedConnectedEntityWithPermissions",
+    "ReadDataRequest",
+    "ReadConnectedDataRequest",
+    "ServiceDataReadConnected",
+]
+
 T = TypeVar("T")
 T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SwitchUserRequest:
-    user_id: UUID = field(default_factory=uuid7)
+    """
+    Represents a request to switch the current user context in a client connection.
+    This request is used to specify a new user identifier for authentication and context switching within the connected system.
+    
+    :param user_id: Gets or sets the unique identifier of the user.
+                    This property is required and is used to specify the user context
+                    during authentication and client connection management.
+    """
+    user_id: UUID
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SuccessOrErrorBase:
+    """
+    Abstract base class providing shared error-handling logic for <see cref="T:Filament.FSCore.Structs.SuccessOrError" />
+    and <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
+    
+    :param success: Whether it is in a success state or not
+    :param message: The message to go along with the result
+    :param stack_trace: The stack trace associated with an error, providing detailed diagnostic information
+    :param error_code: The error code
+    """
     success: bool = field(default_factory=bool)
     message: str = field(default_factory=str)
     stack_trace: Optional[str] = field(default=None)
-    error_code: ErrorCodes = ErrorCodes.None_
+    error_code: ErrorCodes = field(default=ErrorCodes.None_)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SetPermissionsRolesRequest:
+    """
+    Represents a request to override or reset the current user's permission roles.
+    When PermissionsRoleConnections is null, the user's permissions are restored to their defaults.
+    
+    :param permissions_role_connections: The permission role connections to resolve permissions from.
+                                         When null, restores the user's original permissions.
+    """
     permissions_role_connections: Optional[list[UserPermissionsRoleConnection]] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPermission:
-    actions: PermissionAction = PermissionAction.None_
+    """
+    Represents permission settings for a single entity.
+    
+    :param actions: Gets or sets the unconditional permission actions for the entity.
+    :param conditional_actions: Gets or sets the conditional permission actions for the entity.
+                                Each key is an individual permission action, and the value is the combined condition
+                                (OR'd together if multiple conditions apply) that must be satisfied for that action.
+    """
+    actions: PermissionAction = field(default=PermissionAction.None_)
     conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPropertyPermission:
-    actions: PermissionAction = PermissionAction.None_
+    """
+    Represents permission settings for a single entity property.
+    
+    :param actions: Gets or sets the unconditional permission actions for the property.
+    :param conditional_actions: Gets or sets the conditional permission actions for the property.
+                                Each key is an individual permission action, and the value is the combined condition
+                                (OR'd together if multiple conditions apply) that must be satisfied for that action.
+    """
+    actions: PermissionAction = field(default=PermissionAction.None_)
     conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscriptionConfig:
-    scenario_id: UUID = field(default_factory=uuid7)
-    status: DataProcessingStatus = DataProcessingStatus.Unknown
-    type_name: str = field(default_factory=str)
+    """
+    Represents the configuration for a subscription within the system. This class encapsulates
+    the parameters and settings required to define a subscription, enabling the functionality of
+    data filtering and processing in a subscription-based service.
+    
+    :param scenario_id: Gets the unique identifier for the scenario associated with the subscription configuration.
+                        This property is used to link a subscription to a specific scenario, providing contextual
+                        information for data processing and event handling. The value is immutable once set and
+                        is expected to be a globally unique identifier (GUID).
+                        Use this property to verify and process relevant updates or events tied to a particular scenario
+                        in the subscription framework.
+    :param status: Gets the current data processing status of the subscription configuration.
+                   This property indicates the state of the data processing workflow associated
+                   with the subscription, such as whether it is pending, in progress, or complete.
+                   The value is represented by a combination of flags from the <see cref="T:Filament.FSCore.ServiceDataTypes.DataProcessingStatus" /> enumeration,
+                   allowing multiple states to be tracked concurrently.
+                   It is often used to control or filter subscription operations based on the processing state.
+    :param type_name: Gets the fully qualified name of the data type linked to the subscription configuration.
+                      This property is critical for identifying the specific entity type involved in the subscription, allowing
+                      for precise filtering, processing, and association of events. The name should represent a unique
+                      identifier for an entity type within the system to ensure proper correlation in the subscription flow.
+    :param condition: Gets the condition instance used to evaluate or filter subscription-related data.
+                      This property defines the criteria that must be met for specific data to be processed
+                      or included in subscription events. If the condition is not specified (null),
+                      no filtering will be applied based on conditions. The property leverages implementation
+                      of a database condition instance to encapsulate filtering logic and operations.
+    :param mode: Gets the subscription mode that dictates the types of updates or events the subscription should handle.
+                 This property specifies which aspects of the subscription (e.g., data changes, progress updates) are relevant,
+                 as defined by the flags in the <see cref="T:Filament.FilamentHub.Subscriptions.SubscriptionMode" /> enumeration.
+                 Use this property to configure the behavior of the subscription mechanism
+                 to process data or monitor progress according to specific requirements.
+    """
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
+    type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
-    mode: SubscriptionMode = SubscriptionMode.None_
+    mode: SubscriptionMode = field(default=SubscriptionMode.None_)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StructBase:
-    pass
+    """Abstract base class for all struct types in the Filament system."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DbOrderLevel:
-    direction: DbOrderDirection = DbOrderDirection.Ascending
-    property: str = field(default_factory=str)
+    """
+    Represents a single level of database ordering.
+    
+    :param direction: The ordering direction.
+    :param property: The property to order by.
+    """
+    direction: DbOrderDirection = field(default=DbOrderDirection.Ascending)
+    property: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityTypePermissions:
-    entity_permissions: PermissionAction = PermissionAction.None_
+    """
+    Represents permissions for an entity type, including entity-level and property-level permissions.
+    
+    :param entity_permissions: Gets or sets the permission actions for the entity type.
+    :param properties: Gets or sets the dictionary of property-level permissions, keyed by property name.
+    """
+    entity_permissions: PermissionAction
     properties: dict[str, PermissionAction] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PreviewDataRequest:
+    """
+    Represents a request to preview data before committing changes to the database.
+    
+    :param scenario_id: The optional scenario ID to scope the preview operation.
+    :param service_name: The name of the service making the preview request.
+    :param data: The dictionary of new data entities to preview, keyed by type name.
+    :param existing_data: The dictionary of existing data entity IDs to include in the preview, keyed by type name.
+    :param options: The dictionary of data options for the preview operation, keyed by type name.
+    :param apply_pending_requests: Gets or sets whether to apply pending requests before previewing the data. Default is true.
+    """
     scenario_id: Optional[UUID] = field(default=None)
-    service_name: str = field(default_factory=str)
+    service_name: str = field(default='')
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
     existing_data: dict[str, list[UUID]] = field(default_factory=dict)
     options: dict[str, DataOption] = field(default_factory=dict)
-    apply_pending_requests: bool = field(default_factory=bool)
+    apply_pending_requests: bool = field(default=True)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataPreview:
+    """
+    Represents a preview of service data containing entities and connections organized by type name.
+    
+    :param data: Gets or sets the dictionary of entity arrays keyed by their type name.
+    """
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatusData:
-    status: bool = field(default_factory=bool)
-    message: str = field(default_factory=str)
+    """
+    Represents status data containing information about the status, associated message, timestamp, services, and version.
+    
+    :param status: Indicates the current state or condition represented by this property.
+                   Typically used to reflect whether an operation, service, or process is in a successful or failed state.
+    :param message: Contains additional information or context regarding the status of an operation or process.
+                    This property typically holds error messages, informational text, or detailed descriptions
+                    related to the current status.
+    :param timestamp: Indicates the specific point in time when the status data was recorded.
+                      This property is represented as an instantaneous point on the timeline, using the NodaTime library.
+    :param services: Represents a collection of services associated with the current status data.
+                     This property contains the names of the services relevant to a specific tenant or operation.
+    :param version: Represents the version of the backend.
+                    This property is used to indicate the current version of the backend.
+    """
+    status: bool = field(default=False)
+    message: str = field(default='')
     timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     services: list[str] = field(default_factory=list)
-    version: str = field(default_factory=str)
+    version: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityServiceDataUpdate:
+    """
+    Represents a collection of entity changes including created, updated, and deleted entities.
+    
+    :param created: Gets or sets the list of newly created entities.
+    :param updated: Gets or sets the list of updated entities with their change information.
+    :param deleted: Gets or sets the list of deleted entities.
+    """
     created: list[EntityBase] = field(default_factory=list)
     updated: list[UpdatedEntityServiceData_1[EntityBase]] = field(default_factory=list)
     deleted: list[EntityBase] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SuccessOrError(SuccessOrErrorBase):
-    pass
+    """The SuccessOrError type is used to return either success, or an error message."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ValueOrError_1(SuccessOrErrorBase, Generic[T]):
+    """
+    The ValueOrError type is used to return either a valid value, or an error message, along with a flag to determine
+    the state.
+    
+    :param data: The internal data if in a success state
+    """
     data: Optional[T] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPermissions:
+    """
+    Represents a collection of entity permissions keyed by entity name.
+    
+    :param entities: Gets or sets the dictionary of entity permissions, keyed by entity name.
+    """
     entities: dict[str, EntityPermission] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityPropertyPermissions:
+    """
+    Represents a collection of entity property permissions keyed by property name.
+    
+    :param properties: Gets or sets the dictionary of property permissions, keyed by property name.
+    """
     properties: dict[str, EntityPropertyPermission] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscriptionId(StructBase):
+    """
+    Represents a unique identifier for a subscription.
+    
+    :param id: Gets the underlying GUID value of the subscription identifier.
+    """
     id: UUID = field(default_factory=uuid7)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RequestId(StructBase):
+    """
+    Represents a unique identifier for a request operation.
+    
+    :param id: Gets the underlying GUID value of the request identifier.
+    """
     id: UUID = field(default_factory=uuid7)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UpdatedEntityServiceData_1(StructBase, Generic[T_EntityBase]):
-    entity: Optional[T_EntityBase] = field(default=None)
-    updated_properties: list[str] = field(default_factory=list)
+    """
+    Represents service data for an entity that has been updated along with the set of properties that were modified.
+    
+    :param entity: Gets the updated entity.
+    :param updated_properties: Gets the set of property names that were updated on the entity.
+    """
+    entity: Optional[T_EntityBase]
+    updated_properties: list[str]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DbOrderInstance:
+    """
+    Represents an instance of database ordering, comprising a sequence of order levels.
+    
+    :param levels: The collection of database ordering levels, representing the sequence in which data is ordered.
+    """
     levels: list[DbOrderLevel] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SuccessOrErrorPublic(SuccessOrError):
-    error_id: Optional[UUID] = field(default=None)
+    """
+    Represents a public-facing version of the <see cref="T:Filament.FSCore.Structs.SuccessOrError" /> class.
+    This class is used to expose results while ensuring only public errors and messages are shared externally.
+    
+    :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
+                     This identifier can be used for logging, debugging, or correlation purposes.
+    """
+    error_id: Optional[UUID]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
-    error_id: Optional[UUID] = field(default=None)
+    """
+    Represents a public-facing abstraction derived from <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
+    This class is used to expose data and error information in a way that is
+    consumable by external systems or APIs.
+    
+    :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
+                     This identifier can be used for logging, debugging, or correlation purposes.
+    """
+    error_id: Optional[UUID]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedEntity:
-    entity: EntityBase = field(default_factory=EntityBase)
+    """
+    Wraps an entity with additional metadata for tracking permissions and pending operations.
+    
+    :param entity: Gets or sets the wrapped entity.
+    :param permissions: Gets or sets the permissions associated with the entity type.
+    :param pending_create_request_id: Gets or sets the request identifier for a pending create operation.
+    :param pending_update_request_ids: Gets or sets the collection of request identifiers for pending update operations.
+    :param pending_update_add_request_id: Gets or sets the request identifier for a pending update-add operation.
+    """
+    entity: EntityBase
     permissions: Optional[EntityTypePermissions] = field(default=None)
     pending_create_request_id: Optional[RequestId] = field(default=None)
     pending_update_request_ids: Optional[list[RequestId]] = field(default=None)
     pending_update_add_request_id: Optional[RequestId] = field(default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModifyDataRequest(StructBase):
-    scenario_id: UUID = field(default_factory=uuid7)
+    """
+    Represents a request to modify data within a specific scenario.
+    
+    :param scenario_id: Represents the unique identifier associated with a specific scenario.
+                        This identifier is used to track and associate data or operations
+                        with the corresponding scenario in various processes.
+    :param user_id: Represents the unique identifier associated with a user in the context of the operation.
+                    This identifier is used to track and associate the request with the specific user initiating or responsible for it.
+    :param requested_at: Represents the timestamp at which the data modification request was created.
+                         This property is used to track the specific time the request was initialized,
+                         ensuring proper ordering and auditing of operations.
+    :param request_id: Represents the identifier associated with a specific data modification request.
+                       This identifier is used to uniquely track and manage the request for processing
+                       and logging purposes across various operations.
+    :param action: Specifies the type of action to be performed as part of a data modification request.
+                   Used to define the operation (e.g., create, update, delete) being executed on the data.
+    :param update_properties: Specifies the properties within entities that should be updated
+                              as part of the modification request. This collection is used to
+                              define the scope of changes for update actions.
+    :param data: Contains data entities grouped by their respective type names.
+                 This property is used to store and manage collections of entity instances
+                 that are involved in the modification request.
+    """
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user_id: Optional[UUID] = field(default=None)
     requested_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     request_id: RequestId = field(default_factory=RequestId)
-    action: DataRequestAction = DataRequestAction.Unknown
+    action: DataRequestAction = field(default=DataRequestAction.Unknown)
     update_properties: Optional[list[str]] = field(default=None)
     data: dict[str, list[EntityBase]] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcessingStatus:
-    scenario_id: UUID = field(default_factory=uuid7)
+    """
+    Represents the status of a processing operation.
+    
+    :param scenario_id: Gets or sets the unique identifier for the scenario being processed.
+    :param request_ids: Gets or sets the collection of request identifiers associated with this processing status.
+    :param message: Gets or sets the message describing the current processing status.
+    """
+    scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     request_ids: list[RequestId] = field(default_factory=list)
-    message: str = field(default_factory=str)
+    message: str = field(default='')
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataUpdate:
-    scenario_id: UUID = field(default_factory=uuid7)
-    status: DataProcessingStatus = DataProcessingStatus.Unknown
+    """
+    Represents a data update structure for a service. Instances of this class
+    hold update information, including scenario identification, the status of
+    data processing, associated request and subscription identifiers, and details
+    about modified entities. This class is utilized in operations where dynamic
+    updates in the system need to be communicated or processed.
+    
+    :param scenario_id: The unique identifier representing a specific scenario or context
+                        within a service data update.
+    :param status: Represents the current processing status of a service data update,
+                   indicating whether the process is pending, in progress, completed,
+                   or in an unknown state.
+    :param request_ids: A collection of unique identifiers that represent specific requests
+                        associated with a service data update.
+    :param subscription_id: Represents the unique identifier for a subscription, used to associate
+                            update data with a specific subscriber or subscription configuration.
+    :param modified_entities: A collection of entities that have been modified during a service data update,
+                              represented as a dictionary where the key is the entity type name, and the value
+                              contains the corresponding modification details encapsulated in an EntityServiceDataUpdate object.
+    :param progress: Indicates whether the current data update process reflects incremental changes
+                     or provides overall progress updates for the associated service operation.
+    :param progress_amount: Represents the numerical value indicating the progress of a particular service data update,
+                            typically used to convey the completion percentage or progress status.
+    :param sequence_idx: Represents the sequential index associated with the update operation,
+                         used to track and order service data updates consistently.
+    """
+    scenario_id: UUID
+    status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
     request_ids: list[RequestId] = field(default_factory=list)
     subscription_id: SubscriptionId = field(default_factory=SubscriptionId)
     modified_entities: dict[str, EntityServiceDataUpdate] = field(default_factory=dict)
-    progress: bool = field(default_factory=bool)
-    progress_amount: float = 0.0
-    sequence_idx: int = 0
+    progress: bool = field(default=False)
+    progress_amount: float = field(default=0)
+    sequence_idx: int = field(default=0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadDataTypeRequest:
-    type_name: str = field(default_factory=str)
+    """
+    Represents a request to read data of a specific type from the database.
+    
+    :param type_name: The type to read data from.
+    :param condition: The condition to filter the data.
+    :param order: The ordering to apply to the results.
+    :param mode: The mode for reading data (Data, Count, or Distinct).
+    :param limit: The maximum number of records to return.
+    :param offset: The number of records to skip before returning results.
+    :param properties: The list of properties to include in the results. Required when Mode is Distinct.
+    :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is true.
+    """
+    type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
     order: Optional[DbOrderInstance] = field(default=None)
-    mode: ReadMode = ReadMode.Data
-    limit: int = 0
-    offset: int = 0
+    mode: ReadMode = field(default=ReadMode.Data)
+    limit: int = field(default=100000)
+    offset: int = field(default=0)
     properties: Optional[list[str]] = field(default=None)
-    apply_pending_requests: bool = field(default_factory=bool)
+    apply_pending_requests: bool = field(default=True)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadConnectedDataTypeRequest:
-    connection_type_name: str = field(default_factory=str)
-    entity_type_name: str = field(default_factory=str)
+    """
+    Represents a request to read data that is connected through a connection type.
+    
+    :param connection_type_name: The name of the connection type that links entities.
+    :param entity_type_name: The name of the entity type to read.
+    :param entity_ids: The optional array of entity IDs to filter the connected data.
+    :param connection_condition: The condition to filter the connection data.
+    :param entity_condition: The condition to filter the entity data.
+    :param order: The ordering to apply to the results.
+    :param limit: The maximum number of records to return. A value of 0 means no limit.
+    :param offset: The number of records to skip before returning results.
+    :param reverse_connection: Whether to reverse the connection direction (read from instead of to). Default is false.
+    :param connection_properties: The list of connection properties to include in the results.
+    :param entity_properties: The list of entity properties to include in the results.
+    :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is false,
+                                   as this is not currently supported on ReadConnectedData.
+    """
+    connection_type_name: str = field(default='')
+    entity_type_name: str = field(default='')
     entity_ids: Optional[list[UUID]] = field(default=None)
     connection_condition: Optional[DbConditionInstance] = field(default=None)
     entity_condition: Optional[DbConditionInstance] = field(default=None)
     order: Optional[DbOrderInstance] = field(default=None)
-    limit: int = 0
-    offset: int = 0
-    reverse_connection: bool = field(default_factory=bool)
+    limit: int = field(default=0)
+    offset: int = field(default=0)
+    reverse_connection: bool = field(default=False)
     connection_properties: Optional[list[str]] = field(default=None)
     entity_properties: Optional[list[str]] = field(default=None)
-    apply_pending_requests: bool = field(default_factory=bool)
+    apply_pending_requests: bool = field(default=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataRead:
-    type_name: str = field(default_factory=str)
+    """
+    Represents a data structure used for service data being returned from a read request,
+    including information about the type, permissions, entities, and associated metadata.
+    
+    :param type_name: Represents the type name associated with the current service data read operation.
+                      This property identifies the specific data entity or connection type being processed or returned.
+    :param permissions: Specifies the permissions associated with a particular entity type in a service read operation.
+                        This property defines access control rules and capabilities applied to the data entities.
+    :param data: Represents a collection of wrapped entities associated with the current service data read operation.
+                 This property contains the primary data entities being processed or returned by the service.
+    :param pending_update_remove_request_ids: Contains a mapping of entity IDs to their associated pending update removal request identifiers.
+                                              This property tracks entities that are associated with update removal operations and their respective request IDs.
+    :param pending_delete_request_ids: Stores a mapping of entity IDs to their associated pending delete request identifiers.
+                                       This property tracks entities that are marked for deletion with a corresponding request ID.
+    :param entity_count: If the read request was for the entity count, indicates the total number of entities.
+    :param more_data: Indicates whether there is additional data available that was not read due to the limit
+                      of the number of records requested.
+    """
+    type_name: str = field(default='')
     permissions: Optional[EntityTypePermissions] = field(default=None)
     data: list[WrappedEntity] = field(default_factory=list)
     pending_update_remove_request_ids: Optional[dict[UUID, RequestId]] = field(default=None)
     pending_delete_request_ids: Optional[dict[UUID, RequestId]] = field(default=None)
-    entity_count: int = 0
-    more_data: bool = field(default_factory=bool)
+    entity_count: int = field(default=0)
+    more_data: bool = field(default=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedConnectedEntityWithPermissions:
-    connection: WrappedEntity = field(default_factory=WrappedEntity)
-    entity: WrappedEntity = field(default_factory=WrappedEntity)
+    """
+    Represents a wrapped entity with its connection and associated permissions.
+    
+    :param connection: Gets or sets the wrapped connection entity.
+    :param entity: Gets or sets the wrapped entity.
+    """
+    connection: WrappedEntity
+    entity: WrappedEntity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadDataRequest(StructBase):
+    """
+    Represents a request to read data with an optional scenario context.
+    
+    :param request: The underlying read data type request containing the query details.
+    :param scenario_id: The optional scenario ID to scope the data read operation.
+    """
+    request: ReadDataTypeRequest
     scenario_id: Optional[UUID] = field(default=None)
-    request: ReadDataTypeRequest = field(default_factory=ReadDataTypeRequest)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadConnectedDataRequest(StructBase):
+    """
+    Represents a request to read connected data with an optional scenario context.
+    
+    :param request: The underlying read connected data type request containing the query details.
+    :param scenario_id: The optional scenario ID to scope the connected data read operation.
+    """
+    request: ReadConnectedDataTypeRequest
     scenario_id: Optional[UUID] = field(default=None)
-    request: ReadConnectedDataTypeRequest = field(default_factory=ReadConnectedDataTypeRequest)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceDataReadConnected:
-    connection_type_name: str = field(default_factory=str)
-    entity_type_name: str = field(default_factory=str)
+    """
+    Represents the result of reading connected entities including their connections, permissions, and pending operations.
+    
+    :param connection_type_name: Gets or sets the type name of the connection.
+    :param entity_type_name: Gets or sets the type name of the connected entity.
+    :param connection_permissions: Gets or sets the permissions for the connection type.
+    :param entity_permissions: Gets or sets the permissions for the entity type.
+    :param data: Gets or sets the array of connected entities with their permission information.
+    :param pending_update_removed_data: Gets or sets the dictionary of pending update operations that would remove data, keyed by entity identifier.
+    :param pending_delete_data: Gets or sets the dictionary of pending delete operations, keyed by entity identifier.
+    """
+    connection_type_name: str
+    entity_type_name: str
     connection_permissions: Optional[EntityTypePermissions] = field(default=None)
     entity_permissions: Optional[EntityTypePermissions] = field(default=None)
     data: list[WrappedConnectedEntityWithPermissions] = field(default_factory=list)
