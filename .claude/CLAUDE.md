@@ -45,7 +45,7 @@ async def main() -> None:
 ```
 
 - **Authentication**: API key headers (`X-Api-Key-Name` + `X-Api-Key`) and organization header (`X-Organization-Id`)
-- **Default endpoint**: `https://backend.filament-software.com:7076/api/v0` (server, port, path all configurable)
+- **Default endpoint**: `https://backend.filament-software.com:443/api/v0` (server, port, path all configurable)
 - **Serialization**: `_serialization.py` converts between Python dataclasses (snake_case) and SignalR wire format (camelCase dicts), handling `uuid_utils.UUID`, `from __future__ import annotations`, and enum `None_` naming. Includes polymorphic dispatch for `DbConditionInstance` and `DataOption` types.
 - **Conditions**: `conditions.py` defines the `DbConditionInstance` hierarchy (matching the C# backend's wire format). `_condition_builder.py` provides a typed `Condition(Entity).prop("field")` API with mypy plugin support for static validation.
 - **Options**: `options.py` defines `DataOption` for typed key-value options with `option_to_dict`/`option_from_dict` serialization.

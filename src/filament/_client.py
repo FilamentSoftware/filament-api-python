@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 Callback = Union[Callable[..., Any], Callable[..., Awaitable[Any]]]
 
 _DEFAULT_SERVER = "https://backend.filament-software.com"
-_DEFAULT_PORT = 7076
+_DEFAULT_PORT = 443
 _DEFAULT_PATH = "api/v0"
 _DEFAULT_CONNECTION_TIMEOUT = 10.0
 
