@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.2.1 (2026-04-01 18:09)
+
+### Client
+
+#### FIX
+- Default connection port changed from 7076 to 443
+
 ## 0.1.0-dev.0.2.0 (2026-04-01 09:24)
 
 ### Build
