@@ -51,7 +51,7 @@ class TestClientConstruction:
             FilamentClient(organization_id="org", api_key_name="k", api_key="s")
             call_kwargs = mock_cls.call_args
             assert call_kwargs is not None
-            assert call_kwargs[1]["url"] == "https://backend.filament-software.com:7076/api/v0"
+            assert call_kwargs[1]["url"] == "https://backend.filament-software.com:443/api/v0"
 
     def test_custom_url(self) -> None:
         with patch("filament._client.SignalRClient") as mock_cls:
