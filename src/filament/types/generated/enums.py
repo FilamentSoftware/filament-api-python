@@ -2,10 +2,12 @@
 from enum import Enum, Flag
 
 __all__ = [
+    "ActualStatusEnum",
     "AvailabilityModeEnum",
     "AvailabilityRepeatDaysEnum",
     "AvailabilityRepeatModeEnum",
     "BlockUserReasonEnum",
+    "CalendarUserAccess",
     "ChangedEntityStatus",
     "ContactType",
     "CurrencyStatus",
@@ -15,6 +17,7 @@ __all__ = [
     "DataRequestAction",
     "DbOrderDirection",
     "ErrorCodes",
+    "EventUserConnectionStatus",
     "Industry",
     "NameOrder",
     "NoteUserConnectionType",
@@ -44,6 +47,24 @@ __all__ = [
     "UserStatusEnum",
     "UserTypeEnum",
 ]
+
+class ActualStatusEnum(Enum):
+    """
+    Represents the status of an actual, reflecting the task's progress and readiness to proceed.
+    
+    :cvar Waiting: The task cannot yet start because its planned start date is in the future (tomorrow or later).
+    :cvar NotReady: The task cannot yet start because at least one first-level upstream dependency is not complete.
+    :cvar ReadyToStart: All first-level upstream dependencies are complete (or the task has no dependencies),
+                        but no work has started on the task yet.
+    :cvar InProgress: The task has started work, indicated by either an open time log or a qualifying submitted work time log.
+    :cvar Complete: The task's billing proportion has reached 1.0.
+    """
+    Waiting = 0
+    NotReady = 1
+    ReadyToStart = 2
+    InProgress = 3
+    Complete = 4
+
 
 class AvailabilityModeEnum(Enum):
     """
@@ -118,6 +139,23 @@ class BlockUserReasonEnum(Enum):
     """
     Unknown = 0
     NotAppropriate = 1
+
+
+class CalendarUserAccess(Enum):
+    """
+    The access a user has on an event calendar.
+    
+    :cvar None_: No access.
+    :cvar ViewCalendarFreeBusy: The user can see the calendar and its events.
+    :cvar ViewEventDetails: The user can see event details for items in the calendar.
+    :cvar ManageUsers: The user can update calendar membership data.
+    :cvar ManageCalendar: The user can manage the calendar itself.
+    """
+    None_ = 0
+    ViewCalendarFreeBusy = 1
+    ViewEventDetails = 2
+    ManageUsers = 3
+    ManageCalendar = 4
 
 
 class ChangedEntityStatus(Enum):
@@ -356,6 +394,19 @@ class ErrorCodes(Enum):
     RateLimitExceeded = 23
 
 
+class EventUserConnectionStatus(Enum):
+    """
+    Represents a user's acceptance state for an event invitation.
+    
+    :cvar NotAccepted: The user has not yet responded to the event invitation.
+    :cvar Accepted: The user has accepted the event invitation.
+    :cvar Declined: The user has declined the event invitation.
+    """
+    NotAccepted = 0
+    Accepted = 1
+    Declined = 2
+
+
 class Industry(Enum):
     """
     An enum that defines valid training methods
@@ -524,8 +575,8 @@ class ScheduleSegmentModeEnum(Enum):
     :cvar User: Represents a user-defined mode for a schedule segment.
                 This value allows customization or designation of a segment
                 based on user-specific requirements or configurations within the scheduling system.
-    :cvar Meeting: Represents a schedule segment designated for meetings.
-                   This mode is used to allocate time specifically for meetings within the scheduling system.
+    :cvar Event: Represents a schedule segment designated for events.
+                 This mode is used to allocate time specifically for events within the scheduling system.
     :cvar TimeLog: Represents a schedule segment that corresponds to logged time.
                    This mode is used to indicate time that has already been worked and recorded via a TimeLogEntity.
     """
@@ -535,7 +586,7 @@ class ScheduleSegmentModeEnum(Enum):
     Processing = 3
     Group = 4
     User = 5
-    Meeting = 6
+    Event = 6
     TimeLog = 7
 
 

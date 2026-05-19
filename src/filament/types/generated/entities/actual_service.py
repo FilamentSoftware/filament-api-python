@@ -9,7 +9,7 @@ from uuid_utils import UUID, uuid7
 
 from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
-from ..entities.user_service import UserEntity
+from ..enums import ActualStatusEnum
 
 __all__ = [
     "ActualEntity",
@@ -20,28 +20,54 @@ class ActualEntity(ReferenceEntityBase):
     """
     Defines actual time and cost spent on a task and details of when it was started and finished.
     
-    :param user_id: The unique identifier of the user associated with this entity.
-    :param user: The user associated with this entity.
-    :param duration: Represents the total time duration spent on a specific task or activity.
-    :param processing_duration: The duration of additional processing associated with the task.
-    :param proportion: The proportion that this task is complete.
+    :param duration_to_date: The total time duration worked on the task to date, derived from TimeLog schedule segments.
+    :param duration_forecast_total: The total forecast duration for the task, derived from all qualifying schedule segments (Work and TimeLog).
+                                    Represents the predicted total duration at task completion — the sum of planned remaining work and time already logged.
+    :param processing_duration: The duration of additional automated processing associated with the task.
+                                Currently always zero; reserved for future use.
+    :param cost_forecast_total: The forecast cost in the organization's reference currency, derived from all qualifying schedule
+                                segments (Work and TimeLog) and compensation records for assigned users.
+    :param cost_to_date: The actual cost incurred to date in the organization's reference currency.
+    :param chargeable_total: The total chargeable amount for this actual in the organization's reference currency, converted
+                             at the current rate. For tasks this comes from
+                             <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.Chargeable" />.
+                             For groups this is the sum of child chargeable totals.
+    :param chargeable_to_date: The chargeable amount earned to date, equal to <see cref="P:Filament.Services.CoreServices.Entities.ActualService.ActualEntity.ChargeableTotal" /> multiplied by the
+                               billing proportion derived from time log <c>ProportionComplete</c> values.
+                               For groups this is the sum of child chargeable-to-date values.
     :param costs_by_currency_rate_id: The monetary costs attributed to this task, keyed by CurrencyRateEntity ID.
                                       Each entry represents a cost amount at a specific currency rate.
     :param currency_id: The resolved currency for this cost calculation.
                         Determined from the organization's default currency.
-    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
-    :param total_reference_cost: The total cost in the organization's default (reference) currency.
+    :param currency: A helper property for setting the CurrencyId property. Pass in a CurrencyEntity type.
     :param start_instant: The instant (UTC) when work on the task started.
     :param end_instant: The instant (UTC) when work on the task finished.
+    :param status: The computed status of this actual, derived from task progress and dependency state.
+                   For task actuals: Complete if logged work remains with no planned Work segments left,
+                   InProgress if work has started, NotReady if any first-level upstream dependency is incomplete,
+                   Waiting if the planned start date is tomorrow or later, otherwise ReadyToStart.
+                   For group actuals: rolled up from child statuses. Any child InProgress makes the group
+                   InProgress; all children Complete makes the group Complete; any partially complete child
+                   also makes the group InProgress; otherwise any ReadyToStart child makes the group ReadyToStart;
+                   otherwise any Waiting child makes the group Waiting, and empty or fully blocked groups remain Waiting/NotReady.
+    :param office_location_ids: The deduplicated office location IDs associated with this actual.
+                                For tasks this comes from <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskOfficeLocationConnection" /> rows.
+                                For groups this is the union of child office location IDs.
+    :param warnings_data: JSON-serialized warnings for this actual, keyed by warning type with sets of affected user IDs as values.
+                          Null when there are no warnings.
     """
-    user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
-    user: Optional[UserEntity] = field(default=None)
-    duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    duration_to_date: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    duration_forecast_total: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    proportion: float = field(default=0)
+    cost_forecast_total: float = field(default=0)
+    cost_to_date: float = field(default=0)
+    chargeable_total: float = field(default=0)
+    chargeable_to_date: float = field(default=0)
     costs_by_currency_rate_id: dict[UUID, float] = field(default_factory=dict)
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
-    total_reference_cost: float = field(default=0)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
+    status: ActualStatusEnum = field(default=ActualStatusEnum.Waiting)
+    office_location_ids: list[UUID] = field(default_factory=list)
+    warnings_data: Optional[str] = field(default=None)

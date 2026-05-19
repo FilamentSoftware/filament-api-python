@@ -7,6 +7,7 @@ from typing import Optional, Union
 
 from uuid_utils import UUID, uuid7
 
+from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
 from ..entities.scope_item_service import ScopeItemEntity
 from ..entities.scope_service import ScopeEntity
@@ -112,11 +113,16 @@ class TaskEntity(ReferenceEntityBase):
     :param requires_review: If this task needs to go into reviews once it is done.
     :param default_processing_duration: The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions.
                                         This will be used as the default processing duration to be filled in on <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity" />.
+    :param priority: The priority of this task, derived from the scope and scope item priorities.
     :param ancestor_group_ids: Identifies the IDs of all ancestor task groups in the hierarchy that are related to this
                                instance of <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
     :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task.
                             This property is used to establish relationships between task groups in a hierarchical structure,
                             identifying all ancestor groups for the current entity.
+    :param chargeable: The calculated chargeable amount for this task, derived from the task type's chargeable per hour,
+                       the task duration, and the scope/item chargeable multipliers, with currency conversion applied.
+    :param currency_id: The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity.
+    :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
     contexts: dict[str, str] = field(default_factory=dict)
     name: str = field(default='')
@@ -125,5 +131,9 @@ class TaskEntity(ReferenceEntityBase):
     user_count: int = field(default=1)
     requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    priority: float = field(default=1)
     ancestor_group_ids: list[UUID] = field(default_factory=list)
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)
+    chargeable: float = field(default=0)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    currency: Optional[CurrencyEntity] = field(default=None)

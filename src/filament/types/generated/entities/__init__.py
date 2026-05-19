@@ -6,8 +6,8 @@ from .cast_service import *
 from .core import *
 from .currency_service import *
 from .current_instant_service import *
+from .event_service import *
 from .generic import *
-from .meeting_service import *
 from .note_service import *
 from .organization_service import *
 from .permissions_service import *

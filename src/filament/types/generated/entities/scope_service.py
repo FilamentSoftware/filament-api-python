@@ -11,6 +11,7 @@ from ..enums import ScopeType
 
 __all__ = [
     "ScopeEntity",
+    "ScopeStatusEntity",
 ]
 
 @dataclass(kw_only=True)
@@ -25,6 +26,11 @@ class ScopeEntity(Entity):
     :param task_duration_multiplier: An overall multiplier that applies to all task durations. This allows a project to effectively
                                      adjust the duration of all tasks in one place.
     :param chargeable_multiplier: An overall multiplier on chargeable costs. This is used to set global discounts for an entire project.
+    :param priority: The priority of this scope. Used to influence task scheduling priority.
+                     Must be between 0 and 1 (inclusive).
+    :param status_id: The status assigned to this scope.
+                      This is not an EntityLinkProperty because this type is in FSCore, and ScopeStatusEntity
+                      is in CoreServices.
     :param currency_id: The currency used for this scope's monetary values.
                         This is not an EntityLinkProperty because this type is in FSCore, and CurrencyEntity
                         is in CoreServices.
@@ -35,4 +41,24 @@ class ScopeEntity(Entity):
     image_link: Optional[str] = field(default=None)
     task_duration_multiplier: float = field(default=1)
     chargeable_multiplier: float = field(default=1)
+    priority: float = field(default=1)
+    status_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+
+
+@dataclass(kw_only=True)
+class ScopeStatusEntity(Entity):
+    """
+    Represents a status that can be assigned to a scope or scope item.
+    
+    :param name: The name of this status.
+    :param description: A description of this status.
+    :param schedule: Whether entities with this status should be included in scheduling.
+    :param costs: Whether entities with this status should be included in cost calculations.
+    :param priority_multiplier: A multiplier applied to the priority of entities with this status.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    schedule: bool = field(default=True)
+    costs: bool = field(default=True)
+    priority_multiplier: float = field(default=1)
