@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.3.0 (2026-05-19 11:09)
+
+### Generated
+
+#### FEATURE
+- Regenerate Python types: rename MeetingService to EventService and refresh entity/enum definitions
+
 ## 0.1.0-dev.0.2.1 (2026-04-01 18:09)
 
 ### Client
