@@ -116,10 +116,12 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param user: Represents an entity related to the schedule segment, associated via a user type and user identifier.
                  Used to establish and manage a link to the corresponding user or entity providing context or ownership for the schedule segment.
     :param mode: The mode of the schedule segment, specifying its functional purpose within the schedule.
-                 Possible values include Unknown, Work, Buffer, Processing, Group, User, and Meeting.
+                 Possible values include Unknown, Work, Buffer, Processing, Group, User, and Event.
     :param parent_ids: The identifier of the parent segments associated with the current schedule segment entity.
                        Used to establish hierarchical relationships between segments.
     :param parents: The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment.
+    :param priority: The priority of this schedule segment, derived from the associated task's priority.
+                     Meeting segments have a priority of 1.0.
     :param time_log_id: The identifier of the time log entry associated with this schedule segment.
                         This is used to link logged work time segments back to their source time log.
     :param time_log: The time log entry associated with this schedule segment.
@@ -136,5 +138,6 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     mode: ScheduleSegmentModeEnum = field(default=ScheduleSegmentModeEnum.Unknown)
     parent_ids: list[UUID] = field(default_factory=list)
     parents: Optional[list[ScheduleSegmentEntity]] = field(default=None)
+    priority: float = field(default=1)
     time_log_id: Optional[UUID] = field(default=None)
     time_log: Optional[TimeLogEntity] = field(default=None)

@@ -52,7 +52,7 @@ class PermissionEntity(Entity):
     permission_type: PermissionType = field(default=PermissionType.None_)
     type_name: str = field(default='')
     action: PermissionAction = field(default=PermissionAction.None_)
-    properties: list[str] = field(default_factory=list)
+    properties: Optional[list[str]] = field(default=None)
     condition_data: Optional[str] = field(default=None)
     super_admin: bool = field(default=False)
     organization_admin: bool = field(default=False)

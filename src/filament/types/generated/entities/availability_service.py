@@ -18,6 +18,8 @@ class AvailabilityEntity(ReferenceEntityBase):
     For storing availability information for a user. Multiple Availability entities can be stacked, using the
     <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.Priority" /> property to determine the relative priorities.
     
+    :param name: A human-readable name for this Availability entity.
+    :param description: An optional description providing additional detail about this Availability entity.
     :param priority: The priority of this Availability entity. The higher the priority, the more this entity takes precedence.
     :param availability_mode: Whether this Availability entity sets the availability to be Available, Unavailable or AvailableIfRequired.
     :param start_date_time: The start time (in local time) of this Availability block.
@@ -31,6 +33,8 @@ class AvailabilityEntity(ReferenceEntityBase):
                        <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.RepeatCount" /> property, so if the number of repeats has not finished when this time is reached,
                        repeating will finish anyway.
     """
+    name: str = field(default='')
+    description: str = field(default='')
     priority: int = field(default=0)
     availability_mode: AvailabilityModeEnum = field(default=AvailabilityModeEnum.Unknown)
     start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)

@@ -10,6 +10,7 @@ from ..base.base import Entity
 from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import GenericComplexityBase
 from ..entities.scope_category_service import ScopeCategoryEntity
+from ..entities.scope_service import ScopeStatusEntity
 from ..entities.user_service import UserEntity
 
 __all__ = [
@@ -56,6 +57,10 @@ class ScopeItemEntity(Entity):
     :param task_duration_multiplier: This allows fine-grained control over task durations on a per item basis.
     :param chargeable_multiplier: A multiplier on the chargeable cost for this item.  Used for discounting (or adding surplus) to
                                   chargeable costs.
+    :param priority: The priority of this scope item. Used to influence task scheduling priority.
+                     Must be between 0 and 1 (inclusive).
+    :param status_id: The status assigned to this scope item.
+    :param status: A helper method for setting the StatusId property.
     :param internal_note_id: A link to the internal note for this ScopeItem.
     :param internal_note: A helper property for setting the internal note.
     :param client_note_id: A link to the client note for this ScopeItem.
@@ -78,6 +83,9 @@ class ScopeItemEntity(Entity):
     count: int = field(default=1)
     task_duration_multiplier: float = field(default=1)
     chargeable_multiplier: float = field(default=1)
+    priority: float = field(default=1)
+    status_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    status: Optional[ScopeStatusEntity] = field(default=None)
     internal_note_id: Optional[UUID] = field(default=None)
     internal_note: Optional[ScopeItemNoteEntity] = field(default=None)
     client_note_id: Optional[UUID] = field(default=None)
