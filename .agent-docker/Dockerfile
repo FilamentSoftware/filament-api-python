@@ -1,4 +1,4 @@
-FROM claude-code-base
+FROM agent-docker-base
 
 USER root
 
