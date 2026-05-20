@@ -25,12 +25,13 @@ from filament.types.generated.base.base import EntityBase
 T = TypeVar("T")
 
 # Re-exported so external callers can keep importing from filament._serialization.
+# Explicit ``X as X`` aliases satisfy mypy strict's no-implicit-reexport rule.
 from filament._wire_formats import (  # noqa: E402
-    DATETIME_FORMAT,
-    instant_from_wire,
-    instant_to_wire,
-    timedelta_from_wire,
-    timedelta_to_wire,
+    DATETIME_FORMAT as DATETIME_FORMAT,
+    instant_from_wire as instant_from_wire,
+    instant_to_wire as instant_to_wire,
+    timedelta_from_wire as timedelta_from_wire,
+    timedelta_to_wire as timedelta_to_wire,
 )
 
 
