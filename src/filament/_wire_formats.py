@@ -19,7 +19,13 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f00Z"
 
 
 def instant_to_wire(value: datetime.datetime) -> str:
-    """Format a datetime as a C# ``Instant`` wire string."""
+    """Format a datetime as a C# ``Instant`` wire string.
+
+    Timezone-aware inputs are converted to UTC first so a non-UTC offset
+    does not silently shift the emitted instant.
+    """
+    if value.tzinfo is not None:
+        value = value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
     return value.strftime(DATETIME_FORMAT)
 
 
