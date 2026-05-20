@@ -345,10 +345,20 @@ class TestListFromWire:
         assert result is not None
         assert result.string_list == ["a", "b"]
 
+    def test_bool_list(self) -> None:
+        result = from_dict({"boolList": [True, False]}, ListEntity)
+        assert result is not None
+        assert result.bool_list == [True, False]
+
     def test_int_list(self) -> None:
         result = from_dict({"intList": [1, 2, 3]}, ListEntity)
         assert result is not None
         assert result.int_list == [1, 2, 3]
+
+    def test_float_list(self) -> None:
+        result = from_dict({"floatList": [1.5, 2.5]}, ListEntity)
+        assert result is not None
+        assert result.float_list == [1.5, 2.5]
 
     def test_guid_list(self) -> None:
         result = from_dict(
