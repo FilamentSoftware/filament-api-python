@@ -4,6 +4,8 @@
     ],
     "host_commands": [
         "poetry run mypy",
+        "poetry run pytest",
+        "poetry install",
         "poetry lock",
         "scripts/generate_code.sh",
         "scripts\\generate_code.cmd"
