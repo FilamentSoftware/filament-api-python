@@ -57,7 +57,7 @@ class TestOptionToDict:
 
     def test_decimal(self) -> None:
         result = option_to_dict(decimal_option(Decimal("99.99")))
-        assert result == {"valueType": 6, "value": "99.99"}
+        assert result == {"valueType": 6, "value": 99.99}
 
     def test_guid(self) -> None:
         uid = uuid_utils.uuid7()
@@ -75,7 +75,7 @@ class TestOptionToDict:
         td = datetime.timedelta(hours=2, minutes=30)
         result = option_to_dict(duration_option(td))
         assert result["valueType"] == 9
-        assert result["value"] == td.total_seconds()
+        assert result["value"] == "0:02:30:00"
 
     def test_invalid(self) -> None:
         opt = DataOption(value_type=DataOptionType.Invalid.value, value=None)
@@ -149,13 +149,13 @@ class TestOptionFromDict:
 
     def test_instant(self) -> None:
         result = option_from_dict(
-            {"valueType": 8, "value": "2025-06-15T10:30:00"}
+            {"valueType": 8, "value": "2025-06-15T10:30:00.00000000Z"}
         )
         assert result.value_type == DataOptionType.Instant.value
         assert isinstance(result.value, datetime.datetime)
 
     def test_duration(self) -> None:
-        result = option_from_dict({"valueType": 9, "value": 9000.0})
+        result = option_from_dict({"valueType": 9, "value": "0:02:30:00"})
         assert result.value_type == DataOptionType.Duration.value
         assert result.value == datetime.timedelta(seconds=9000)
 
