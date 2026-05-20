@@ -24,7 +24,14 @@ from filament.types.generated.base.base import EntityBase
 
 T = TypeVar("T")
 
-DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f00Z"
+# Re-exported so external callers can keep importing from filament._serialization.
+from filament._wire_formats import (  # noqa: E402
+    DATETIME_FORMAT,
+    instant_from_wire,
+    instant_to_wire,
+    timedelta_from_wire,
+    timedelta_to_wire,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -243,10 +250,16 @@ def _convert_to_dict_value(
     if _is_uuid_type(field_type) and convert_uuid:
         return str(data)
 
-    # datetime
+    # datetime (Instant)
     if field_type is datetime.datetime:
         if isinstance(data, datetime.datetime):
-            return data.strftime(DATETIME_FORMAT)
+            return instant_to_wire(data)
+        return data
+
+    # timedelta (Duration)
+    if field_type is datetime.timedelta:
+        if isinstance(data, datetime.timedelta):
+            return timedelta_to_wire(data)
         return data
 
     return data
@@ -337,12 +350,20 @@ def _convert_from_dict_value(
             return uuid_utils.UUID(data)
         return data
 
-    # datetime
+    # datetime (Instant)
     if field_type is datetime.datetime:
         if isinstance(data, datetime.datetime):
             return data
         if isinstance(data, str):
-            return datetime.datetime.strptime(data, DATETIME_FORMAT)
+            return instant_from_wire(data)
+        return data
+
+    # timedelta (Duration)
+    if field_type is datetime.timedelta:
+        if isinstance(data, datetime.timedelta):
+            return data
+        if isinstance(data, str):
+            return timedelta_from_wire(data)
         return data
 
     # bool (must be checked before int since bool is a subclass of int)

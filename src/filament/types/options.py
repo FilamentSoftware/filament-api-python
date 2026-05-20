@@ -14,6 +14,13 @@ from typing import Any, Optional, Union
 
 import uuid_utils
 
+from filament._wire_formats import (
+    instant_from_wire,
+    instant_to_wire,
+    timedelta_from_wire,
+    timedelta_to_wire,
+)
+
 __all__ = [
     "DataOption",
     "option_to_dict",
@@ -109,17 +116,23 @@ def _scalar_to_wire(value: Any, vt: int) -> Any:
     if vt == _VT_DOUBLE:
         return float(value)
     if vt == _VT_DECIMAL:
-        return str(value)
+        # C# wire format is a JSON number; coerce to float so the surrounding
+        # JSON encoder serializes it numerically.
+        return float(value)
     if vt == _VT_GUID:
         return str(value)
-    if vt in (_VT_INSTANT, _VT_LOCAL_DATE_TIME, _VT_LOCAL_DATE, _VT_LOCAL_TIME):
+    if vt == _VT_INSTANT:
+        if isinstance(value, datetime.datetime):
+            return instant_to_wire(value)
+        return str(value) if not isinstance(value, str) else value
+    if vt == _VT_DURATION:
+        if isinstance(value, datetime.timedelta):
+            return timedelta_to_wire(value)
+        return value
+    if vt in (_VT_LOCAL_DATE_TIME, _VT_LOCAL_DATE, _VT_LOCAL_TIME):
         if isinstance(value, datetime.datetime):
             return value.isoformat()
         return str(value)
-    if vt == _VT_DURATION:
-        if isinstance(value, datetime.timedelta):
-            return value.total_seconds()
-        return value
     if vt in (_VT_INTERVAL, _VT_DATE_TIME_ZONE):
         return str(value)
     # String and fallback
@@ -146,13 +159,13 @@ def _scalar_from_wire(value: Any, vt: int) -> Any:
         if isinstance(value, datetime.datetime):
             return value
         if isinstance(value, str):
-            return datetime.datetime.fromisoformat(value)
+            return instant_from_wire(value)
         return value
     if vt == _VT_DURATION:
         if isinstance(value, datetime.timedelta):
             return value
-        if isinstance(value, (int, float)):
-            return datetime.timedelta(seconds=value)
+        if isinstance(value, str):
+            return timedelta_from_wire(value)
         return value
     if vt in (_VT_LOCAL_DATE_TIME, _VT_LOCAL_DATE, _VT_LOCAL_TIME,
               _VT_INTERVAL, _VT_DATE_TIME_ZONE):
