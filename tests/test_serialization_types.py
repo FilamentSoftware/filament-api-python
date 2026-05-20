@@ -428,21 +428,23 @@ class TestNonStringKeyDictToWire:
     def test_int_key(self) -> None:
         entity = NonStringKeyDictEntity(int_string_dict={1: "a", 2: "b"})
         wire = to_dict(entity)["intStringDict"]
-        # Keys may be either int or str depending on serializer; pin to str
-        # since JSON only allows string keys at the wire level.
-        assert wire == {"1": "a", "2": "b"} or wire == {1: "a", 2: "b"}
+        # JSON requires string keys; normalise so the assertion catches any
+        # regression that stops producing convertible keys.
+        assert {str(k): v for k, v in wire.items()} == {"1": "a", "2": "b"}
 
     def test_guid_key(self) -> None:
         entity = NonStringKeyDictEntity(guid_string_dict={_SAMPLE_GUID: "a"})
         wire = to_dict(entity)["guidStringDict"]
-        assert wire == {"12345678-1234-5678-1234-567812345678": "a"}
+        assert {str(k): v for k, v in wire.items()} == {
+            "12345678-1234-5678-1234-567812345678": "a",
+        }
 
     def test_enum_key(self) -> None:
         # C# wire convention: integer-keyed enum dictionaries use the
         # integer value as the string key (e.g. "1", not "Value2").
         entity = NonStringKeyDictEntity(enum_string_dict={SampleEnum.Value2: "a"})
         wire = to_dict(entity)["enumStringDict"]
-        assert wire == {"1": "a"} or wire == {1: "a"}
+        assert {str(k): v for k, v in wire.items()} == {"1": "a"}
 
 
 # ===========================================================================
