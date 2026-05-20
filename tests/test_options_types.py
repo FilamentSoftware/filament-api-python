@@ -108,6 +108,20 @@ class TestScalarOptionToWire:
         opt = DataOption(value_type=DataOptionType.Duration.value, value=_SAMPLE_DURATION)
         assert option_to_dict(opt) == {"valueType": 9, "value": _SAMPLE_DURATION_WIRE}
 
+    def test_duration_negative(self) -> None:
+        opt = DataOption(
+            value_type=DataOptionType.Duration.value,
+            value=-datetime.timedelta(hours=1, minutes=2, seconds=3),
+        )
+        assert option_to_dict(opt) == {"valueType": 9, "value": "-0:01:02:03"}
+
+    def test_duration_fractional(self) -> None:
+        opt = DataOption(
+            value_type=DataOptionType.Duration.value,
+            value=datetime.timedelta(seconds=1, microseconds=500_000),
+        )
+        assert option_to_dict(opt) == {"valueType": 9, "value": "0:00:00:01.500000000"}
+
     def test_interval(self) -> None:
         # No native Python NodaTime Interval; round-trip the literal string.
         opt = DataOption(value_type=DataOptionType.Interval.value, value=_SAMPLE_INTERVAL_WIRE)
@@ -196,6 +210,16 @@ class TestScalarOptionFromWire:
         result = option_from_dict({"valueType": 9, "value": _SAMPLE_DURATION_WIRE})
         assert result.value_type == DataOptionType.Duration.value
         assert result.value == _SAMPLE_DURATION
+
+    def test_duration_negative(self) -> None:
+        result = option_from_dict({"valueType": 9, "value": "-0:01:02:03"})
+        assert result.value_type == DataOptionType.Duration.value
+        assert result.value == -datetime.timedelta(hours=1, minutes=2, seconds=3)
+
+    def test_duration_fractional(self) -> None:
+        result = option_from_dict({"valueType": 9, "value": "0:00:00:01.500000000"})
+        assert result.value_type == DataOptionType.Duration.value
+        assert result.value == datetime.timedelta(seconds=1, microseconds=500_000)
 
     def test_interval(self) -> None:
         result = option_from_dict({"valueType": 10, "value": _SAMPLE_INTERVAL_WIRE})
@@ -290,6 +314,19 @@ class TestArrayOptionToWire:
             value=[_SAMPLE_DURATION],
         )
         assert option_to_dict(opt) == {"valueType": 22, "value": [_SAMPLE_DURATION_WIRE]}
+
+    def test_duration_array_mixed_sign_and_fractional(self) -> None:
+        opt = DataOption(
+            value_type=DataOptionType.DurationArray.value,
+            value=[
+                -datetime.timedelta(hours=1, minutes=2, seconds=3),
+                datetime.timedelta(seconds=1, microseconds=500_000),
+            ],
+        )
+        assert option_to_dict(opt) == {
+            "valueType": 22,
+            "value": ["-0:01:02:03", "0:00:00:01.500000000"],
+        }
 
     def test_interval_array(self) -> None:
         opt = DataOption(
@@ -386,6 +423,16 @@ class TestArrayOptionFromWire:
         result = option_from_dict({"valueType": 22, "value": [_SAMPLE_DURATION_WIRE]})
         assert result.value_type == DataOptionType.DurationArray.value
         assert result.value == [_SAMPLE_DURATION]
+
+    def test_duration_array_mixed_sign_and_fractional(self) -> None:
+        result = option_from_dict(
+            {"valueType": 22, "value": ["-0:01:02:03", "0:00:00:01.500000000"]}
+        )
+        assert result.value_type == DataOptionType.DurationArray.value
+        assert result.value == [
+            -datetime.timedelta(hours=1, minutes=2, seconds=3),
+            datetime.timedelta(seconds=1, microseconds=500_000),
+        ]
 
     def test_interval_array(self) -> None:
         result = option_from_dict({"valueType": 23, "value": [_SAMPLE_INTERVAL_WIRE]})
