@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.3.1 (2026-05-20 16:23)
+
+### Serialization
+
+#### FIX
+- Fixed Duration, Instant, and Decimal serialization to match the C# backend wire format
+
 ## 0.1.0-dev.0.3.0 (2026-05-19 11:09)
 
 ### Generated
