@@ -29,7 +29,7 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
-plugins = ["filament_mypy_plugin"]
+plugins = ["src/filament_mypy_plugin.py"]
 
 [[tool.mypy.overrides]]
 module = ["pysignalr", "pysignalr.*"]
