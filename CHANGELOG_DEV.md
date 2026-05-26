@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.3.2 (2026-05-26 10:16)
+
+### Serialization
+
+#### FIX
+- Deserialized Instant values now carry UTC tzinfo instead of being naive
+
 ## 0.1.0-dev.0.3.1 (2026-05-20 16:23)
 
 ### Serialization
