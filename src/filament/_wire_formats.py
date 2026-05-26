@@ -30,8 +30,15 @@ def instant_to_wire(value: datetime.datetime) -> str:
 
 
 def instant_from_wire(value: str) -> datetime.datetime:
-    """Parse a C# ``Instant`` wire string into a (naive) datetime."""
-    return datetime.datetime.strptime(value, DATETIME_FORMAT)
+    """Parse a C# ``Instant`` wire string into a UTC-aware datetime.
+
+    The wire format's trailing ``Z`` denotes UTC; the returned datetime
+    carries ``tzinfo=datetime.timezone.utc`` so downstream code never has
+    to guess.
+    """
+    return datetime.datetime.strptime(value, DATETIME_FORMAT).replace(
+        tzinfo=datetime.timezone.utc
+    )
 
 
 def timedelta_to_wire(value: datetime.timedelta) -> str:

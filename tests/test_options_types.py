@@ -35,7 +35,7 @@ from filament.types.options import (
 # match what the backend produces / accepts.
 
 _SAMPLE_GUID = UUID("12345678-1234-5678-1234-567812345678")
-_SAMPLE_INSTANT = datetime.datetime(2025, 1, 2, 3, 4, 5)
+_SAMPLE_INSTANT = datetime.datetime(2025, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc)
 _SAMPLE_INSTANT_WIRE = "2025-01-02T03:04:05.00000000Z"
 
 _SAMPLE_DURATION = datetime.timedelta(days=1, hours=2, minutes=3, seconds=4)
