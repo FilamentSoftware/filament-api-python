@@ -127,6 +127,14 @@ class FilamentClient:
         # when a server invocation returns an error.
         self._signalr_client.on_error(self._handle_signalr_error)
 
+        # In-flight invocation futures, tracked so they can be failed
+        # collectively if the SignalR connection drops before the
+        # server response arrives (e.g. websocket close 1009 when a
+        # response exceeds the client's max frame size — otherwise
+        # the awaiting caller would hang indefinitely).
+        self._pending_invocations: set[asyncio.Future[Any]] = set()
+        self._signalr_client.on_close(self._handle_close)
+
         # Background task for pysignalr's run() loop
         self._run_task: Optional[asyncio.Task[None]] = None
         self._connected: Optional[asyncio.Event] = None
@@ -206,6 +214,9 @@ class FilamentClient:
 
         Wraps pysignalr's fire-and-forget ``send()`` with a
         :class:`asyncio.Future` so callers can ``await`` the result.
+        If the SignalR connection drops before the server replies,
+        the future is failed with :class:`FilamentConnectionError`
+        so the caller sees an exception instead of hanging.
         """
         loop = asyncio.get_running_loop()
         future: asyncio.Future[Any] = loop.create_future()
@@ -219,7 +230,15 @@ class FilamentClient:
                 else:
                     future.set_result(message.result)
 
-        await self._signalr_client.send(method, list(args), on_invocation=on_completion)
+        self._pending_invocations.add(future)
+        future.add_done_callback(self._pending_invocations.discard)
+
+        try:
+            await self._signalr_client.send(method, list(args), on_invocation=on_completion)
+        except BaseException:
+            if not future.done():
+                future.cancel()
+            raise
         return await future
 
     # ------------------------------------------------------------------
@@ -249,6 +268,22 @@ class FilamentClient:
     async def _handle_signalr_error(self, message: CompletionMessage) -> None:
         """Handle invocation errors from the server."""
         logger.error("SignalR invocation error: %s", message.error)
+
+    async def _handle_close(self) -> None:
+        """Fail any in-flight invocations when the SignalR connection drops.
+
+        Without this, a caller awaiting :meth:`_invoke` after a websocket
+        close (e.g. close code 1009 — message too big) would hang forever,
+        because the completion callback can never fire on a closed socket.
+        """
+        if not self._pending_invocations:
+            return
+        error = FilamentConnectionError(
+            "SignalR connection closed before the server response arrived"
+        )
+        for future in list(self._pending_invocations):
+            if not future.done():
+                future.set_exception(error)
 
     async def _handle_authentication_failed(self, message: str = "") -> None:
         """Record an ``AuthenticationFailed`` event from the server."""
