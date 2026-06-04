@@ -95,6 +95,38 @@ class TestClientConstruction:
             expected_token = base64.b64encode(b"my-key:my-org:my-secret").decode()
             assert headers["Authorization"] == f"ApiKey {expected_token}"
 
+    def test_default_max_size_is_1mib(self) -> None:
+        with patch("filament._client.SignalRClient") as mock_cls:
+            FilamentClient(organization_id="org", api_key_name="k", api_key="s")
+            call_kwargs = mock_cls.call_args
+            assert call_kwargs is not None
+            assert call_kwargs[1]["max_size"] == 2**20
+
+    def test_explicit_max_size_forwarded(self) -> None:
+        with patch("filament._client.SignalRClient") as mock_cls:
+            FilamentClient(
+                organization_id="org",
+                api_key_name="k",
+                api_key="s",
+                max_size=4 * 2**20,
+            )
+            call_kwargs = mock_cls.call_args
+            assert call_kwargs is not None
+            assert call_kwargs[1]["max_size"] == 4 * 2**20
+
+    def test_max_size_none_forwarded(self) -> None:
+        """Passing None opts out of the limit (unlimited message size)."""
+        with patch("filament._client.SignalRClient") as mock_cls:
+            FilamentClient(
+                organization_id="org",
+                api_key_name="k",
+                api_key="s",
+                max_size=None,
+            )
+            call_kwargs = mock_cls.call_args
+            assert call_kwargs is not None
+            assert call_kwargs[1]["max_size"] is None
+
 
 class TestReadData:
     @pytest.mark.asyncio
