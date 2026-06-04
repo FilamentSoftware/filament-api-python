@@ -12,7 +12,7 @@ import pytest
 from uuid_utils import UUID, uuid7
 
 from filament._client import FilamentClient
-from filament._exceptions import FilamentAuthenticationError
+from filament._exceptions import FilamentAuthenticationError, FilamentConnectionError
 from filament.types.generated.enums import (
     DataProcessingStatus,
     ErrorCodes,
@@ -462,3 +462,99 @@ class TestEventCallbacks:
         }
         await client._handle_processing_started(status_data)
         successful_callback.assert_called_once()
+
+
+class TestConnectionClose:
+    """Connection-drop handling for in-flight invocations."""
+
+    @staticmethod
+    def _client_with_real_invoke() -> FilamentClient:
+        """Like ``_make_client`` but keeps the real ``_invoke`` method."""
+        with patch("filament._client.SignalRClient"):
+            return FilamentClient(
+                organization_id="org",
+                api_key_name="k",
+                api_key="s",
+            )
+
+    @pytest.mark.asyncio
+    async def test_invoke_registers_and_clears_pending_future(self) -> None:
+        """_invoke should add its future to the pending set and remove it on completion."""
+        import asyncio
+
+        from pysignalr.messages import CompletionMessage
+
+        client = self._client_with_real_invoke()
+
+        captured: dict[str, Any] = {}
+
+        async def fake_send(method: str, args: list[Any], on_invocation: Any) -> None:
+            captured["on_invocation"] = on_invocation
+
+        client._signalr_client.send = AsyncMock(side_effect=fake_send)
+
+        async def complete_later() -> None:
+            # Yield until _invoke has reached `await future` and registered it.
+            for _ in range(10):
+                if client._pending_invocations:
+                    break
+                await asyncio.sleep(0)
+            assert len(client._pending_invocations) == 1
+            await captured["on_invocation"](
+                CompletionMessage(invocation_id="x", result={"ok": True}),
+            )
+
+        completer = asyncio.create_task(complete_later())
+        result = await client._invoke("SomeMethod", "arg")
+        await completer
+
+        assert result == {"ok": True}
+        # Future is discarded once completed.
+        assert len(client._pending_invocations) == 0
+
+    @pytest.mark.asyncio
+    async def test_close_fails_pending_invocations(self) -> None:
+        """_handle_close should fail every awaiting _invoke with FilamentConnectionError.
+
+        Simulates the 1009 close case: send() succeeds (the request goes out),
+        but the server never replies because the websocket has been torn down.
+        Without on_close handling, the caller would hang on `await future`.
+        """
+        import asyncio
+
+        client = self._client_with_real_invoke()
+
+        # send() returns immediately (request sent fine) but the completion
+        # callback is never invoked, mimicking a dropped websocket.
+        client._signalr_client.send = AsyncMock(return_value=None)
+
+        invoke_task = asyncio.create_task(client._invoke("SomeMethod"))
+        # Yield until _invoke has reached `await future`.
+        for _ in range(10):
+            if client._pending_invocations:
+                break
+            await asyncio.sleep(0)
+        assert len(client._pending_invocations) == 1
+
+        await client._handle_close()
+
+        with pytest.raises(FilamentConnectionError):
+            await invoke_task
+        # Done-callback drains the pending set.
+        assert client._pending_invocations == set()
+
+    @pytest.mark.asyncio
+    async def test_close_with_no_pending_is_noop(self) -> None:
+        """_handle_close is safe to call when no invocations are in flight."""
+        client = _make_client()
+        # Should not raise.
+        await client._handle_close()
+        assert client._pending_invocations == set()
+
+    def test_close_handler_registered(self) -> None:
+        """FilamentClient should register an on_close handler with SignalRClient."""
+        with patch("filament._client.SignalRClient") as mock_cls:
+            mock_client = MagicMock()
+            mock_cls.return_value = mock_client
+            FilamentClient(organization_id="org", api_key_name="k", api_key="s")
+            mock_client.on_close.assert_called_once()
