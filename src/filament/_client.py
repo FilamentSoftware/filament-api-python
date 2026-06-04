@@ -41,6 +41,8 @@ _DEFAULT_SERVER = "https://backend.filament-software.com"
 _DEFAULT_PORT = 443
 _DEFAULT_PATH = "api/v0"
 _DEFAULT_CONNECTION_TIMEOUT = 10.0
+# Matches the websockets-library default that pysignalr uses; pass ``None`` for unlimited.
+_DEFAULT_MAX_SIZE = 2**20  # 1 MiB
 
 
 class FilamentClient:
@@ -63,6 +65,7 @@ class FilamentClient:
         port: int = _DEFAULT_PORT,
         path: str = _DEFAULT_PATH,
         connection_timeout: float = _DEFAULT_CONNECTION_TIMEOUT,
+        max_size: Optional[int] = _DEFAULT_MAX_SIZE,
     ) -> None:
         """Initialise the client.
 
@@ -74,6 +77,11 @@ class FilamentClient:
         :param path: URL path prefix for the SignalR hub endpoint.
         :param connection_timeout: Timeout in seconds for the initial
             connection to the server (default 10).
+        :param max_size: Maximum size in bytes of an incoming SignalR
+            message (default 1 MiB).  Pass ``None`` to remove the limit.
+            When the server sends a larger message the websocket is
+            closed with code 1009 and any in-flight invocation fails
+            with :class:`FilamentConnectionError`.
         """
         self._api_key_name = api_key_name
         self._authentication_failed = False
@@ -111,6 +119,7 @@ class FilamentClient:
             headers=headers,
             connection_timeout=int(connection_timeout),
             ping_interval=3600,
+            max_size=max_size,
         )
 
         # Register internal event handlers.  pysignalr passes
