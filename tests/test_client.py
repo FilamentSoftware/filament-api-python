@@ -689,6 +689,19 @@ class TestClientHello:
         with pytest.raises(FilamentAuthenticationError):
             await client._send_client_hello()
 
+    @pytest.mark.asyncio
+    async def test_send_client_hello_times_out(self) -> None:
+        """A ClientHello that never completes raises FilamentConnectionError after timeout."""
+        client = _make_client(connection_timeout=0.05)
+
+        async def hang_forever(*args: Any, **kwargs: Any) -> Any:
+            await asyncio.sleep(10)
+
+        client._invoke = AsyncMock(side_effect=hang_forever)
+
+        with pytest.raises(FilamentConnectionError, match="ClientHello did not complete"):
+            await client._send_client_hello()
+
 
 class TestDataUpdateRejected:
     """DataUpdateRejected event routing to subscription on_error callbacks."""

@@ -285,10 +285,22 @@ class FilamentClient:
         Sent once per connection.  Older backends that don't implement the
         ``ClientHello`` hub method return an invocation error; we log it and
         continue, since the client-side ``max_size`` cap still applies.
+
+        The invocation is bounded by ``connection_timeout``: if the server
+        accepts the socket but never sends a completion for ``ClientHello``,
+        we fail the connect with :class:`FilamentConnectionError` rather than
+        hang ``__aenter__`` indefinitely.
         """
         request = ClientHelloRequest(max_message_size_bytes=self._max_size)
         try:
-            result_dict: Any = await self._invoke("ClientHello", to_dict(request))
+            result_dict: Any = await asyncio.wait_for(
+                self._invoke("ClientHello", to_dict(request)),
+                timeout=self._connection_timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            raise FilamentConnectionError(
+                f"ClientHello did not complete within {self._connection_timeout}s"
+            ) from exc
         except FilamentError:
             # Connection / authentication / other lifecycle errors bubble — only
             # the "older server doesn't implement ClientHello" case gets swallowed.
