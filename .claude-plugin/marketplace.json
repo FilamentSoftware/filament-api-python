@@ -1,0 +1,13 @@
+{
+  "name": "filament",
+  "owner": {
+    "name": "Filament Software"
+  },
+  "plugins": [
+    {
+      "name": "filament-api",
+      "source": "./",
+      "description": "Skill for using the Filament Python API (FilamentClient): building query Conditions, reading and modifying entity data, and setting up real-time subscriptions over SignalR."
+    }
+  ]
+}

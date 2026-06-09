@@ -23,6 +23,7 @@ __all__ = [
     "NoteUserConnectionType",
     "PermissionAction",
     "PermissionType",
+    "ProcessingRunStatus",
     "ReadMode",
     "RequestStatus",
     "ScenarioEventAction",
@@ -33,6 +34,8 @@ __all__ = [
     "ScopeMilestoneDirectionEnum",
     "ScopeTaskTypeComplexitySource",
     "ScopeType",
+    "ServiceProcessingMode",
+    "ServiceProcessingStatus",
     "SubscriptionMode",
     "TaskDependencyOverrideIncludeState",
     "TaskDependencyOverrideOverlapState",
@@ -43,6 +46,7 @@ __all__ = [
     "TrainingType",
     "UserAddressType",
     "UserEmailType",
+    "UserLicenseType",
     "UserPhoneType",
     "UserStatusEnum",
     "UserTypeEnum",
@@ -476,6 +480,25 @@ class PermissionType(Enum):
     Scenario = 2
 
 
+class ProcessingRunStatus(Enum):
+    """
+    The status of an overall processing run.
+    
+    :cvar Unknown: Unknown status.
+    :cvar Pending: The processing run has been created but has not yet started executing services.
+    :cvar Processing: The processing run is currently executing services.
+    :cvar Completed: The processing run has completed successfully.
+    :cvar Failed: The processing run failed.
+    :cvar Cancelled: The processing run was cancelled.
+    """
+    Unknown = 0
+    Pending = 1
+    Processing = 2
+    Completed = 3
+    Failed = 4
+    Cancelled = 5
+
+
 class ReadMode(Enum):
     """
     Specifies the mode for reading data from the database.
@@ -654,6 +677,51 @@ class ScopeType(Enum):
     Other = 6
 
 
+class ServiceProcessingMode(Enum):
+    """
+    The role a service is playing in a processing run — what work it is performing. Fixed at
+    run setup, does not change as the run progresses.
+    
+    :cvar Unknown: Unknown mode.
+    :cvar Read: The service is reading upstream data only, providing context to other services.
+    :cvar Update: The service is processing a modify-data request (the main processing pipeline).
+    :cvar Propagate: The service is propagating changes from upstream services to downstream services.
+    :cvar Source: The service is acting as a scenario source — handling requests inside a scenario.
+    :cvar Live: The service is providing current (live) state into a scenario.
+    :cvar LivePropagate: The service is propagating current (live) state through a scenario.
+    """
+    Unknown = 0
+    Read = 1
+    Update = 2
+    Propagate = 3
+    Source = 4
+    Live = 5
+    LivePropagate = 6
+
+
+class ServiceProcessingStatus(Enum):
+    """
+    The status of an individual service within a processing run.
+    
+    :cvar Unknown: Unknown status.
+    :cvar Pending: The service is part of the run but has not yet started.
+    :cvar Processing: The service is currently executing as part of the run.
+    :cvar Publishing: The service has finished its work and the Hub is currently publishing the results to
+                      subscribers. Only used for services that publish per-node data (Update / Propagate / Source
+                      / Live / LivePropagate); pure Read services transition directly to <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Completed" />.
+    :cvar Completed: The service has finished its work for the run successfully.
+    :cvar Failed: The service failed during the run.
+    :cvar Cancelled: The service was cancelled before completing.
+    """
+    Unknown = 0
+    Pending = 1
+    Processing = 2
+    Publishing = 3
+    Completed = 4
+    Failed = 5
+    Cancelled = 6
+
+
 class SubscriptionMode(Flag):
     """
     Represents the mode of a subscription, defining the types of updates
@@ -803,6 +871,18 @@ class UserEmailType(Enum):
     Home = 0
     Business = 1
     Other = 2
+
+
+class UserLicenseType(Enum):
+    """
+    The set of license types tracked by UserLicenseService. Rules for each type are currently
+    hard-coded in the UserLicenseProcessor.
+    
+    :cvar User: A user-level license: held by anyone who can log in or appear on a schedule.
+    :cvar Production: A production license: held by users with write access to ScopeItemEntity.
+    """
+    User = 0
+    Production = 1
 
 
 class UserPhoneType(Enum):
