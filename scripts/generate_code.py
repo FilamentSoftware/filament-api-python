@@ -109,7 +109,22 @@ def main() -> int:
             return 1
         shutil.rmtree(output_path)
     staging_path.replace(output_path)
+
+    # Regenerate the human-readable type reference from the new output so it
+    # never drifts from the generated dataclasses.
+    _regenerate_type_reference()
     return 0
+
+
+def _regenerate_type_reference() -> None:
+    """Run the type-reference doc generator, best-effort (never fails codegen)."""
+    script = Path(__file__).resolve().parent / "generate_type_reference.py"
+    if not script.exists():
+        return
+    try:
+        subprocess.run([sys.executable, str(script)], check=True)
+    except (subprocess.CalledProcessError, OSError) as exc:
+        print(f"Warning: failed to regenerate type reference: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":
