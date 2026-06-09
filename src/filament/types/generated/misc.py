@@ -11,9 +11,10 @@ from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
 from .connections.user_service import UserPermissionsRoleConnection
-from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, SubscriptionMode
+from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode
 
 __all__ = [
+    "ServiceProcessingInfo",
     "SwitchUserRequest",
     "SuccessOrErrorBase",
     "SetPermissionsRolesRequest",
@@ -53,6 +54,23 @@ __all__ = [
 T = TypeVar("T")
 T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
+
+
+@dataclass(kw_only=True)
+class ServiceProcessingInfo:
+    """
+    Per-service information for a processing run. SortOrder reflects the service's position in
+    the participating-node DAG (parallel services share a SortOrder, downstream services get
+    higher values). Mode is set once at run setup; Status is updated as the service progresses.
+    
+    :param sort_order: Topological-level position in the processing DAG. Services that can run in parallel share
+                       a value; downstream services have higher values.
+    :param status: Current execution status of the service within the run.
+    :param mode: The role the service is playing in the run.
+    """
+    sort_order: int = field(default=0)
+    status: ServiceProcessingStatus = field(default=ServiceProcessingStatus.Unknown)
+    mode: ServiceProcessingMode = field(default=ServiceProcessingMode.Unknown)
 
 
 @dataclass(kw_only=True)

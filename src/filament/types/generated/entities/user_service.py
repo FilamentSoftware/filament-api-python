@@ -66,7 +66,7 @@ class UserEntity(UserBaseEntity):
     user_name: str = field(default='')
     password: Optional[str] = field(default=None)
     email_address: str = field(default='')
-    pronouns: str = field(default='')
+    pronouns: Optional[str] = field(default=None)
     image_link: Optional[str] = field(default=None)
     name: str = field(default=' ')
     tax_credit_location_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

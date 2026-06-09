@@ -8,11 +8,12 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus
+from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus
 
 __all__ = [
     "ErrorEntity",
     "RequestEntity",
+    "ProcessingRunEntity",
     "EventLogEntity",
     "ScenarioEntity",
     "ScenarioServiceEntity",
@@ -60,6 +61,30 @@ class RequestEntity(Entity):
     error_message: Optional[str] = field(default=None)
     affected_entities: list[str] = field(default_factory=list)
     request_data: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class ProcessingRunEntity(Entity):
+    """
+    Represents a single processing run for an organization. Created when a batch of requests
+    begins processing, and updated as the run moves through its lifecycle.
+    
+    :param sequence: The sequence number of the processing run. Monotonically increasing per organization.
+    :param status: The overall status of the processing run.
+    :param error_message: Error message if the processing run failed.
+    :param request_ids: Identifiers of the requests/operations in this processing run. For runs created by the
+                        main processing pipeline or scenario-request processing these are <c>RequestEntity.Id</c>
+                        values; for runs created by scenario propagation this is a synthetic identifier for the
+                        propagation operation with no corresponding <c>RequestEntity</c> in the database.
+    :param processing_service_data: JSON-serialized dictionary of service name → <see cref="T:Filament.FSCore.CoreEntities.ServiceProcessingInfo" /> for the
+                                    services participating in this processing run. Use <see cref="P:Filament.FSCore.CoreEntities.ProcessingRunEntity.ServiceData" /> for the
+                                    strongly-typed view.
+    """
+    sequence: int = field(default=0)
+    status: ProcessingRunStatus = field(default=ProcessingRunStatus.Unknown)
+    error_message: Optional[str] = field(default=None)
+    request_ids: list[UUID] = field(default_factory=list)
+    processing_service_data: str = field(default='')
 
 
 @dataclass(kw_only=True)
