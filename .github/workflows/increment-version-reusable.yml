@@ -69,6 +69,52 @@ jobs:
             echo "is_dependabot=false" >> $GITHUB_OUTPUT
           fi
 
+      # First pass: compute the next version without committing or tagging, so
+      # the plugin manifest can be bumped *before* the changelog commit/tag.
+      - name: Calculate next version
+        id: version_preview
+        uses: hughmacdonald/SemanticVersioner@v1
+        with:
+          main-branch: "main"
+          dev-branch: ${{ inputs.dev-branch }}
+          dev-suffix: ${{ inputs.dev-suffix }}
+          use-semantic-dev-versions: ${{ inputs.use-semantic-dev-versions }}
+          changelog-file: ${{ inputs.changelog-file }}
+          changelog-message: ${{ steps.detect_dependabot.outputs.is_dependabot == 'true' && 'Update dependencies' || '' }}
+          dry-run: true
+
+      # Bump the plugin manifest first. This is a `chore:` commit, which does not
+      # affect the version SemanticVersioner computes on the real pass below, so
+      # the changelog commit/tag lands on top of it and includes this change.
+      - name: Stamp version into Claude plugin manifest
+        env:
+          NEW_VERSION: ${{ steps.version_preview.outputs.new-version }}
+        run: |
+          set -euo pipefail
+          file=".claude-plugin/plugin.json"
+          version="${NEW_VERSION#v}"
+          if [[ -z "$version" ]]; then
+            echo "No new version produced; skipping plugin.json update."
+            exit 0
+          fi
+          if [[ ! -f "$file" ]]; then
+            echo "$file not found; skipping plugin.json update."
+            exit 0
+          fi
+          tmp="$(mktemp)"
+          jq --arg v "$version" '.version = $v' "$file" > "$tmp"
+          mv "$tmp" "$file"
+          if git diff --quiet -- "$file"; then
+            echo "$file already at $version; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git commit -m "chore: set Claude plugin version to ${version}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      # Second pass: the real run that writes the changelog, commits, and tags.
       - name: Increment Version
         id: increment_version
         uses: hughmacdonald/SemanticVersioner@v1
