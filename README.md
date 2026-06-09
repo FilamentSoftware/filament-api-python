@@ -2,6 +2,38 @@
 
 An async Python client for the Filament platform, communicating over SignalR.
 
+## Documentation
+
+Full, multi-page documentation lives in [`docs/`](docs/README.md):
+
+- [Getting Started](docs/getting-started.md) — install, connect, authenticate, error handling
+- [Finding Entity & Connection Types](docs/finding-types.md) — where every type and enum lives
+- [Type Reference](docs/type-reference.md) — auto-generated catalogue of every entity, connection, and enum
+- [Reading Data](docs/reading-data.md) — queries, ordering, paging, projections
+- [Building Conditions](docs/conditions.md) — the typed condition builder and operators
+- [Modifying Data](docs/modifying-data.md) — create, update, delete, partial updates
+- [Subscriptions](docs/subscriptions.md) — real-time updates and lifecycle events
+- [Data Options](docs/data-options.md) — the typed `DataOption` key-value type
+- [API Reference](docs/api-reference.md) — `FilamentClient`, the response envelope, exceptions
+
+Runnable scripts are in [`examples/`](examples/). The sections below are a quick
+overview; see the docs for the full detail.
+
+### Claude Code skill
+
+This repo doubles as a [Claude Code](https://claude.com/claude-code) plugin that
+ships a `using-filament-api` skill. Install it in any project that uses this
+package so Claude has the API reference on hand:
+
+```text
+/plugin marketplace add FilamentSoftware/filament-api-python
+/plugin install filament-api@filament
+```
+
+The skill routes Claude to the bundled [`docs/`](docs/README.md) — it stays in
+sync with the documentation rather than duplicating it. Once installed, invoke it
+with `/filament-api:using-filament-api`.
+
 ## Requirements
 
 - Python 3.10, 3.11, 3.12, or 3.13
