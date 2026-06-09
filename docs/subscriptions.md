@@ -126,7 +126,7 @@ callback won't tear down the connection.
 | `subscription_id` | `SubscriptionId` | The (backend) subscription that produced it. |
 | `modified_entities` | `dict[str, EntityServiceDataUpdate]` | Changes, keyed by entity type name. |
 | `progress` | `bool` | Whether this is a progress update. |
-| `progress_amount` | `float` | Progress value, when `progress` is set. |
+| `progress_amount` | `float` | Progress value when `progress` is set. |
 | `sequence_idx` | `int` | Monotonic ordering index. |
 | `request_ids` | `list[RequestId]` | Requests that caused this update. |
 
@@ -222,7 +222,7 @@ Both return a `SuccessOrErrorPublic`. Leaving the `async with` block also tears
 down the connection (and therefore all subscriptions); explicit unsubscribing is
 good practice when you want to stop receiving events but keep the client open.
 
-When unwinding on cancellation, wrap the unsubscribe in `asyncio.shield` so it
+When unwinding on cancellation, wrap the unsubscribe call in `asyncio.shield` so it
 isn't itself cancelled mid-flight (as the examples do).
 
 ## Processing-lifecycle events
@@ -241,4 +241,3 @@ f.on_processing_failed(lambda status: print("Failed:", status.message))
 and a human-readable `message`. Like data callbacks, these may be sync or async,
 and you can register more than one of each. They are handy for tracking when a
 [`modify_data`](modifying-data.md) request has finished processing.
-</content>

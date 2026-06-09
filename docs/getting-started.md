@@ -214,4 +214,3 @@ if __name__ == "__main__":
 - Filter your reads with [Conditions](conditions.md).
 - Write data with [Modifying Data](modifying-data.md).
 - React to changes in real time with [Subscriptions](subscriptions.md).
-</content>

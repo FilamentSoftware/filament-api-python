@@ -15,7 +15,7 @@ from filament.types import UserEntity, UserStatusEnum, ReadDataRequest
 
 Under the hood, `filament.types` aggregates three groups:
 
-```
+```text
 filament/types/
 ├── conditions.py     # DbConditionInstance hierarchy (see Conditions guide)
 ├── options.py        # DataOption (see Data Options guide)
@@ -176,7 +176,7 @@ The types you build to make requests, and the payloads you get back, live in
 
 Defined in `filament/types/generated/base/base.py`:
 
-```
+```text
 SpecifiedPropertiesBase          # tracks which fields you set (partial updates)
 └── EntityBase                   # id, created_at/by, updated_at/by, scope_id
     ├── Entity                   # base for ordinary entities
@@ -259,4 +259,3 @@ typed `Condition` builder.
 
 When in doubt: the *typed* builder lets you keep writing snake_case; the *string*
 APIs expect the wire camelCase name.
-</content>

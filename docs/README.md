@@ -99,5 +99,3 @@ this documentation refers to:
 - **Generated code is read-only.** Everything under
   `src/filament/types/generated/` is produced by the backend's code generator.
   See [Finding Types](finding-types.md#generated-code-is-read-only).
-</content>
-</invoke>

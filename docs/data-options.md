@@ -108,4 +108,3 @@ Python types.
   back as **UTC-aware** `datetime` objects.
 - **NodaTime types without a direct Python equivalent** (LocalDateTime,
   LocalDate, LocalTime, Interval, DateTimeZone) round-trip as strings.
-</content>

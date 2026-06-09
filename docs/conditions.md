@@ -286,4 +286,3 @@ await f.read_data(
 
 See [Reading Data](reading-data.md) and [Subscriptions](subscriptions.md) for the
 surrounding request shapes.
-</content>

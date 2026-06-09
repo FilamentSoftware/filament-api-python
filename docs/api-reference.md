@@ -174,7 +174,7 @@ Defined in `filament._exceptions` and re-exported at the top level. These are
 raised only for **connection/authentication** failures (when entering the context
 manager) — request-level failures use the envelope above instead.
 
-```
+```text
 FilamentError                     # base — catch this to handle any client error
 ├── FilamentAuthenticationError   # the server rejected the credentials
 └── FilamentConnectionError       # the SignalR connection failed or timed out
@@ -201,4 +201,3 @@ except filament.FilamentError:
 - [Modifying Data](modifying-data.md)
 - [Subscriptions](subscriptions.md)
 - [Data Options](data-options.md)
-</content>

@@ -206,4 +206,3 @@ request/response types are available in `filament.types`.
 > `get_status`; these are part of the wire protocol but are not yet wrapped by a
 > dedicated client method. See the [API Reference](api-reference.md) for the
 > methods that are implemented today.
-</content>

@@ -160,4 +160,3 @@ if not result.success:
 
 See the [API Reference](api-reference.md#the-response-envelope) for the envelope
 fields.
-</content>
