@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.4.0 (2026-06-09 11:58)
+
+### Other
+
+#### OTHER
+- Add guides for connections, reading/modifying data, subscriptions, data options, and finding types
+
 ## 0.1.0-dev.0.3.2 (2026-05-26 10:16)
 
 ### Serialization
