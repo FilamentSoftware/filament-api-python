@@ -5,6 +5,7 @@ import datetime
 from dataclasses import dataclass, field
 
 from ..base.base import Entity
+from ..enums import ScheduleMode
 
 __all__ = [
     "ScheduleSettingsEntity",
@@ -17,15 +18,61 @@ class ScheduleSettingsEntity(Entity):
     Represents the settings for a schedule within the scheduling service.
     
     :param full_schedule: Run a new full schedule each time.
-    :param usage_smoothing_window: The number of days to smooth the usage data over.
     :param hiring_delay: How long it will take to hire a new user.
     :param create_placeholder_users: Whether the system should create placeholder users if there are no available users.
                                      Even if this is false, if there are no users with all the required skills, placeholder users will be created.
+    :param force_placeholder_user_gap_duration: Specifies the gap after a task could be scheduled at which a placeholder user will be
+                                                created even if CreatePlaceholderUsers is false.
+    :param maintain_schedule_for: Window of stability for the maintain-schedule feature. When this property is set to a
+                                  positive duration, any reschedule (incremental or settings-driven rebuild — but NOT an
+                                  explicit <c>FullSchedule = true</c> request) compares the existing schedule against the
+                                  new one within <c>[now, now + MaintainScheduleFor]</c> and prefers to keep tasks on the
+                                  same real user (and in roughly the same order) over that window. <c>Duration.Zero</c>
+                                  disables the in-window pin and the task-side ordering boost but leaves cross-cycle
+                                  user-to-task affinity active.
+    :param task_priority_start_buffer_days_a_weight_multiplier: Multiplier applied to the task-priority StartBufferDaysA weight from
+                                                                <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_start_buffer_days_b_weight_multiplier: Multiplier applied to the task-priority StartBufferDaysB weight from
+                                                                <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_earliest_milestone_days_weight_multiplier: Multiplier applied to the task-priority EarliestMilestoneDays weight from
+                                                                    <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                    disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_available_user_count_weight_multiplier: Multiplier applied to the task-priority AvailableUserCount weight from
+                                                                 <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                 disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_remaining_duration_hours_weight_multiplier: Multiplier applied to the task-priority RemainingDurationHours weight from
+                                                                     <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                     disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_proportion_complete_weight_multiplier: Multiplier applied to the task-priority ProportionComplete weight from
+                                                                <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_task_priority_weight_multiplier: Multiplier applied to the task-priority TaskPriority weight from
+                                                          <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                          disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_siblings_scheduled_score_weight_multiplier: Multiplier applied to the task-priority SiblingsScheduledScore weight from
+                                                                     <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                                     disables the component; values above <c>1.0</c> amplify it.
+    :param task_priority_window_order_weight_multiplier: Multiplier applied to the task-priority PreviousScheduleOrderInMaintainWindow weight
+                                                         from <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                         disables the in-window task-ordering boost; values above <c>1.0</c> amplify it. See the
+                                                         maintain-schedule feature for context.
     """
     full_schedule: bool = field(default=False)
-    usage_smoothing_window: int = field(default=0)
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     create_placeholder_users: bool = field(default=True)
+    force_placeholder_user_gap_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    maintain_schedule_for: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    task_priority_start_buffer_days_a_weight_multiplier: float = field(default=1)
+    task_priority_start_buffer_days_b_weight_multiplier: float = field(default=1)
+    task_priority_earliest_milestone_days_weight_multiplier: float = field(default=1)
+    task_priority_available_user_count_weight_multiplier: float = field(default=1)
+    task_priority_remaining_duration_hours_weight_multiplier: float = field(default=1)
+    task_priority_proportion_complete_weight_multiplier: float = field(default=1)
+    task_priority_task_priority_weight_multiplier: float = field(default=1)
+    task_priority_siblings_scheduled_score_weight_multiplier: float = field(default=1)
+    task_priority_window_order_weight_multiplier: float = field(default=1)
 
 
 @dataclass(kw_only=True)
@@ -34,6 +81,8 @@ class ScheduleScopeSettingsEntity(Entity):
     Represents schedule settings that can be global or could be overridden at a scope level.
     
     :param duration_rounding_thresholds: Defines the thresholds used for rounding durations in the schedule.
+    :param mode: How the scheduler positions tasks within their allowed window for this scope.
+                 Different scopes may use different modes. Defaults to <see cref="F:Filament.Services.CoreServices.Entities.ScheduleSettingsService.ScheduleMode.FrontLoad" />.
     :param near_buffer_distance: Represents the distance from the current time for the near buffer proportions.
     :param near_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the near distance.
     :param near_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the near distance.
@@ -42,8 +91,42 @@ class ScheduleScopeSettingsEntity(Entity):
     :param far_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the far distance.
     :param far_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the far distance.
     :param far_buffer_max_proportion: The maximum proportion of a task's duration that should be used as buffer at the far distance.
+    :param user_priority_reference_cost_weight_multiplier: Multiplier applied to the user-selection ReferenceCost priority weight from
+                                                           <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                           unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_actual_user_weight_multiplier: Multiplier applied to the user-selection ActualUser priority weight from
+                                                        <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                        unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_user_last_worked_on_task_weight_multiplier: Multiplier applied to the user-selection UserLastWorkedOnTask priority weight from
+                                                                     <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                                     unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_hours_worked_on_task_weight_multiplier: Multiplier applied to the user-selection HoursWorkedOnTask priority weight from
+                                                                 <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                                 unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_hours_to_start_weight_multiplier: Multiplier applied to the user-selection HoursToStart priority weight from
+                                                           <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                           unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_real_world_duration_weight_multiplier: Multiplier applied to the user-selection RealWorldDurationProportion priority weight
+                                                                from <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the
+                                                                default unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify
+                                                                it.
+    :param user_priority_total_group_duration_hours_weight_multiplier: Multiplier applied to the user-selection TotalGroupDurationHours priority weight from
+                                                                       <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                                       unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_solved_deviation_weight_multiplier: Multiplier applied to the user-selection SolvedDeviation priority weight from
+                                                             <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
+                                                             unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+    :param user_priority_assigned_in_window_weight_multiplier: Multiplier applied to the user-selection PreviouslyAssignedToTaskInMaintainWindow
+                                                               priority weight from <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c>
+                                                               leaves the default unchanged; <c>0.0</c> disables the in-window pin for this scope;
+                                                               values above <c>1.0</c> amplify it. See the maintain-schedule feature for context.
+    :param user_priority_assigned_outside_window_weight_multiplier: Multiplier applied to the user-selection PreviouslyAssignedToTaskNotInMaintainWindow
+                                                                    priority weight from <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c>
+                                                                    leaves the default unchanged; <c>0.0</c> disables the long-horizon affinity for this
+                                                                    scope; values above <c>1.0</c> amplify it.
     """
     duration_rounding_thresholds: list[datetime.timedelta] = field(default_factory=list)
+    mode: ScheduleMode = field(default=ScheduleMode.FrontLoad)
     near_buffer_distance: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     near_buffer_min_proportion: float = field(default=0)
     near_buffer_initial_proportion: float = field(default=0)
@@ -52,3 +135,13 @@ class ScheduleScopeSettingsEntity(Entity):
     far_buffer_min_proportion: float = field(default=0.05)
     far_buffer_initial_proportion: float = field(default=0.1)
     far_buffer_max_proportion: float = field(default=0.15)
+    user_priority_reference_cost_weight_multiplier: float = field(default=1)
+    user_priority_actual_user_weight_multiplier: float = field(default=1)
+    user_priority_user_last_worked_on_task_weight_multiplier: float = field(default=1)
+    user_priority_hours_worked_on_task_weight_multiplier: float = field(default=1)
+    user_priority_hours_to_start_weight_multiplier: float = field(default=1)
+    user_priority_real_world_duration_weight_multiplier: float = field(default=1)
+    user_priority_total_group_duration_hours_weight_multiplier: float = field(default=1)
+    user_priority_solved_deviation_weight_multiplier: float = field(default=1)
+    user_priority_assigned_in_window_weight_multiplier: float = field(default=1)
+    user_priority_assigned_outside_window_weight_multiplier: float = field(default=1)

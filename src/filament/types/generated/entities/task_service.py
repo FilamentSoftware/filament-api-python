@@ -11,7 +11,7 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
 from ..entities.scope_item_service import ScopeItemEntity
 from ..entities.scope_service import ScopeEntity
-from ..enums import TaskMilestoneDirectionEnum
+from ..enums import TaskMilestoneDirectionEnum, TaskMilestoneModeEnum
 
 __all__ = [
     "TaskGroupLevelEntity",
@@ -39,12 +39,16 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     
     :param name: The given name for this milestone.
     :param description: The description of this milestone
+    :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Fixed" /> anchors
+                 to a concrete instant, <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Priority" /> promotes upstream tasks,
+                 and <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Report" /> is observational only.
     :param instant: The moment in time this milestone is due.
                     If the Instant is null, the milestone is flexible and can be moved
     :param direction: Should tasks start after this milestone, or end before it?
     """
     name: str = field(default='')
     description: str = field(default='')
+    mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Report)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
 

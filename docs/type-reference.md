@@ -377,6 +377,16 @@ The status of a scenario.
 | `RequiresPropagation` | Scenario requires propagation. |
 | `UpToDate` | Scenario is up to date. |
 
+### `ScheduleMode` (`Enum`)
+
+Controls how the scheduler positions tasks within their allowed window for a given scope.
+
+| Member | Description |
+| ------ | ----------- |
+| `Spread` | Spread work as evenly as possible across the available window, aiming for balanced user load rather than packing work to one end. |
+| `FrontLoad` | Schedule every task as soon as possible, packing work toward the start of each task's available window to maximise slack against downstream milestones. |
+| `BackLoad` | Schedule every task as late as possible, placing work close to (but not past) the latest feasible finish so that it completes just in time. |
+
 ### `ScheduleSegmentModeEnum` (`Enum`)
 
 Represents the mode of a schedule segment within the scheduling system.
@@ -409,6 +419,16 @@ Defines the direction of a scope milestone.
 | ------ | ----------- |
 | `StartAfter` | Indicates that connected tasks must start after the milestone. |
 | `EndBefore` | Indicates that connected tasks must end before the milestone. |
+
+### `ScopeMilestoneModeEnum` (`Enum`)
+
+Defines how a scope milestone constrains scheduling.
+
+| Member | Description |
+| ------ | ----------- |
+| `Report` | The milestone has a null `Instant` and should not affect scheduling. Its instant is placed immediately before or after all linked tasks for reporting purposes only. |
+| `Priority` | The milestone has a null `Instant`. All upstream tasks should be prioritised, but the milestone's instant is derived from the schedule rather than imposed. |
+| `Fixed` | The milestone has a non-null `Instant` and linked tasks should be placed at that instant where possible. |
 
 ### `ScopeTaskTypeComplexitySource` (`Enum`)
 
@@ -499,6 +519,16 @@ Defines the direction of a task milestone, specifying whether the milestone is
 | ------ | ----------- |
 | `StartAfter` | Represents a task milestone direction where the milestone is configured to start at or after a designated point in time. This is generally used to ensure that dependent tasks or deadlines begin no earlier than the specified milestone. |
 | `EndBefore` | Represents a task milestone direction where the milestone is configured to end at or before a designated point in time. This is typically used to ensure that dependent tasks or deadlines conclude no later than the specified milestone. |
+
+### `TaskMilestoneModeEnum` (`Enum`)
+
+Defines how a task milestone constrains scheduling.
+
+| Member | Description |
+| ------ | ----------- |
+| `Report` | The milestone has a null `Instant` and should not affect scheduling. Its instant is placed immediately before or after all linked tasks for reporting purposes only. |
+| `Priority` | The milestone has a null `Instant`. All upstream tasks should be prioritised, but the milestone's instant is derived from the schedule rather than imposed. |
+| `Fixed` | The milestone has a non-null `Instant` and linked tasks should be placed at that instant where possible. |
 
 ### `TaskStatusEnum` (`Enum`)
 
@@ -1273,10 +1303,18 @@ Represents the results of a scheduling process within the scheduling service.
 | ----- | ---- | ------- | ----------- |
 | `schedule_start_instant` | `datetime.datetime` | — | The start instant of the scheduling process. |
 | `schedule_end_instant` | `datetime.datetime` | — | The end instant of the scheduling process. |
+| `unscheduled_events` | `dict[UUID, str]` | — | A mapping of Event IDs -&gt; reason string for events the scheduler could not place (for example insufficient required users, required-user conflicts, or no feasible slot). Cleared and repopulated on each run. |
+| `events_excluding_required_users` | `dict[UUID, str]` | — | A mapping of Event IDs -&gt; user ids (comma-separated) that were placed but with one or more required users excluded because those users could not be made available at the chosen slot. Cleared and repopulated on each run. |
 | `milestones_missed` | `dict[UUID, datetime.timedelta]` | — | A dictionary representing the milestones that were not achieved during the scheduling process, keyed by their unique identifiers, with the associated missed duration for each milestone. |
 | `early_placeholder_users` | `dict[UUID, datetime.datetime]` | — | A dictionary containing placeholder user ids that were required to start earlier than the expected earliest start time, with the associated instant representing the earliest start time required. |
 | `scores` | `dict[str, float]` | — | A dictionary representing scores associated with various items, identified by a string key and paired with a double value. |
 | `combined_score` | `float` | `0` | Represents the combined score computed from individual scores, utilized for evaluating the overall performance or outcome. |
+| `warnings` | `list[str]` | — | Non-fatal warnings raised during the most recent scheduling run — over-constrained graphs, degraded axis fallbacks, priority-milestone data-entry issues, etc. Cleared and repopulated on each run. |
+| `solve_error_count` | `int` | `0` | Number of connected components that threw an exception during the spring-layout relaxation on the most recent run. Each one represents a partial solve where some tasks were skipped — strong signal that the parameter combination broke the solver, distinct from the data-driven warnings on `Warnings`. |
+| `spring_layout_iterations_run` | `int` | `0` | Maximum number of relaxation iterations observed across all spring-layout components on the most recent run. Useful for tuning the iterations setting in SpringLayoutSettings. |
+| `spring_layout_convergence_delta` | `float` | `0` | Largest \|solved(t) - solved(t-1)\| observed on the final iteration across all spring-layout components. Useful for detecting non-convergence. |
+| `working_hours_axis_component_count` | `int` | `0` | Number of connected components the spring-layout solver built an axis for on the most recent run. |
+| `working_hours_axis_total_component_hours` | `float` | `0` | Sum of WorkingHoursAxis.TotalWorkingHours across all components — a rough health check for total envelope schedulable capacity. |
 
 ##### `ScheduleMilestoneEntity`
 
@@ -1308,7 +1346,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[EntityBase]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | The name of the schedule segment. Represents a descriptive or identifying title for the segment. |
 | `description` | `str` | `''` | A brief textual explanation or characterization of the schedule segment. Provides additional context or details about the segment. |
-| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as a serialized JSON string. |
+| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as a serialized JSON string. Lazy-serialised: setting `Reasons` stashes the object reference; serialisation happens on the first read of `ReasonsData` (typically the DB persistence path). Pass-2 in-memory work that never reads ReasonsData avoids the per-segment JSON cost entirely. Marked `ExcludeFromEqualityAttribute` so entity-equality comparisons do not trigger the lazy serialisation; reasons are an audit/diagnostic blob, not part of the segment's identity. |
 | `start_instant` | `datetime.datetime` | — | Represents the starting point in time for the schedule segment as an instant. This property defines the exact timestamp from which the segment begins. |
 | `end_instant` | `datetime.datetime` | — | The end time of the schedule segment, represented as an instant in time. Defines the point at which this segment concludes. |
 | `user_type` | `str` | `''` | Specifies the type of user associated with the schedule segment. Represents a categorization or classification of the user, such as regular user, placeholder, etc. |
@@ -1319,6 +1357,7 @@ _Extends:_ `ReferenceEntityBase`
 | `parents` | `Optional[list[ScheduleSegmentEntity]]` | `None` | The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment. |
 | `priority` | `float` | `1` | The priority of this schedule segment, derived from the associated task's priority. Meeting segments have a priority of 1.0. |
 | `time_log_id` | `Optional[UUID]` | `None` | The identifier of the time log entry associated with this schedule segment. This is used to link logged work time segments back to their source time log. |
+| `duration_multiplier` | `Optional[float]` | `None` | Snapshot of the `DurationMultiplier` for the user who performed the logged work, captured at the time the segment was first created. Only populated on segments with `Mode` = `TimeLog`; null for all other modes and when no matching `CastUserConnection` existed at creation time. The value is intentionally frozen — later changes to the underlying `DurationMultiplier` do not update this snapshot. |
 | `time_log` | `Optional[TimeLogEntity]` | `None` | The time log entry associated with this schedule segment. Used to conveniently link a segment to its source time log. |
 
 #### Connections
@@ -1346,9 +1385,19 @@ Represents the settings for a schedule within the scheduling service.
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `full_schedule` | `bool` | `False` | Run a new full schedule each time. |
-| `usage_smoothing_window` | `int` | `0` | The number of days to smooth the usage data over. |
 | `hiring_delay` | `datetime.timedelta` | — | How long it will take to hire a new user. |
 | `create_placeholder_users` | `bool` | `True` | Whether the system should create placeholder users if there are no available users. Even if this is false, if there are no users with all the required skills, placeholder users will be created. |
+| `force_placeholder_user_gap_duration` | `datetime.timedelta` | — | Specifies the gap after a task could be scheduled at which a placeholder user will be created even if CreatePlaceholderUsers is false. |
+| `maintain_schedule_for` | `datetime.timedelta` | — | Window of stability for the maintain-schedule feature. When this property is set to a positive duration, any reschedule (incremental or settings-driven rebuild — but NOT an explicit FullSchedule = true request) compares the existing schedule against the new one within [now, now + MaintainScheduleFor] and prefers to keep tasks on the same real user (and in roughly the same order) over that window. Duration.Zero disables the in-window pin and the task-side ordering boost but leaves cross-cycle user-to-task affinity active. |
+| `task_priority_start_buffer_days_a_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority StartBufferDaysA weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_start_buffer_days_b_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority StartBufferDaysB weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_earliest_milestone_days_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority EarliestMilestoneDays weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_available_user_count_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority AvailableUserCount weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_remaining_duration_hours_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority RemainingDurationHours weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_proportion_complete_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority ProportionComplete weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_task_priority_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority TaskPriority weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_siblings_scheduled_score_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority SiblingsScheduledScore weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `task_priority_window_order_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority PreviousScheduleOrderInMaintainWindow weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the in-window task-ordering boost; values above 1.0 amplify it. See the maintain-schedule feature for context. |
 
 ##### `ScheduleScopeSettingsEntity`
 
@@ -1357,6 +1406,7 @@ Represents schedule settings that can be global or could be overridden at a scop
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `duration_rounding_thresholds` | `list[datetime.timedelta]` | — | Defines the thresholds used for rounding durations in the schedule. |
+| `mode` | `ScheduleMode` | `ScheduleMode.FrontLoad` | How the scheduler positions tasks within their allowed window for this scope. Different scopes may use different modes. Defaults to `FrontLoad`. |
 | `near_buffer_distance` | `datetime.timedelta` | — | Represents the distance from the current time for the near buffer proportions. |
 | `near_buffer_min_proportion` | `float` | `0` | The minimum proportion of a task's duration that should be used as buffer at the near distance. |
 | `near_buffer_initial_proportion` | `float` | `0` | The initial proportion of a task's duration that should be used as buffer at the near distance. |
@@ -1365,6 +1415,16 @@ Represents schedule settings that can be global or could be overridden at a scop
 | `far_buffer_min_proportion` | `float` | `0.05` | The minimum proportion of a task's duration that should be used as buffer at the far distance. |
 | `far_buffer_initial_proportion` | `float` | `0.1` | The initial proportion of a task's duration that should be used as buffer at the far distance. |
 | `far_buffer_max_proportion` | `float` | `0.15` | The maximum proportion of a task's duration that should be used as buffer at the far distance. |
+| `user_priority_reference_cost_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection ReferenceCost priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_actual_user_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection ActualUser priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_user_last_worked_on_task_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection UserLastWorkedOnTask priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_hours_worked_on_task_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection HoursWorkedOnTask priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_hours_to_start_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection HoursToStart priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_real_world_duration_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection RealWorldDurationProportion priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_total_group_duration_hours_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection TotalGroupDurationHours priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_solved_deviation_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection SolvedDeviation priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
+| `user_priority_assigned_in_window_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection PreviouslyAssignedToTaskInMaintainWindow priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the in-window pin for this scope; values above 1.0 amplify it. See the maintain-schedule feature for context. |
+| `user_priority_assigned_outside_window_weight_multiplier` | `float` | `1` | Multiplier applied to the user-selection PreviouslyAssignedToTaskNotInMaintainWindow priority weight from SchedulePrioritySettings for tasks in this scope. 1.0 leaves the default unchanged; 0.0 disables the long-horizon affinity for this scope; values above 1.0 amplify it. |
 
 ### Scope Category Service
 
@@ -1586,6 +1646,7 @@ Represents a milestone within a scope.
 | ----- | ---- | ------- | ----------- |
 | `name` | `str` | `''` | The name of the milestone. |
 | `description` | `str` | `''` | A description of the milestone. |
+| `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Report` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone begins or ends (depending on its Direction) If the Instant is null, then it if flexible and can be moved |
 | `direction` | `ScopeMilestoneDirectionEnum` | `ScopeMilestoneDirectionEnum.StartAfter` | Is this a start milestone or a delivery milestone. StartAfter means connected tasks must start after the milestone. EndBefore means the tasks must be finished before this milestone. |
 | `automatically_assign` | `bool` | `False` | Automatically assign this milestone based on ScopeTaskTypeIds, ScopeTaskTypeStepIds, and ScopeGroupIds |
@@ -1911,6 +1972,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[EntityBase]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | The given name for this milestone. |
 | `description` | `str` | `''` | The description of this milestone |
+| `mode` | `TaskMilestoneModeEnum` | `TaskMilestoneModeEnum.Report` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone is due. If the Instant is null, the milestone is flexible and can be moved |
 | `direction` | `TaskMilestoneDirectionEnum` | `TaskMilestoneDirectionEnum.EndBefore` | Should tasks start after this milestone, or end before it? |
 
@@ -2108,6 +2170,7 @@ _Extends:_ `UserBaseEntity`
 | `compensation_per_hour_suggested` | `float` | `0` | This is a suggested compensation for the user calculated based on their current skills and skill levels. |
 | `currency_id` | `UUID` | — | The currency this user's monetary values are denominated in. |
 | `currency` | `Optional[CurrencyEntity]` | `None` | A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type. |
+| `dev_mode` | `bool` | `False` | Whether this user has developer mode enabled. This flag is read-only from outside the system: it cannot be set on create or update through the API, and can only be set directly on the database. Defaults to false. |
 
 ##### `UserAddressEntity`
 
