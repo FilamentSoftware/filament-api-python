@@ -60,19 +60,49 @@ class ScheduleResultEntity(Entity):
     
     :param schedule_start_instant: The start instant of the scheduling process.
     :param schedule_end_instant: The end instant of the scheduling process.
+    :param unscheduled_events: A mapping of Event IDs -&gt; reason string for events the scheduler could not place
+                               (for example insufficient required users, required-user conflicts, or no feasible
+                               slot). Cleared and repopulated on each run.
+    :param events_excluding_required_users: A mapping of Event IDs -&gt; user ids (comma-separated) that were placed but with one
+                                            or more required users excluded because those users could not be made available at
+                                            the chosen slot. Cleared and repopulated on each run.
     :param milestones_missed: A dictionary representing the milestones that were not achieved during the scheduling process,
                               keyed by their unique identifiers, with the associated missed duration for each milestone.
     :param early_placeholder_users: A dictionary containing placeholder user ids that were required to start earlier than the expected
                                     earliest start time, with the associated instant representing the earliest start time required.
     :param scores: A dictionary representing scores associated with various items, identified by a string key and paired with a double value.
     :param combined_score: Represents the combined score computed from individual scores, utilized for evaluating the overall performance or outcome.
+    :param warnings: Non-fatal warnings raised during the most recent scheduling run — over-constrained
+                     graphs, degraded axis fallbacks, priority-milestone data-entry issues, etc. Cleared
+                     and repopulated on each run.
+    :param solve_error_count: Number of connected components that threw an exception during the spring-layout
+                              relaxation on the most recent run. Each one represents a partial solve where some
+                              tasks were skipped — strong signal that the parameter combination broke the
+                              solver, distinct from the data-driven warnings on <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultEntity.Warnings" />.
+    :param spring_layout_iterations_run: Maximum number of relaxation iterations observed across all spring-layout
+                                         components on the most recent run. Useful for tuning the <c>iterations</c>
+                                         setting in <c>SpringLayoutSettings</c>.
+    :param spring_layout_convergence_delta: Largest <c>|solved(t) - solved(t-1)|</c> observed on the final iteration
+                                            across all spring-layout components. Useful for detecting non-convergence.
+    :param working_hours_axis_component_count: Number of connected components the spring-layout solver built an axis for on
+                                               the most recent run.
+    :param working_hours_axis_total_component_hours: Sum of <c>WorkingHoursAxis.TotalWorkingHours</c> across all components — a
+                                                     rough health check for total envelope schedulable capacity.
     """
     schedule_start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
+    unscheduled_events: dict[UUID, str] = field(default_factory=dict)
+    events_excluding_required_users: dict[UUID, str] = field(default_factory=dict)
     milestones_missed: dict[UUID, datetime.timedelta] = field(default_factory=dict)
     early_placeholder_users: dict[UUID, datetime.datetime] = field(default_factory=dict)
     scores: dict[str, float] = field(default_factory=dict)
     combined_score: float = field(default=0)
+    warnings: list[str] = field(default_factory=list)
+    solve_error_count: int = field(default=0)
+    spring_layout_iterations_run: int = field(default=0)
+    spring_layout_convergence_delta: float = field(default=0)
+    working_hours_axis_component_count: int = field(default=0)
+    working_hours_axis_total_component_hours: float = field(default=0)
 
 
 @dataclass(kw_only=True)
@@ -104,7 +134,14 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param description: A brief textual explanation or characterization of the schedule segment.
                         Provides additional context or details about the segment.
     :param reasons_data: A descriptive field that provides justification or explanation related to the schedule segment,
-                         stored as a serialized JSON string.
+                         stored as a serialized JSON string. Lazy-serialised: setting
+                         <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Reasons" /> stashes the object reference; serialisation
+                         happens on the first read of <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.ReasonsData" /> (typically the
+                         DB persistence path). Pass-2 in-memory work that never reads
+                         ReasonsData avoids the per-segment JSON cost entirely.
+                         Marked <see cref="T:Filament.FSCore.Entities.Attributes.ExcludeFromEqualityAttribute" /> so entity-equality
+                         comparisons do not trigger the lazy serialisation; reasons are an
+                         audit/diagnostic blob, not part of the segment's identity.
     :param start_instant: Represents the starting point in time for the schedule segment as an instant.
                           This property defines the exact timestamp from which the segment begins.
     :param end_instant: The end time of the schedule segment, represented as an instant in time.
@@ -124,6 +161,12 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
                      Meeting segments have a priority of 1.0.
     :param time_log_id: The identifier of the time log entry associated with this schedule segment.
                         This is used to link logged work time segments back to their source time log.
+    :param duration_multiplier: Snapshot of the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> for the user who
+                                performed the logged work, captured at the time the segment was first created. Only
+                                populated on segments with <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Mode" /> = <see cref="F:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentModeEnum.TimeLog" />;
+                                null for all other modes and when no matching <see cref="T:Filament.Services.CoreServices.Entities.CastService.CastUserConnection" /> existed at
+                                creation time. The value is intentionally frozen — later changes to the underlying
+                                <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> do not update this snapshot.
     :param time_log: The time log entry associated with this schedule segment.
                      Used to conveniently link a segment to its source time log.
     """
@@ -140,4 +183,5 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     parents: Optional[list[ScheduleSegmentEntity]] = field(default=None)
     priority: float = field(default=1)
     time_log_id: Optional[UUID] = field(default=None)
+    duration_multiplier: Optional[float] = field(default=None)
     time_log: Optional[TimeLogEntity] = field(default=None)

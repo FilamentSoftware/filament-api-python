@@ -8,7 +8,7 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import ScopeMilestoneDirectionEnum
+from ..enums import ScopeMilestoneDirectionEnum, ScopeMilestoneModeEnum
 
 __all__ = [
     "ScopeMilestoneEntity",
@@ -21,6 +21,9 @@ class ScopeMilestoneEntity(Entity):
     
     :param name: The name of the milestone.
     :param description: A description of the milestone.
+    :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Fixed" /> anchors
+                 to a concrete instant, <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Priority" /> promotes upstream tasks,
+                 and <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Report" /> is observational only.
     :param instant: The moment in time this milestone begins or ends (depending on its Direction)
                     If the Instant is null, then it if flexible and can be moved
     :param direction: Is this a start milestone or a delivery milestone.  StartAfter means connected tasks must start
@@ -32,6 +35,7 @@ class ScopeMilestoneEntity(Entity):
     """
     name: str = field(default='')
     description: str = field(default='')
+    mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Report)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: ScopeMilestoneDirectionEnum = field(default=ScopeMilestoneDirectionEnum.StartAfter)
     automatically_assign: bool = field(default=False)

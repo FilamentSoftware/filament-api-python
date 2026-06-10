@@ -55,6 +55,9 @@ class UserEntity(UserBaseEntity):
                                             skill levels.
     :param currency_id: The currency this user's monetary values are denominated in.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    :param dev_mode: Whether this user has developer mode enabled. This flag is read-only from outside the system: it
+                     cannot be set on create or update through the API, and can only be set directly on the database.
+                     Defaults to false.
     """
     schedule_status: UserStatusEnum = field(default=UserStatusEnum.Disabled)
     user_type: UserTypeEnum = field(default=UserTypeEnum.Internal)
@@ -78,6 +81,7 @@ class UserEntity(UserBaseEntity):
     compensation_per_hour_suggested: float = field(default=0)
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
+    dev_mode: bool = field(default=False)
 
 
 @dataclass(kw_only=True)

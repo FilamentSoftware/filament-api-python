@@ -29,9 +29,11 @@ __all__ = [
     "ScenarioEventAction",
     "ScenarioServiceTypeEnum",
     "ScenarioStatus",
+    "ScheduleMode",
     "ScheduleSegmentModeEnum",
     "ScopeGroupChildType",
     "ScopeMilestoneDirectionEnum",
+    "ScopeMilestoneModeEnum",
     "ScopeTaskTypeComplexitySource",
     "ScopeType",
     "ServiceProcessingMode",
@@ -40,6 +42,7 @@ __all__ = [
     "TaskDependencyOverrideIncludeState",
     "TaskDependencyOverrideOverlapState",
     "TaskMilestoneDirectionEnum",
+    "TaskMilestoneModeEnum",
     "TaskStatusEnum",
     "TimeLogModeEnum",
     "TimeLogStatusEnum",
@@ -576,6 +579,22 @@ class ScenarioStatus(Enum):
     UpToDate = 2
 
 
+class ScheduleMode(Enum):
+    """
+    Controls how the scheduler positions tasks within their allowed window for a given scope.
+    
+    :cvar Spread: Spread work as evenly as possible across the available window, aiming for balanced
+                  user load rather than packing work to one end.
+    :cvar FrontLoad: Schedule every task as soon as possible, packing work toward the start of each task's
+                     available window to maximise slack against downstream milestones.
+    :cvar BackLoad: Schedule every task as late as possible, placing work close to (but not past) the
+                    latest feasible finish so that it completes just in time.
+    """
+    Spread = 0
+    FrontLoad = 1
+    BackLoad = 2
+
+
 class ScheduleSegmentModeEnum(Enum):
     """
     Represents the mode of a schedule segment within the scheduling system.
@@ -633,6 +652,24 @@ class ScopeMilestoneDirectionEnum(Enum):
     """
     StartAfter = 0
     EndBefore = 1
+
+
+class ScopeMilestoneModeEnum(Enum):
+    """
+    Defines how a scope milestone constrains scheduling.
+    
+    :cvar Report: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.Instant" /> and should not affect
+                  scheduling. Its instant is placed immediately before or after all linked tasks for
+                  reporting purposes only.
+    :cvar Priority: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.Instant" />. All upstream tasks
+                    should be prioritised, but the milestone's instant is derived from the schedule rather
+                    than imposed.
+    :cvar Fixed: The milestone has a non-null <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.Instant" /> and linked tasks
+                 should be placed at that instant where possible.
+    """
+    Report = 0
+    Priority = 1
+    Fixed = 2
 
 
 class ScopeTaskTypeComplexitySource(Enum):
@@ -781,6 +818,24 @@ class TaskMilestoneDirectionEnum(Enum):
     """
     StartAfter = 0
     EndBefore = 1
+
+
+class TaskMilestoneModeEnum(Enum):
+    """
+    Defines how a task milestone constrains scheduling.
+    
+    :cvar Report: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.Instant" /> and should not affect
+                  scheduling. Its instant is placed immediately before or after all linked tasks for
+                  reporting purposes only.
+    :cvar Priority: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.Instant" />. All upstream tasks
+                    should be prioritised, but the milestone's instant is derived from the schedule rather
+                    than imposed.
+    :cvar Fixed: The milestone has a non-null <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.Instant" /> and linked tasks
+                 should be placed at that instant where possible.
+    """
+    Report = 0
+    Priority = 1
+    Fixed = 2
 
 
 class TaskStatusEnum(Enum):
