@@ -1,3 +1,10 @@
+## 0.1.0-dev.0.4.1 (2026-06-10 19:54)
+
+### Other
+
+#### OTHER
+- Added scheduler diagnostic fields (unscheduled events and required-user exclusions) and new backend enum values
+
 ## 0.1.0-dev.0.4.0 (2026-06-09 11:58)
 
 ### Other
