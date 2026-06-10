@@ -1,0 +1,156 @@
+name: Create Release
+
+on:
+  workflow_run:
+    workflows:
+      - "Increment Version (develop)"
+      - "Increment Version (main)"
+    types:
+      - completed
+
+jobs:
+  resolve-version:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Download version artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: version
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Get version
+        id: get_version
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < version.txt)"
+          if [[ -z "$version" ]]; then
+            echo "::error::version.txt is empty or contains only whitespace"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $version"
+
+  build:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-version.outputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Convert version to PEP 440
+        id: pep440
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          raw="${VERSION#v}"
+          # Convert semver dev format (e.g. 0.1.0-dev.0.0.3) to PEP 440 (e.g. 0.1.0.dev3)
+          if [[ "$raw" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-dev\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            major="${BASH_REMATCH[2]}"
+            minor="${BASH_REMATCH[3]}"
+            patch="${BASH_REMATCH[4]}"
+            dev_num=$(printf '%d%03d%03d' "$major" "$minor" "$patch")
+            raw="${base}.dev${dev_num}"
+          fi
+          echo "version=$raw" >> "$GITHUB_OUTPUT"
+          echo "PEP 440 version: $raw"
+
+      - name: Set package version
+        run: poetry version "${{ steps.pep440.outputs.version }}"
+
+      - name: Set __version__
+        env:
+          PEP440_VERSION: ${{ steps.pep440.outputs.version }}
+        run: sed -i "s|^__version__ = .*|__version__ = \"${PEP440_VERSION}\"|" src/filament/__init__.py
+
+      - name: Build package
+        run: poetry build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+
+  release:
+    needs: [resolve-version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-version.outputs.version }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Extract changelog
+        id: extract_changelog
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          # Determine which changelog to use based on version
+          if echo "$VERSION" | grep -q "dev"; then
+            file="CHANGELOG_DEV.md"
+          else
+            file="CHANGELOG.md"
+          fi
+
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+          if [[ ! -f "$file" ]]; then
+            echo "body=Release $VERSION" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          content="$(awk '
+            BEGIN { in_section=0 }
+            /^## / {
+              if (in_section) { exit }
+              in_section=1
+            }
+            in_section { print }
+          ' "$file")"
+
+          delimiter="EOF_$(date +%s%N)"
+          {
+            echo "body<<$delimiter"
+            echo "$content"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.version }}
+          body: ${{ steps.extract_changelog.outputs.body }}
+          prerelease: ${{ contains(needs.resolve-version.outputs.version, 'dev') }}
+          files: |
+            dist/*
+            ${{ steps.extract_changelog.outputs.file }}

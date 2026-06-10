@@ -1,0 +1,6 @@
+{
+  "name": "filament-api",
+  "description": "Skill for using the Filament Python API (FilamentClient): building query Conditions, reading and modifying entity data, and setting up real-time subscriptions over SignalR.",
+  "version": "0.1.0-dev.0.4.1",
+  "skills": "./skills"
+}

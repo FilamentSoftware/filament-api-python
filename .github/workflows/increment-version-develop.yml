@@ -1,0 +1,23 @@
+name: Increment Version (develop)
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  increment-version:
+    uses: ./.github/workflows/increment-version-reusable.yml
+    permissions:
+      id-token: write
+      contents: write
+      checks: write
+    with:
+      changelog-file: CHANGELOG_DEV.md
+      fetch-depth: 0
+      dev-branch: develop
+      dev-suffix: dev
+      use-semantic-dev-versions: true
+      detect-dependabot: true
+    secrets:
+      SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
