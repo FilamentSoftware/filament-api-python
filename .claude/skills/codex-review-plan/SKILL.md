@@ -22,10 +22,10 @@ If no plan path is given, auto-detect (see Step 1).
 
 ## Session tracking
 
-- Session IDs live at `.claude/codex-sessions/plan-<PLAN_BASE>.session` (one line, the UUID). `<PLAN_BASE>` is the plan filename minus `.md`, sanitised via `sed 's/[^A-Za-z0-9_.-]/_/g'` (see Step 2).
+- Session IDs live at `.codex-sessions/plan-<PLAN_BASE>.session` (one line, the UUID). `<PLAN_BASE>` is the plan filename minus `.md`, sanitised via `sed 's/[^A-Za-z0-9_.-]/_/g'` (see Step 2).
 - The log from the most recent run lives next to it as `plan-<PLAN_BASE>.log`.
 - The `plan-` prefix keeps these paths distinct from the branch skill's `branch-<BRANCH_SLUG>.session/.log` so they cannot collide.
-- Both paths are gitignored via `.claude/.gitignore`.
+- Both paths are gitignored via the repo-root `.gitignore` (`.codex-sessions/`). The directory lives at the repo root (not under `.claude/`) so writing session state never triggers permission prompts, while still persisting on the host across runs and containers.
 
 ## Timeout
 
@@ -47,17 +47,17 @@ If no plan path is given, auto-detect (see Step 1).
 ## Step 2 — Prepare session state
 
 ```bash
-mkdir -p .claude/codex-sessions
+mkdir -p .codex-sessions
 ```
 
-Verify `.claude/.gitignore` contains `codex-sessions/`. If it doesn't, tell the user to add it themselves and stop this skill — do not write to the file. This keeps the review run strictly read-only; a skill-driven `.gitignore` edit would otherwise taint the repo state during a review.
+Verify the repo-root `.gitignore` contains `.codex-sessions/`. If it doesn't, tell the user to add it themselves and stop this skill — do not write to the file. This keeps the review run strictly read-only; a skill-driven `.gitignore` edit would otherwise taint the repo state during a review.
 
 Compute:
 
 - `PLAN_FILE` = plan filename (e.g., `2026-04-16-fix-schedule-crash.md`)
 - `PLAN_BASE` = `$(basename "$PLAN_FILE" .md | sed 's/[^A-Za-z0-9_.-]/_/g')`
-- `SESSION_FILE` = `.claude/codex-sessions/plan-$PLAN_BASE.session`
-- `LOG_FILE` = `.claude/codex-sessions/plan-$PLAN_BASE.log`
+- `SESSION_FILE` = `.codex-sessions/plan-$PLAN_BASE.session`
+- `LOG_FILE` = `.codex-sessions/plan-$PLAN_BASE.log`
 
 If `SESSION_FILE` exists and `fresh` was not passed, read its contents as `SESSION_ID` — this is a re-review.
 

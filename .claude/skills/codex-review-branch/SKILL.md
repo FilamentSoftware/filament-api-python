@@ -20,10 +20,10 @@ The skill may be invoked with:
 
 ## Session tracking
 
-- Session IDs live at `.claude/codex-sessions/branch-<branch-slug>.session` (one line, the UUID).
+- Session IDs live at `.codex-sessions/branch-<branch-slug>.session` (one line, the UUID).
 - The log from the most recent run is next to it as `branch-<branch-slug>.log`.
 - `<branch-slug>` is the branch name with `/` replaced by `_` and any other non-`[A-Za-z0-9_.-]` chars replaced by `_`.
-- Both paths are gitignored via `.claude/.gitignore` (`codex-sessions/`).
+- Both paths are gitignored via the repo-root `.gitignore` (`.codex-sessions/`). The directory lives at the repo root (not under `.claude/`) so writing session state never triggers permission prompts, while still persisting on the host across runs and containers.
 
 ## Timeout
 
@@ -52,8 +52,8 @@ Compute:
 - `BRANCH` = current branch
 - `MERGE_BASE` = `git merge-base origin/develop HEAD`
 - `BRANCH_SLUG` = `$(echo "$BRANCH" | sed 's/[^A-Za-z0-9_.-]/_/g')`
-- `SESSION_FILE` = `.claude/codex-sessions/branch-$BRANCH_SLUG.session`
-- `LOG_FILE` = `.claude/codex-sessions/branch-$BRANCH_SLUG.log`
+- `SESSION_FILE` = `.codex-sessions/branch-$BRANCH_SLUG.session`
+- `LOG_FILE` = `.codex-sessions/branch-$BRANCH_SLUG.log`
 
 If `MERGE_BASE == HEAD` (branch has no commits ahead of develop), check `git status --porcelain` before stopping:
 
@@ -84,10 +84,10 @@ Decision tree:
 ## Step 3 — Prepare session state
 
 ```bash
-mkdir -p .claude/codex-sessions
+mkdir -p .codex-sessions
 ```
 
-Verify `.claude/.gitignore` contains `codex-sessions/`. If it doesn't, tell the user to add it themselves and stop this skill — do not write to the file. This keeps the review run strictly read-only; a skill-driven `.gitignore` edit would otherwise taint `scope=uncommitted` reviews.
+Verify the repo-root `.gitignore` contains `.codex-sessions/`. If it doesn't, tell the user to add it themselves and stop this skill — do not write to the file. This keeps the review run strictly read-only; a skill-driven `.gitignore` edit would otherwise taint `scope=uncommitted` reviews.
 
 If `SESSION_FILE` exists and `fresh` was not passed, read its contents as `SESSION_ID` — this is a re-review. If `fresh` was passed and the file exists, delete it.
 
