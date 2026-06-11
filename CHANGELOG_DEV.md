@@ -1,3 +1,19 @@
+## 0.2.0-dev.0.0.1 (2026-06-11 10:24)
+
+### Client
+
+#### FIX
+- Surface SignalR disconnects mid-call as FilamentConnectionError instead of hanging indefinitely
+
+#### FEATURE
+- Reassemble multi-part DataUpdated events into one callback per logical update
+- Add FilamentClient(max_size=...) to opt in to larger SignalR responses
+
+### Scripts
+
+#### OTHER
+- Switch codegen runner to the backend's --api hub generator flag
+
 ## 0.1.0-dev.0.4.1 (2026-06-10 19:54)
 
 ### Other
