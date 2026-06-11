@@ -10,14 +10,12 @@ from uuid_utils import UUID, uuid7
 from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
-from .connections.user_service import UserPermissionsRoleConnection
 from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode
 
 __all__ = [
     "ServiceProcessingInfo",
-    "SwitchUserRequest",
+    "ClientHelloRequest",
     "SuccessOrErrorBase",
-    "SetPermissionsRolesRequest",
     "EntityPermission",
     "EntityPropertyPermission",
     "SubscriptionConfig",
@@ -38,6 +36,7 @@ __all__ = [
     "DbOrderInstance",
     "SuccessOrErrorPublic",
     "ValueOrErrorPublic_1",
+    "DataUpdateRejectedNotification",
     "WrappedEntity",
     "ModifyDataRequest",
     "ProcessingStatus",
@@ -74,16 +73,19 @@ class ServiceProcessingInfo:
 
 
 @dataclass(kw_only=True)
-class SwitchUserRequest:
+class ClientHelloRequest:
     """
-    Represents a request to switch the current user context in a client connection.
-    This request is used to specify a new user identifier for authentication and context switching within the connected system.
+    Represents a connect-time capability handshake sent by the client to advertise what it can
+    accept. Sent as a request object (rather than bare arguments) so additional capability fields
+    (protocol version, supported features, etc.) can be added later without changing the
+    <c>ClientHello</c> hub-method signature.
     
-    :param user_id: Gets or sets the unique identifier of the user.
-                    This property is required and is used to specify the user context
-                    during authentication and client connection management.
+    :param max_message_size_bytes: The maximum number of bytes the client can accept in a single SignalR message (an invocation
+                                   response or a pushed event). <c>null</c> (or absent) means unlimited — the client opts out of
+                                   the cap, preserving the default behaviour. The server rejects values that are zero, negative,
+                                   or below a small floor.
     """
-    user_id: UUID
+    max_message_size_bytes: Optional[int] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -101,18 +103,6 @@ class SuccessOrErrorBase:
     message: str = field(default_factory=str)
     stack_trace: Optional[str] = field(default=None)
     error_code: ErrorCodes = field(default=ErrorCodes.None_)
-
-
-@dataclass(kw_only=True)
-class SetPermissionsRolesRequest:
-    """
-    Represents a request to override or reset the current user's permission roles.
-    When PermissionsRoleConnections is null, the user's permissions are restored to their defaults.
-    
-    :param permissions_role_connections: The permission role connections to resolve permissions from.
-                                         When null, restores the user's original permissions.
-    """
-    permissions_role_connections: Optional[list[UserPermissionsRoleConnection]] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -385,6 +375,27 @@ class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
 
 
 @dataclass(kw_only=True)
+class DataUpdateRejectedNotification:
+    """
+    Notifies a subscribed client that a pushed data update was not delivered because its
+    serialised size would have exceeded the maximum message size the client negotiated via the
+    connect-time <c>ClientHello</c> capability handshake. The client routes this to the affected
+    subscription's callback as an error path, in place of the <c>DataUpdated</c> event that would
+    otherwise have been sent.
+    
+    :param subscription_id: The identifier of the subscription whose update was rejected. Lets the client correlate
+                            the rejection with the originating subscription.
+    :param actual_bytes: The actual serialised size, in bytes, of the update that could not be delivered.
+    :param limit_bytes: The maximum message size, in bytes, the client negotiated for this connection.
+    :param reason: A human-readable explanation of why the update was rejected.
+    """
+    subscription_id: SubscriptionId
+    actual_bytes: int
+    limit_bytes: int
+    reason: str
+
+
+@dataclass(kw_only=True)
 class WrappedEntity:
     """
     Wraps an entity with additional metadata for tracking permissions and pending operations.
@@ -477,6 +488,15 @@ class ServiceDataUpdate:
                             typically used to convey the completion percentage or progress status.
     :param sequence_idx: Represents the sequential index associated with the update operation,
                          used to track and order service data updates consistently.
+    :param part_idx: The zero-based index of this update within the set of parts produced when a single logical
+                     update is split for delivery because it would exceed the client's negotiated message-size
+                     limit. <c>0</c> when the update was not split (the default). All parts of a split update
+                     share the same <see cref="P:Filament.FSCore.ServiceDataTypes.ServiceDataUpdate.SequenceIdx" />, <see cref="P:Filament.FSCore.ServiceDataTypes.ServiceDataUpdate.SubscriptionId" />, and other envelope
+                     fields, differing only in their entities and <see cref="P:Filament.FSCore.ServiceDataTypes.ServiceDataUpdate.PartIdx" />.
+    :param part_count: The total number of parts a single logical update was split into for delivery (because it
+                       would exceed the client's negotiated message-size limit). <c>1</c> when the update was not
+                       split (the default). Lets the client know how many <c>DataUpdated</c> events to expect for
+                       the update.
     """
     scenario_id: UUID
     status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
@@ -486,6 +506,8 @@ class ServiceDataUpdate:
     progress: bool = field(default=False)
     progress_amount: float = field(default=0)
     sequence_idx: int = field(default=0)
+    part_idx: int = field(default=0)
+    part_count: int = field(default=1)
 
 
 @dataclass(kw_only=True)

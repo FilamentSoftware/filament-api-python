@@ -246,6 +246,7 @@ Represents a set of predefined error codes that can be used to indicate
 | `ConnectionError` | Represents an error condition that occurs during connection attempts or operations. This error code is used to indicate failures or issues related to establishing or maintaining a connection. |
 | `TypeError` | Represents an error condition that occurs when there is a mismatch or invalid type detected. This error code is used to indicate issues arising from improper or unexpected type usage. |
 | `RateLimitExceeded` | Indicates that the API key has exceeded its configured rate limit. This error code is used when too many requests have been made within the rate limit window. |
+| `ResponseTooLarge` | Indicates that a response (an invocation result or a pushed event) would exceed the maximum message size the client negotiated via the connect-time capability handshake. The response is not sent; instead this error is returned (carrying the actual and limit byte counts) so the caller can narrow the query or raise the client's limit. |
 
 ### `EventUserConnectionStatus` (`Enum`)
 
