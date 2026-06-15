@@ -1,3 +1,25 @@
+## 0.2.0 (2026-06-15 13:15)
+
+### Client
+
+#### FIX
+- Surface SignalR disconnects mid-call as FilamentConnectionError instead of hanging indefinitely
+
+#### FEATURE
+- Reassemble multi-part DataUpdated events into one callback per logical update
+- Add FilamentClient(max_size=...) to opt in to larger SignalR responses
+
+### Scripts
+
+#### OTHER
+- Switch codegen runner to the backend's --api hub generator flag
+
+### Other
+
+#### OTHER
+- Plugin manifest version is now stamped only on release builds, so develop to main merges no longer conflict on .claude-plugin/plugin.json
+- PRs now get an auto-updating comment previewing the changelog and version on merge
+
 ## 0.1.0 (2026-06-10 20:00)
 
 ### Build
