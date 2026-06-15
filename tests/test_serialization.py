@@ -21,6 +21,7 @@ from filament.types.generated.enums import (
     SubscriptionMode,
 )
 from filament.types.generated.misc import (
+    DataUpdateRejectedNotification,
     DbOrderInstance,
     DbOrderLevel,
     ModifyDataRequest,
@@ -292,6 +293,51 @@ class TestRoundTrip:
         assert restored.data is not None
         assert original.data is not None
         assert restored.data.id == original.data.id
+
+    def test_service_data_update_roundtrip(self) -> None:
+        """Round-trips the new part_idx / part_count fields on ServiceDataUpdate."""
+        original = ServiceDataUpdate(
+            scenario_id=UUID("11111111-2222-3333-4444-555555555555"),
+            status=DataProcessingStatus.Pending,
+            request_ids=[RequestId(id=uuid7())],
+            subscription_id=SubscriptionId(id=uuid7()),
+            modified_entities={},
+            progress=True,
+            progress_amount=0.5,
+            sequence_idx=42,
+            part_idx=1,
+            part_count=3,
+        )
+        serialized = to_dict(original)
+        assert serialized is not None
+        restored = from_dict(serialized, ServiceDataUpdate)
+        assert restored is not None
+        assert restored.scenario_id == original.scenario_id
+        assert restored.status == original.status
+        assert restored.subscription_id.id == original.subscription_id.id
+        assert restored.progress is True
+        assert restored.progress_amount == 0.5
+        assert restored.sequence_idx == 42
+        assert restored.part_idx == 1
+        assert restored.part_count == 3
+        assert len(restored.request_ids) == 1
+        assert restored.request_ids[0].id == original.request_ids[0].id
+
+    def test_data_update_rejected_notification_roundtrip(self) -> None:
+        original = DataUpdateRejectedNotification(
+            subscription_id=SubscriptionId(id=uuid7()),
+            actual_bytes=4_194_304,
+            limit_bytes=1_048_576,
+            reason="ServiceDataUpdate exceeds negotiated limit",
+        )
+        serialized = to_dict(original)
+        assert serialized is not None
+        restored = from_dict(serialized, DataUpdateRejectedNotification)
+        assert restored is not None
+        assert restored.subscription_id.id == original.subscription_id.id
+        assert restored.actual_bytes == 4_194_304
+        assert restored.limit_bytes == 1_048_576
+        assert restored.reason == original.reason
 
 
 # ---------------------------------------------------------------------------

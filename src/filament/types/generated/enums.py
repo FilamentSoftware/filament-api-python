@@ -383,6 +383,10 @@ class ErrorCodes(Enum):
     :cvar RateLimitExceeded: Indicates that the API key has exceeded its configured rate limit.
                              This error code is used when too many requests have been made within
                              the rate limit window.
+    :cvar ResponseTooLarge: Indicates that a response (an invocation result or a pushed event) would exceed the
+                            maximum message size the client negotiated via the connect-time capability handshake.
+                            The response is not sent; instead this error is returned (carrying the actual and
+                            limit byte counts) so the caller can narrow the query or raise the client's limit.
     """
     None_ = 0
     NotSupported = 1
@@ -399,6 +403,7 @@ class ErrorCodes(Enum):
     ConnectionError = 12
     TypeError = 13
     RateLimitExceeded = 23
+    ResponseTooLarge = 25
 
 
 class EventUserConnectionStatus(Enum):
