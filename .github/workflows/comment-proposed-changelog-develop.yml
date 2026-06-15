@@ -1,0 +1,25 @@
+name: Comment Proposed Changelog (develop)
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - develop
+
+jobs:
+  comment-proposed-changelog:
+    uses: ./.github/workflows/comment-proposed-changelog-reusable.yml
+    with:
+      target-branch: develop
+      changelog-file: CHANGELOG_DEV.md
+      dev-branch: develop
+      dev-suffix: dev
+      use-semantic-dev-versions: true
