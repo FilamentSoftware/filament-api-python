@@ -1,3 +1,10 @@
+## 0.2.0-dev.0.0.2 (2026-06-15 10:01)
+
+### Other
+
+#### OTHER
+- PRs now get an auto-updating comment previewing the changelog and version on merge
+
 ## 0.2.0-dev.0.0.1 (2026-06-11 10:24)
 
 ### Client
