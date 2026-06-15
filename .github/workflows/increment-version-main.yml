@@ -15,5 +15,6 @@ jobs:
     with:
       changelog-file: CHANGELOG.md
       fetch-depth: 0
+      stamp-plugin-manifest: true
     secrets:
       SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
