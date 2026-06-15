@@ -1,0 +1,135 @@
+name: Comment Proposed Changelog (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      target-branch:
+        description: Branch the pull request targets.
+        required: true
+        type: string
+      changelog-file:
+        description: Changelog file to preview (e.g. CHANGELOG.md or CHANGELOG_DEV.md).
+        required: true
+        type: string
+      dev-branch:
+        description: Dev branch name for SemanticVersioner, or empty for main flow.
+        required: false
+        type: string
+        default: ""
+      dev-suffix:
+        description: Dev suffix for SemanticVersioner.
+        required: false
+        type: string
+        default: ""
+      use-semantic-dev-versions:
+        description: Whether to use semantic dev versions.
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  comment-proposed-changelog:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Fetch merge preview and release branches
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git fetch origin develop:refs/remotes/origin/develop
+          git fetch origin +refs/pull/${{ github.event.pull_request.number }}/merge:refs/remotes/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Preview merged changelog
+        id: preview
+        uses: hughmacdonald/SemanticVersioner@v1
+        with:
+          main-branch: main
+          dev-branch: ${{ inputs.dev-branch }}
+          dev-suffix: ${{ inputs.dev-suffix }}
+          use-semantic-dev-versions: ${{ inputs.use-semantic-dev-versions }}
+          changelog-file: ${{ inputs.changelog-file }}
+          preview-changelog: true
+          target-ref: refs/remotes/pull/${{ github.event.pull_request.number }}/merge
+          changelog-message: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && 'Update dependencies' || '' }}
+
+      - name: Build comment body
+        id: comment
+        shell: bash
+        env:
+          RENDERED_CHANGELOG: ${{ steps.preview.outputs.rendered-changelog }}
+          TARGET_BRANCH: ${{ inputs.target-branch }}
+          NEW_VERSION: ${{ steps.preview.outputs.new-version }}
+          PREVIOUS_VERSION: ${{ steps.preview.outputs.previous-version }}
+        run: |
+          delimiter="EOF_$(date +%s%N)"
+          {
+            echo "body<<$delimiter"
+            echo "<!-- proposed-changelog-comment -->"
+            echo "## Proposed changelog on merge to \`$TARGET_BRANCH\`"
+            echo
+            echo "Expected version: \`$NEW_VERSION\`"
+            echo "Current $TARGET_BRANCH version: \`$PREVIOUS_VERSION\`"
+            echo
+            echo "\`\`\`md"
+            printf '%s\n' "$RENDERED_CHANGELOG"
+            echo "\`\`\`"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update PR comment
+        uses: actions/github-script@v9
+        env:
+          COMMENT_BODY: ${{ steps.comment.outputs.body }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const marker = '<!-- proposed-changelog-comment -->';
+            const body = process.env.COMMENT_BODY;
+            const issueNumber = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const existing = comments
+              .filter(comment =>
+                comment.user?.login === 'github-actions[bot]' &&
+                typeof comment.body === 'string' &&
+                comment.body.includes(marker)
+              )
+              .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body,
+            });
