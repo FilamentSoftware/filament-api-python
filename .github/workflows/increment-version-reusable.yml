@@ -32,6 +32,11 @@ on:
         required: false
         type: boolean
         default: false
+      stamp-plugin-manifest:
+        description: 'Stamp the new version into .claude-plugin/plugin.json and commit it. Enable only on the release branch (main) so the file never diverges across branches and develop -> main merges stay conflict-free.'
+        required: false
+        type: boolean
+        default: false
     secrets:
       SLACK_RELEASE_WEBHOOK_URL:
         required: true
@@ -87,6 +92,7 @@ jobs:
       # affect the version SemanticVersioner computes on the real pass below, so
       # the changelog commit/tag lands on top of it and includes this change.
       - name: Stamp version into Claude plugin manifest
+        if: inputs.stamp-plugin-manifest
         env:
           NEW_VERSION: ${{ steps.version_preview.outputs.new-version }}
         run: |
