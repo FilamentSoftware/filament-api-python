@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..entities.generic import ReferenceEntityBase
-from ..enums import AvailabilityModeEnum, AvailabilityRepeatDaysEnum, AvailabilityRepeatModeEnum
+from ..enums import AvailabilityModeEnum, RepeatDaysEnum, RepeatModeEnum
 
 __all__ = [
     "AvailabilityEntity",
@@ -41,7 +41,7 @@ class AvailabilityEntity(ReferenceEntityBase):
     end_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     date_time_zone: str = field(default='UTC')
     outside: bool = field(default=False)
-    repeat_mode: AvailabilityRepeatModeEnum = field(default=AvailabilityRepeatModeEnum.None_)
-    repeat_days: AvailabilityRepeatDaysEnum = field(default=AvailabilityRepeatDaysEnum.None_)
+    repeat_mode: RepeatModeEnum = field(default=RepeatModeEnum.None_)
+    repeat_days: RepeatDaysEnum = field(default=RepeatDaysEnum.None_)
     repeat_count: int = field(default=0)
     repeat_end: Optional[datetime.datetime] = field(default=None)

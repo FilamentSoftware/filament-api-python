@@ -58,6 +58,14 @@ class ScheduleSettingsEntity(Entity):
                                                          from <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
                                                          disables the in-window task-ordering boost; values above <c>1.0</c> amplify it. See the
                                                          maintain-schedule feature for context.
+    :param max_event_repeat: Maximum horizon past <c>CurrentInstant</c> for which recurring events are materialised.
+                             Occurrences whose target start is beyond this horizon are not scheduled until a later
+                             run when <c>CurrentInstant</c> has advanced. Default: 365 days.
+    :param initial_repeating_event_alignment_lookahead: Number of leading occurrences across which the planner attempts to align a recurring
+                                                        event's time-within-period. Until this many anchors have been persisted, the planner
+                                                        uses a lookahead pass to pick a single target time-within-period that the most of the
+                                                        first N occurrences can land at simultaneously. From the (N+1)th anchor onward, the
+                                                        mode-of-history calculation drives the target instead. Default: 4.
     """
     full_schedule: bool = field(default=False)
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -73,6 +81,8 @@ class ScheduleSettingsEntity(Entity):
     task_priority_task_priority_weight_multiplier: float = field(default=1)
     task_priority_siblings_scheduled_score_weight_multiplier: float = field(default=1)
     task_priority_window_order_weight_multiplier: float = field(default=1)
+    max_event_repeat: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    initial_repeating_event_alignment_lookahead: int = field(default=4)
 
 
 @dataclass(kw_only=True)

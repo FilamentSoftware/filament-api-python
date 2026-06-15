@@ -60,12 +60,17 @@ class ScheduleResultEntity(Entity):
     
     :param schedule_start_instant: The start instant of the scheduling process.
     :param schedule_end_instant: The end instant of the scheduling process.
-    :param unscheduled_events: A mapping of Event IDs -&gt; reason string for events the scheduler could not place
-                               (for example insufficient required users, required-user conflicts, or no feasible
-                               slot). Cleared and repopulated on each run.
-    :param events_excluding_required_users: A mapping of Event IDs -&gt; user ids (comma-separated) that were placed but with one
-                                            or more required users excluded because those users could not be made available at
-                                            the chosen slot. Cleared and repopulated on each run.
+    :param unscheduled_events: A mapping of per-occurrence diagnostic keys (see
+                               <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.OccurrenceKey(System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; reason string for event occurrences
+                               the scheduler could not place (for example insufficient required users, required-user
+                               conflicts, or no feasible slot). Keys are composite <c>"{eventId:N}:{ISO8601 target
+                               instant or empty}"</c>; non-recurring events / event-level diagnostics use an empty
+                               instant part. Cleared and repopulated on each run.
+    :param events_excluding_required_users: A mapping of per-occurrence diagnostic keys (see
+                                            <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.OccurrenceKey(System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; user ids (comma-separated) of
+                                            required users excluded because they could not be made available at the chosen slot.
+                                            Keys are composite <c>"{eventId:N}:{ISO8601 target instant or empty}"</c>. Cleared and
+                                            repopulated on each run.
     :param milestones_missed: A dictionary representing the milestones that were not achieved during the scheduling process,
                               keyed by their unique identifiers, with the associated missed duration for each milestone.
     :param early_placeholder_users: A dictionary containing placeholder user ids that were required to start earlier than the expected
@@ -91,8 +96,8 @@ class ScheduleResultEntity(Entity):
     """
     schedule_start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    unscheduled_events: dict[UUID, str] = field(default_factory=dict)
-    events_excluding_required_users: dict[UUID, str] = field(default_factory=dict)
+    unscheduled_events: dict[str, str] = field(default_factory=dict)
+    events_excluding_required_users: dict[str, str] = field(default_factory=dict)
     milestones_missed: dict[UUID, datetime.timedelta] = field(default_factory=dict)
     early_placeholder_users: dict[UUID, datetime.datetime] = field(default_factory=dict)
     scores: dict[str, float] = field(default_factory=dict)
@@ -169,6 +174,12 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
                                 <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> do not update this snapshot.
     :param time_log: The time log entry associated with this schedule segment.
                      Used to conveniently link a segment to its source time log.
+    :param occurrence_target_instant: For event segments belonging to a recurring event, the drift-free target instant of
+                                      this occurrence (the rule's configured <c>StartDateTime + N * period</c>, converted to
+                                      UTC via the event's time zone). Stable across re-plans even when the actual chosen
+                                      <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.StartInstant" /> drifts within the shifted search window. Null for
+                                      non-recurring events and for non-event segments. Used as the three-tier reuse key
+                                      together with <c>ReferenceId</c>.
     """
     name: str = field(default='')
     description: str = field(default='')
@@ -185,3 +196,4 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     time_log_id: Optional[UUID] = field(default=None)
     duration_multiplier: Optional[float] = field(default=None)
     time_log: Optional[TimeLogEntity] = field(default=None)
+    occurrence_target_instant: Optional[datetime.datetime] = field(default=None)

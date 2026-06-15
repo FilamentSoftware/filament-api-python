@@ -69,35 +69,6 @@ An enum to define what affect an `AvailabilityEntity` has on overall availabilit
 | `Available` | This entity defines a time period when the user is specifically available. |
 | `AvailableIfRequired` | This entity defines a time period when the user is available if required. |
 
-### `AvailabilityRepeatDaysEnum` (`Flag`)
-
-An enum to reference the days of the week that an `AvailabilityEntity` repeats on. This enum supports
-
-| Member | Description |
-| ------ | ----------- |
-| `None_` | Invalid option - does not repeat on any day. |
-| `Monday` | Repeats on Mondays. |
-| `Tuesday` | Repeats on Tuesdays. |
-| `Wednesday` | Repeats on Wednesdays. |
-| `Thursday` | Repeats on Thursdays. |
-| `Friday` | Repeats on Fridays. |
-| `Weekdays` | Repeats on all weekdays. |
-| `Saturday` | Repeats on Saturdays. |
-| `Sunday` | Repeats on Sundays. |
-| `Weekend` | Repeats on all weekend days. |
-
-### `AvailabilityRepeatModeEnum` (`Enum`)
-
-An enum to specify how often an availability should repeat
-
-| Member | Description |
-| ------ | ----------- |
-| `None_` | No repeat. |
-| `Day` | Repeat each day. |
-| `Week` | Repeat each week (with optional repeating on multiple days of the week - see `AvailabilityRepeatDaysEnum`). |
-| `Month` | Repeat each month. |
-| `Year` | Repeat each year. |
-
 ### `BlockUserReasonEnum` (`Enum`)
 
 Enumerates the possible reasons for blocking a user within the system.
@@ -247,6 +218,7 @@ Represents a set of predefined error codes that can be used to indicate
 | `TypeError` | Represents an error condition that occurs when there is a mismatch or invalid type detected. This error code is used to indicate issues arising from improper or unexpected type usage. |
 | `RateLimitExceeded` | Indicates that the API key has exceeded its configured rate limit. This error code is used when too many requests have been made within the rate limit window. |
 | `ResponseTooLarge` | Indicates that a response (an invocation result or a pushed event) would exceed the maximum message size the client negotiated via the connect-time capability handshake. The response is not sent; instead this error is returned (carrying the actual and limit byte counts) so the caller can narrow the query or raise the client's limit. |
+| `ProtectionError` | The operation was blocked because downstream entities have protection records preventing deletion of the upstream entity. |
 
 ### `EventUserConnectionStatus` (`Enum`)
 
@@ -331,6 +303,35 @@ Specifies the mode for reading data from the database.
 | `Data` | Read the actual data records. |
 | `Count` | Read only the count of matching records. |
 | `Distinct` | Read distinct values for specified properties. |
+
+### `RepeatDaysEnum` (`Flag`)
+
+An enum to reference the days of the week that a weekly recurring entity repeats on.
+
+| Member | Description |
+| ------ | ----------- |
+| `None_` | Invalid option - does not repeat on any day. |
+| `Monday` | Repeats on Mondays. |
+| `Tuesday` | Repeats on Tuesdays. |
+| `Wednesday` | Repeats on Wednesdays. |
+| `Thursday` | Repeats on Thursdays. |
+| `Friday` | Repeats on Fridays. |
+| `Weekdays` | Repeats on all weekdays. |
+| `Saturday` | Repeats on Saturdays. |
+| `Sunday` | Repeats on Sundays. |
+| `Weekend` | Repeats on all weekend days. |
+
+### `RepeatModeEnum` (`Enum`)
+
+An enum to specify how often a recurring entity (availability, event, …) should repeat.
+
+| Member | Description |
+| ------ | ----------- |
+| `None_` | No repeat. |
+| `Day` | Repeat each day. |
+| `Week` | Repeat each week (with optional repeating on multiple days of the week - see `RepeatDaysEnum`). |
+| `Month` | Repeat each month. |
+| `Year` | Repeat each year. |
 
 ### `RequestStatus` (`Enum`)
 
@@ -671,6 +672,14 @@ Represents a single processing run for an organization. Created when a batch of 
 | `request_ids` | `list[UUID]` | — | Identifiers of the requests/operations in this processing run. For runs created by the main processing pipeline or scenario-request processing these are RequestEntity.Id values; for runs created by scenario propagation this is a synthetic identifier for the propagation operation with no corresponding RequestEntity in the database. |
 | `processing_service_data` | `str` | `''` | JSON-serialized dictionary of service name → `ServiceProcessingInfo` for the services participating in this processing run. Use `ServiceData` for the strongly-typed view. |
 
+##### `ProcessingSettingsEntity`
+
+Per-organisation processing configuration. This is a singleton per tenant: the single
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `success_snapshots` | `bool` | `False` | Whether processing-succeeded snapshots should be written for this organisation. Defaults to false. |
+
 ##### `EventLogEntity`
 
 Represents an event log entry created when data is processed.
@@ -735,6 +744,20 @@ Represents a changed entity in the system.
 | `status` | `ChangedEntityStatus` | `ChangedEntityStatus.Unknown` | The status of the change. |
 | `updated_properties` | `Optional[list[str]]` | `None` | List of updated property names. |
 | `is_new` | `bool` | `False` | Whether this entity is new. |
+
+##### `EntityProtectionEntity`
+
+Tracks entity protection relationships. When a downstream entity depends on an upstream entity
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `upstream_entity_type` | `str` | `''` | The type name of the entity being protected (upstream entity that cannot be deleted). |
+| `upstream_entity_id` | `UUID` | — | The ID of the upstream entity being protected. |
+| `downstream_entity_type` | `str` | `''` | The type name of the downstream entity that depends on the upstream entity. For both property-based and connection-based protections, this is the entity that has the dependency (e.g., "TimeLogEntity", "CastEntity"). |
+| `downstream_entity_id` | `UUID` | — | The ID of the downstream entity. |
+| `protection_source_property` | `Optional[str]` | `None` | For property-based protections: the property name that created this protection (e.g., "UserId"). Null for connection-based protections. |
+| `protection_source_connection_type` | `Optional[str]` | `None` | For connection-based protections: the connection type name (e.g., "CastUserConnection"). Null for property-based protections. |
+| `protection_source_connection_id` | `Optional[UUID]` | `None` | For connection-based protections: the ID of the specific connection instance. Null for property-based protections. |
 
 ### Actual Service
 
@@ -820,8 +843,8 @@ _Extends:_ `ReferenceEntityBase`
 | `end_date_time` | `datetime.datetime` | — | The end time (in local time) of this Availability block. |
 | `date_time_zone` | `str` | `'UTC'` | The time zone that local times should be calculated based on. |
 | `outside` | `bool` | `False` | Whether the availability mode should be applied between the start and end times, or outside of this range. |
-| `repeat_mode` | `AvailabilityRepeatModeEnum` | `AvailabilityRepeatModeEnum.None_` | Whether this availability should be repeating, every day, week, month, or year (or with no repeating). |
-| `repeat_days` | `AvailabilityRepeatDaysEnum` | `AvailabilityRepeatDaysEnum.None_` | If the `RepeatMode` is Week, which days of the week it should be repeated on. |
+| `repeat_mode` | `RepeatModeEnum` | `RepeatModeEnum.None_` | Whether this availability should be repeating, every day, week, month, or year (or with no repeating). |
+| `repeat_days` | `RepeatDaysEnum` | `RepeatDaysEnum.None_` | If the `RepeatMode` is Week, which days of the week it should be repeated on. |
 | `repeat_count` | `int` | `0` | If it is a repeating entity, how many times to repeat for. 0 means to repeat indefinitely. |
 | `repeat_end` | `Optional[datetime.datetime]` | `None` | If it is a repeating entity, when to finish repeating. This property takes precedence over the `RepeatCount` property, so if the number of repeats has not finished when this time is reached, repeating will finish anyway. |
 
@@ -947,6 +970,10 @@ Represents an event entity, including details such as name, description, duratio
 | `date_time_zone` | `str` | `'UTC'` | What time zone the event is being called under. |
 | `review_task_groups` | `list[str]` | — | A list of all review tasks group that this event will use to auto generate a task review list. |
 | `include_review_task_users` | `bool` | `False` | Should the users who created content to be reviewed be automatically invited to the event? |
+| `repeat_mode` | `RepeatModeEnum` | `RepeatModeEnum.None_` | How often this event should repeat. `None` means the event has a single occurrence. |
+| `repeat_days` | `RepeatDaysEnum` | `RepeatDaysEnum.None_` | If `RepeatMode` is `Week`, which days of the week the event repeats on. Ignored for other modes. |
+| `repeat_count` | `int` | `0` | If it is a repeating event, how many occurrences to materialise. 0 means repeat indefinitely (bounded by `RepeatEnd` and ScheduleSettingsEntity.MaxEventRepeat). |
+| `repeat_end` | `Optional[datetime.datetime]` | `None` | If it is a repeating event, when to finish repeating. Takes precedence over `RepeatCount`: if the repeat count has not been reached when this time arrives, repeating stops anyway. |
 
 ##### `EventCalendarEntity`
 
@@ -1304,8 +1331,8 @@ Represents the results of a scheduling process within the scheduling service.
 | ----- | ---- | ------- | ----------- |
 | `schedule_start_instant` | `datetime.datetime` | — | The start instant of the scheduling process. |
 | `schedule_end_instant` | `datetime.datetime` | — | The end instant of the scheduling process. |
-| `unscheduled_events` | `dict[UUID, str]` | — | A mapping of Event IDs -&gt; reason string for events the scheduler could not place (for example insufficient required users, required-user conflicts, or no feasible slot). Cleared and repopulated on each run. |
-| `events_excluding_required_users` | `dict[UUID, str]` | — | A mapping of Event IDs -&gt; user ids (comma-separated) that were placed but with one or more required users excluded because those users could not be made available at the chosen slot. Cleared and repopulated on each run. |
+| `unscheduled_events` | `dict[str, str]` | — | A mapping of per-occurrence diagnostic keys (see `OccurrenceKey`) -&gt; reason string for event occurrences the scheduler could not place (for example insufficient required users, required-user conflicts, or no feasible slot). Keys are composite "{eventId:N}:{ISO8601 target instant or empty}"; non-recurring events / event-level diagnostics use an empty instant part. Cleared and repopulated on each run. |
+| `events_excluding_required_users` | `dict[str, str]` | — | A mapping of per-occurrence diagnostic keys (see `OccurrenceKey`) -&gt; user ids (comma-separated) of required users excluded because they could not be made available at the chosen slot. Keys are composite "{eventId:N}:{ISO8601 target instant or empty}". Cleared and repopulated on each run. |
 | `milestones_missed` | `dict[UUID, datetime.timedelta]` | — | A dictionary representing the milestones that were not achieved during the scheduling process, keyed by their unique identifiers, with the associated missed duration for each milestone. |
 | `early_placeholder_users` | `dict[UUID, datetime.datetime]` | — | A dictionary containing placeholder user ids that were required to start earlier than the expected earliest start time, with the associated instant representing the earliest start time required. |
 | `scores` | `dict[str, float]` | — | A dictionary representing scores associated with various items, identified by a string key and paired with a double value. |
@@ -1360,6 +1387,7 @@ _Extends:_ `ReferenceEntityBase`
 | `time_log_id` | `Optional[UUID]` | `None` | The identifier of the time log entry associated with this schedule segment. This is used to link logged work time segments back to their source time log. |
 | `duration_multiplier` | `Optional[float]` | `None` | Snapshot of the `DurationMultiplier` for the user who performed the logged work, captured at the time the segment was first created. Only populated on segments with `Mode` = `TimeLog`; null for all other modes and when no matching `CastUserConnection` existed at creation time. The value is intentionally frozen — later changes to the underlying `DurationMultiplier` do not update this snapshot. |
 | `time_log` | `Optional[TimeLogEntity]` | `None` | The time log entry associated with this schedule segment. Used to conveniently link a segment to its source time log. |
+| `occurrence_target_instant` | `Optional[datetime.datetime]` | `None` | For event segments belonging to a recurring event, the drift-free target instant of this occurrence (the rule's configured StartDateTime + N * period, converted to UTC via the event's time zone). Stable across re-plans even when the actual chosen `StartInstant` drifts within the shifted search window. Null for non-recurring events and for non-event segments. Used as the three-tier reuse key together with ReferenceId. |
 
 #### Connections
 
@@ -1399,6 +1427,8 @@ Represents the settings for a schedule within the scheduling service.
 | `task_priority_task_priority_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority TaskPriority weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
 | `task_priority_siblings_scheduled_score_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority SiblingsScheduledScore weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
 | `task_priority_window_order_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority PreviousScheduleOrderInMaintainWindow weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the in-window task-ordering boost; values above 1.0 amplify it. See the maintain-schedule feature for context. |
+| `max_event_repeat` | `datetime.timedelta` | — | Maximum horizon past CurrentInstant for which recurring events are materialised. Occurrences whose target start is beyond this horizon are not scheduled until a later run when CurrentInstant has advanced. Default: 365 days. |
+| `initial_repeating_event_alignment_lookahead` | `int` | `4` | Number of leading occurrences across which the planner attempts to align a recurring event's time-within-period. Until this many anchors have been persisted, the planner uses a lookahead pass to pick a single target time-within-period that the most of the first N occurrences can land at simultaneously. From the (N+1)th anchor onward, the mode-of-history calculation drives the target instead. Default: 4. |
 
 ##### `ScheduleScopeSettingsEntity`
 

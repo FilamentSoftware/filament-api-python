@@ -14,11 +14,13 @@ __all__ = [
     "ErrorEntity",
     "RequestEntity",
     "ProcessingRunEntity",
+    "ProcessingSettingsEntity",
     "EventLogEntity",
     "ScenarioEntity",
     "ScenarioServiceEntity",
     "ScenarioEventEntity",
     "ChangedEntity",
+    "EntityProtectionEntity",
 ]
 
 @dataclass(kw_only=True)
@@ -85,6 +87,20 @@ class ProcessingRunEntity(Entity):
     error_message: Optional[str] = field(default=None)
     request_ids: list[UUID] = field(default_factory=list)
     processing_service_data: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class ProcessingSettingsEntity(Entity):
+    """
+    Per-organisation processing configuration. This is a singleton per tenant: the single
+    instance has both <see cref="P:Filament.FSCore.Entities.EntityBase.Id" /> and <see cref="P:Filament.FSCore.Entities.EntityBase.ScenarioId" /> set to
+    <see cref="F:System.Guid.Empty" /> (it lives outside any scenario). When no row exists for a tenant,
+    the processing run falls back to the property defaults defined here.
+    
+    :param success_snapshots: Whether processing-succeeded snapshots should be written for this organisation.
+                              Defaults to false.
+    """
+    success_snapshots: bool = field(default=False)
 
 
 @dataclass(kw_only=True)
@@ -200,3 +216,33 @@ class ChangedEntity(Entity):
     status: ChangedEntityStatus = field(default=ChangedEntityStatus.Unknown)
     updated_properties: Optional[list[str]] = field(default=None)
     is_new: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class EntityProtectionEntity(Entity):
+    """
+    Tracks entity protection relationships. When a downstream entity depends on an upstream entity
+    (via a property link or connection), a protection record prevents deletion of the upstream entity
+    unless all downstream dependents are also deleted in the same request, or (for connection-based
+    protections) the protecting connection itself is deleted in the same request.
+    
+    :param upstream_entity_type: The type name of the entity being protected (upstream entity that cannot be deleted).
+    :param upstream_entity_id: The ID of the upstream entity being protected.
+    :param downstream_entity_type: The type name of the downstream entity that depends on the upstream entity.
+                                   For both property-based and connection-based protections, this is the entity
+                                   that has the dependency (e.g., "TimeLogEntity", "CastEntity").
+    :param downstream_entity_id: The ID of the downstream entity.
+    :param protection_source_property: For property-based protections: the property name that created this protection (e.g., "UserId").
+                                       Null for connection-based protections.
+    :param protection_source_connection_type: For connection-based protections: the connection type name (e.g., "CastUserConnection").
+                                              Null for property-based protections.
+    :param protection_source_connection_id: For connection-based protections: the ID of the specific connection instance.
+                                            Null for property-based protections.
+    """
+    upstream_entity_type: str = field(default='')
+    upstream_entity_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    downstream_entity_type: str = field(default='')
+    downstream_entity_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    protection_source_property: Optional[str] = field(default=None)
+    protection_source_connection_type: Optional[str] = field(default=None)
+    protection_source_connection_id: Optional[UUID] = field(default=None)
