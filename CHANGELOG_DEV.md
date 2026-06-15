@@ -1,3 +1,10 @@
+## 0.2.0-dev.0.0.3 (2026-06-15 10:46)
+
+### Other
+
+#### OTHER
+- Plugin manifest version is now stamped only on release builds, so develop to main merges no longer conflict on .claude-plugin/plugin.json
+
 ## 0.2.0-dev.0.0.2 (2026-06-15 10:01)
 
 ### Other
