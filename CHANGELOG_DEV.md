@@ -1,3 +1,10 @@
+## 0.3.0-dev.0.0.1 (2026-06-15 17:58)
+
+### Types
+
+#### FEATURE
+- Generated types now support recurring events (event repeat schedules, shared RepeatMode/RepeatDays enums, per-occurrence schedule keys and alignment settings)
+
 ## 0.2.0-dev.0.0.4 (2026-06-15 10:48)
 
 ## 0.2.0-dev.0.0.3 (2026-06-15 10:46)
