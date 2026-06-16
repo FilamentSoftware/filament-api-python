@@ -1,3 +1,10 @@
+## 0.3.0-dev.0.0.3 (2026-06-16 13:30)
+
+### Serialization
+
+#### FIX
+- from_dict no longer overrides a dataclass field's own default or default_factory when the wire payload omits an optional field
+
 ## 0.3.0-dev.0.0.2 (2026-06-16 11:03)
 
 ### Other
