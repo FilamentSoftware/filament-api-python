@@ -14,7 +14,7 @@ from typing import Any, Optional, Union
 
 import uuid_utils
 
-from filament._wire_formats import (
+from .._wire_formats import (
     instant_from_wire,
     instant_to_wire,
     timedelta_from_wire,

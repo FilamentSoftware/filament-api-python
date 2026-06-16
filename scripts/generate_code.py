@@ -65,7 +65,11 @@ def main() -> int:
         "--exclude-system-types",
         "--api",
         "--entity-base",
-        "filament._specified_properties.SpecifiedPropertiesBase",
+        # Relative import: EntityBase is generated at
+        # src/filament/types/generated/base/base.py, so reaching
+        # filament._specified_properties is four levels up
+        # (base -> generated -> types -> filament).
+        "...._specified_properties.SpecifiedPropertiesBase",
         "-o",
         str(output_path),
     ]

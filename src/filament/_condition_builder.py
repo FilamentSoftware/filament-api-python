@@ -15,8 +15,8 @@ from typing import Any, Generic, Optional, Type, TypeVar, get_args, get_origin, 
 
 import uuid_utils
 
-from filament._serialization import DATETIME_FORMAT, camel_case_from_snake_case
-from filament.types.conditions import (
+from ._serialization import DATETIME_FORMAT, camel_case_from_snake_case
+from .types.conditions import (
     DbConditionArrayComparison,
     DbConditionBetween,
     DbConditionCombine,

@@ -14,9 +14,9 @@ from pysignalr.client import SignalRClient
 from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
 
-from filament._exceptions import FilamentAuthenticationError, FilamentConnectionError, FilamentError
-from filament._serialization import from_dict, to_dict
-from filament.types.generated.misc import (
+from ._exceptions import FilamentAuthenticationError, FilamentConnectionError, FilamentError
+from ._serialization import from_dict, to_dict
+from .types.generated.misc import (
     ClientHelloRequest,
     DataUpdateRejectedNotification,
     EntityPermissions,
@@ -33,7 +33,7 @@ from filament.types.generated.misc import (
     SuccessOrErrorPublic,
     ValueOrErrorPublic_1,
 )
-from filament.types.generated.enums import ErrorCodes
+from .types.generated.enums import ErrorCodes
 
 logger = logging.getLogger(__name__)
 
