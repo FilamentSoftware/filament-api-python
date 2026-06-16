@@ -1,3 +1,10 @@
+## 0.3.0-dev.0.0.2 (2026-06-16 11:03)
+
+### Other
+
+#### OTHER
+- Internal package now uses relative imports throughout, so it can be vendored or renamed without rewriting import paths
+
 ## 0.3.0-dev.0.0.1 (2026-06-15 17:58)
 
 ### Types
