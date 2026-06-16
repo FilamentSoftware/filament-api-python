@@ -504,39 +504,32 @@ The tests use `pytest` + `pytest-asyncio`. `FilamentClient` tests **mock `pysign
 
 ## changelog
 
-**References**: `CHANGELOG_DEV.md` (the dev-stream changelog), `.github/workflows/validate-pull-request.yml` and `.github/workflows/increment-version-develop.yml` / `increment-version-reusable.yml` (the validation + auto-version steps that read this file).
+**References**: `.claude/CLAUDE.md` "Changelog" section, `CHANGELOG_DEV.md` / `CHANGELOG.md` (the generated changelog files — **never** hand-edited), `.github/workflows/validate-pull-request.yml` and `.github/workflows/increment-version-develop.yml` / `increment-version-reusable.yml` (the validation + auto-version steps).
 
 ### What this focus is really about
 
-The project uses **two changelogs**:
+Changelog content is carried **in commit messages**, not written into the changelog files. The release tooling harvests `CHANGELOG:` lines from the branch's commits and writes them into `CHANGELOG_DEV.md` / `CHANGELOG.md` at version-bump time.
 
-- `CHANGELOG_DEV.md` — updated on every PR to `develop`; entries become release notes for dev releases.
-- `CHANGELOG.md` — updated on PRs to `main`; entries are release notes for stable releases.
+- **`CHANGELOG_DEV.md` and `CHANGELOG.md` are generated/maintained by the release tooling.** Hand-editing either one causes version drift and merge conflicts. This is stated in `.claude/CLAUDE.md` "Changelog" — treat it with the same weight as the "Generated Code" DO NOT EDIT rule.
+- The unit of changelog intent is a commit with a `CHANGELOG: <summary>` line in its message. The branch's user-visible change is described there, and the tooling does the rest on merge.
 
-`validate-pull-request.yml` enforces a changelog update on every PR. Entries follow the existing convention:
-
-- Top-level versioned section (`## 0.1.0-dev.0.3.2 (2026-05-26 10:16)`) — written by the version-bumper bot, not the author.
-- Subsection per area (`### Client`, `### Serialization`, `### Generated`, `### Conditions`, etc.).
-- Category sub-subsection (`#### FIX`, `#### FEATURE`).
-- One bullet per change.
-
-The auditor doesn't apply versions (the bot does on merge) — but the auditor must check the **next-version-draft section** at the top has an entry for the branch's user-visible change.
+So the auditor's job here is two-fold: confirm the branch carries its changelog intent in a commit (not in the changelog files), and flag any direct edit to the changelog files.
 
 ### Rules
 
-- **A user-visible change must add a bullet under the unreleased draft section in `CHANGELOG_DEV.md`** (the branch typically targets `develop`). "User-visible" means any change a downstream consumer could notice: a new / changed / removed `__all__` export, a new ctor parameter, a behaviour change in serialization, a new event handler, a regenerated type. A branch with such a change and no `CHANGELOG_DEV.md` update is `[FIX]` — CI rejects PRs lacking changelog updates (`.github/workflows/validate-pull-request.yml`).
+- **Each branch should have at least one commit with a `CHANGELOG:` line in it.** This is where a user-visible change is recorded for the release tooling to harvest. "User-visible" means any change a downstream consumer could notice: a new / changed / removed `__all__` export, a new ctor parameter, a behaviour change in serialization, a new event handler, a regenerated type. A branch with such a change but no `CHANGELOG:` commit line is `[FIX]`.
+  - Grep hint: `git log <merge-base>..HEAD --format=%B | grep -i '^CHANGELOG:'` — zero matches on a branch with user-visible changes is the tell.
 
-- **The entry's section heading should match the area touched.** Existing sections: `Client`, `Serialization`, `Generated`, `Conditions`, `Options`. A new section is a `[Q]` — fine if the area genuinely doesn't fit existing ones, but cross-check first.
+- **Changelogs should never be written to `CHANGELOG_DEV.md` or `CHANGELOG.md` as part of the branch.** Any branch diff that touches either file is `[FIX]` — these are owned by the release tooling, and a manual edit causes version drift and merge conflicts (see `.claude/CLAUDE.md` "Changelog").
+  - Grep hint: any add/modify of `CHANGELOG_DEV.md` or `CHANGELOG.md` in the branch diff.
 
-- **Category is `FIX` for bug fixes and `FEATURE` for new behaviour.** An entry mis-categorised (FEATURE for a bug fix or vice versa) is `[Q]` — it changes how the release notes read.
+- **Pure-internal refactors (no observable user effect) don't need a `CHANGELOG:` line.** A branch that refactors a private helper, renames an internal variable, tightens a type hint on a private method, etc. doesn't require changelog intent — and one that adds a noisy `CHANGELOG:` line for such a change is `[Q]` (clutters the harvested release notes).
 
-- **Pure-internal refactors (no observable user effect) don't need a changelog entry.** A branch that refactors a private helper, renames an internal variable, tightens a type hint on a private method, etc. and adds a changelog bullet anyway is `[Q]` (clutters the release notes).
-
-- **Generated-code regenerations** typically get an entry under `### Generated` with category `FEATURE` if new types appear, or `FIX` if a serialization mismatch was corrected. A branch that regenerates `types/generated/**` and adds no changelog entry is `[Q]` (every prior regen in `CHANGELOG_DEV.md` has one).
+- **Generated-code regenerations** carry their changelog intent in the `CHANGELOG:` commit line like any other user-visible change (new types → feature-flavoured wording; corrected serialization mismatch → fix-flavoured). A branch that regenerates `types/generated/**` with no `CHANGELOG:` commit line is `[Q]`.
 
 ### Common false positives
 
-- A branch that *only* edits `.claude/` (skills, agents, CLAUDE.md) or `.github/` workflows — no end-user impact.
+- A branch that *only* edits `.claude/` (skills, agents, CLAUDE.md) or `.github/` workflows — no end-user impact, no `CHANGELOG:` line required.
 - A test-only branch where the production code is unchanged.
 
 ---
