@@ -14,7 +14,7 @@ import datetime
 import re
 import types
 from collections.abc import Sequence as ABCSequence
-from dataclasses import fields, is_dataclass
+from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
 from typing import Any, Optional, TypeVar, Type, Union, get_origin, get_args
 
@@ -458,9 +458,16 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         camel_key = camel_case_from_snake_case(f.name)
         if camel_key not in data and f.name not in data:
             # Default missing Optional fields to None so dataclasses
-            # without explicit defaults still construct correctly.
+            # without explicit defaults still construct correctly. Skip
+            # fields that define their own default / default_factory so we
+            # don't clobber it — let the dataclass apply its own value.
             field_type = hints.get(f.name, f.type)
-            if f.name not in dataclass_data and _is_optional(field_type):
+            has_default = f.default is not MISSING or f.default_factory is not MISSING
+            if (
+                f.name not in dataclass_data
+                and _is_optional(field_type)
+                and not has_default
+            ):
                 dataclass_data[f.name] = None
             continue
 
