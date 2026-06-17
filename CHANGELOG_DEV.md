@@ -1,3 +1,10 @@
+## 0.3.0-dev.0.0.4 (2026-06-17 10:09)
+
+### Mypy Plugin
+
+#### FIX
+- Condition.prop() now type-narrows fields inherited from base entities instead of flagging them as unknown
+
 ## 0.3.0-dev.0.0.3 (2026-06-16 13:30)
 
 ### Serialization
