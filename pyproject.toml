@@ -19,6 +19,9 @@ packages = [
 pytest = ">=8.0"
 pytest-asyncio = ">=1.0"
 pytest-cov = ">=6.0"
+# Required by tests/test_mypy_plugin.py, which type-checks snippets in-process
+# to verify the condition-builder mypy plugin.
+mypy = ">=1.0"
 
 [tool.poetry.group.types.dependencies]
 mypy = ">=1.0"
