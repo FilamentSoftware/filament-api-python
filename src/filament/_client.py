@@ -6,7 +6,10 @@ import base64
 import contextlib
 import inspect
 import logging
+import math
+import re
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from types import TracebackType
 from typing import Any, Optional, Type, Union
 
@@ -14,7 +17,12 @@ from pysignalr.client import SignalRClient
 from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
 
-from ._exceptions import FilamentAuthenticationError, FilamentConnectionError, FilamentError
+from ._exceptions import (
+    FilamentAuthenticationError,
+    FilamentConnectionError,
+    FilamentError,
+    ResponseTooLargeError,
+)
 from ._serialization import from_dict, to_dict
 from .types.generated.misc import (
     ClientHelloRequest,
@@ -32,8 +40,9 @@ from .types.generated.misc import (
     SubscriptionId,
     SuccessOrErrorPublic,
     ValueOrErrorPublic_1,
+    WrappedEntity,
 )
-from .types.generated.enums import ErrorCodes
+from .types.generated.enums import ErrorCodes, ReadMode
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +55,14 @@ _DEFAULT_PATH = "api/v0"
 _DEFAULT_CONNECTION_TIMEOUT = 10.0
 # Matches the websockets-library default that pysignalr uses; pass ``None`` for unlimited.
 _DEFAULT_MAX_SIZE = 2**20  # 1 MiB
+
+# Parses the byte counts out of a ``ResponseTooLarge`` error message.  The backend
+# formats it as ``"Response would be {actual:N0} bytes; client limit is {limit:N0}
+# bytes."`` where ``:N0`` inserts thousands separators (e.g. ``1,234,567``), so the
+# captured groups may contain commas which are stripped before ``int`` conversion.
+_RESPONSE_TOO_LARGE_RE = re.compile(
+    r"would be ([\d,]+) bytes.*?limit is ([\d,]+) bytes"
+)
 
 
 class FilamentClient:
@@ -748,7 +765,31 @@ class FilamentClient:
         self,
         request: ReadDataRequest,
     ) -> ValueOrErrorPublic_1[ServiceDataRead]:
-        """Read entity data from the server."""
+        """Read entity data from the server.
+
+        If the server rejects the response as too large
+        (:attr:`ErrorCodes.ResponseTooLarge` — returned when the serialised
+        result would exceed the ``max_size`` negotiated at connect time),
+        the request is automatically split into smaller pages.  The number
+        of pages is derived from the byte counts reported in the error
+        message, and each page is read recursively so that a page which is
+        *itself* too large (because the data is not spread evenly across the
+        entities) is split again.  The pages are then merged into a single
+        :class:`ServiceDataRead`.
+
+        Recursion stops when a request for a single entity is still too
+        large: in that case no further requests are made and a
+        :class:`ResponseTooLargeError` is raised, carrying the size of the
+        offending single-entity response and the size the full request would
+        have produced.
+        """
+        return await self._read_data_paged(request)
+
+    async def _read_data_once(
+        self,
+        request: ReadDataRequest,
+    ) -> ValueOrErrorPublic_1[ServiceDataRead]:
+        """Issue a single ``ReadData`` invocation without any paging."""
         request_dict = to_dict(request)
         result_dict: Any = await self._invoke("ReadData", request_dict)
         try:
@@ -758,6 +799,154 @@ class FilamentClient:
         if result is not None:
             return result
         return _deserialization_error()
+
+    async def _read_data_paged(
+        self,
+        request: ReadDataRequest,
+        full_request_bytes: Optional[int] = None,
+    ) -> ValueOrErrorPublic_1[ServiceDataRead]:
+        """Read data, splitting into smaller pages on ``ResponseTooLarge``.
+
+        See :meth:`read_data` for the user-facing contract.
+
+        :param full_request_bytes: Serialised size the original (top-level)
+            request would have produced.  Threaded through the recursion so a
+            single-entity failure can report it; ``None`` at the top level,
+            where it is taken from the first too-large response.
+        """
+        result = await self._read_data_once(request)
+
+        # Only a too-large response triggers paging; everything else (success
+        # or any other error) is returned to the caller untouched.
+        if result.success or result.error_code != ErrorCodes.ResponseTooLarge:
+            return result
+
+        match = _RESPONSE_TOO_LARGE_RE.search(result.message)
+        if match is None:
+            # The error code says too large but the message isn't in the
+            # expected format, so we can't size the pages — surface as-is.
+            return result
+        would_be = int(match.group(1).replace(",", ""))
+        limit_bytes = int(match.group(2).replace(",", ""))
+        # The first too-large response we see is the full, un-paged request.
+        if full_request_bytes is None:
+            full_request_bytes = would_be
+        if limit_bytes <= 0:
+            return result
+
+        type_request = request.request
+
+        # Resolve an unlimited request (``limit <= 0`` means "all matching
+        # records") to a concrete entity count so the range can be divided
+        # into pages.  Only meaningful for a plain data read.
+        limit = type_request.limit
+        if limit <= 0:
+            if type_request.mode != ReadMode.Data:
+                return result
+            count = await self._read_entity_count(request)
+            if count is None:
+                return result
+            limit = count - type_request.offset
+
+        if limit <= 1:
+            # A single entity (or none) is still too large — nothing left to
+            # split, so stop making requests and report the failure.
+            raise ResponseTooLargeError(
+                entity_bytes=would_be,
+                full_request_bytes=full_request_bytes,
+                limit_bytes=limit_bytes,
+            )
+
+        # Split the [offset, offset + limit) range into ``num_pages`` pages,
+        # sized so each page is expected to fit within the byte limit.  Always
+        # at least two pages so the per-page limit is strictly smaller than the
+        # current one, guaranteeing the recursion makes progress towards the
+        # single-entity base case.
+        num_pages = max(2, math.ceil(would_be / limit_bytes))
+        page_size = max(1, math.ceil(limit / num_pages))
+
+        accumulated: list[WrappedEntity] = []
+        template: Optional[ServiceDataRead] = None
+        # Pending-request maps are keyed by entity ID, so each page contributes
+        # its own entries — merge them rather than keeping only the first page's.
+        pending_update_remove: dict[UUID, RequestId] = {}
+        pending_delete: dict[UUID, RequestId] = {}
+        saw_pending_update_remove = False
+        saw_pending_delete = False
+        offset = type_request.offset
+        end = type_request.offset + limit
+        more_data = False
+
+        while offset < end:
+            page_limit = min(page_size, end - offset)
+            page_request = replace(
+                request,
+                request=replace(type_request, offset=offset, limit=page_limit),
+            )
+            # A single-entity page that is still too large raises
+            # ResponseTooLargeError, which propagates out without reading any
+            # further pages.
+            page_result = await self._read_data_paged(page_request, full_request_bytes)
+            if not page_result.success or page_result.data is None:
+                # Some other error (e.g. a deserialization failure) — surface it.
+                return page_result
+            page_data = page_result.data
+            if template is None:
+                template = page_data
+            accumulated.extend(page_data.data)
+            if page_data.pending_update_remove_request_ids is not None:
+                pending_update_remove.update(page_data.pending_update_remove_request_ids)
+                saw_pending_update_remove = True
+            if page_data.pending_delete_request_ids is not None:
+                pending_delete.update(page_data.pending_delete_request_ids)
+                saw_pending_delete = True
+            more_data = page_data.more_data
+            offset += page_limit
+            if not page_data.more_data:
+                # No further records available within the requested range.
+                break
+
+        if template is None:  # pragma: no cover - unreachable while limit > 1
+            return result
+
+        merged = ServiceDataRead(
+            type_name=template.type_name,
+            permissions=template.permissions,
+            data=accumulated,
+            pending_update_remove_request_ids=(
+                pending_update_remove if saw_pending_update_remove else None
+            ),
+            pending_delete_request_ids=(
+                pending_delete if saw_pending_delete else None
+            ),
+            entity_count=template.entity_count,
+            more_data=more_data,
+        )
+        return ValueOrErrorPublic_1(
+            success=True,
+            message="",
+            error_code=ErrorCodes.None_,
+            error_id=None,
+            data=merged,
+        )
+
+    async def _read_entity_count(
+        self,
+        request: ReadDataRequest,
+    ) -> Optional[int]:
+        """Read the total entity count for *request* using ``ReadMode.Count``.
+
+        Used to give an unlimited (``limit <= 0``) read a finite range to
+        page over.  Returns ``None`` if the count read fails.
+        """
+        count_request = replace(
+            request,
+            request=replace(request.request, mode=ReadMode.Count),
+        )
+        result = await self._read_data_once(count_request)
+        if result.success and result.data is not None:
+            return result.data.entity_count
+        return None
 
     async def modify_data(
         self,
