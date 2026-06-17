@@ -135,8 +135,10 @@ class FilamentConditionPlugin(Plugin):
         if field_name is None:
             return ctx.default_return_type
 
-        # 3. Look up field on the entity (TypeInfo.names includes inherited members)
-        sym = entity_type.type.names.get(field_name)
+        # 3. Look up field on the entity. TypeInfo.get() walks the MRO, so
+        #    fields inherited from base entities are resolved too (TypeInfo.names
+        #    only holds members declared directly on the class).
+        sym = entity_type.type.get(field_name)
         if sym is None or not isinstance(sym.node, Var) or sym.node.type is None:
             ctx.api.fail(
                 f'Entity "{entity_type.type.name}" has no field "{field_name}"',
