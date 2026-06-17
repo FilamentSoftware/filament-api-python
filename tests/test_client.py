@@ -6,7 +6,7 @@ serialization, and subscription routing without a live server.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,10 +14,16 @@ from pysignalr.messages import CompletionMessage
 from uuid_utils import UUID, uuid7
 
 from filament._client import FilamentClient
-from filament._exceptions import FilamentAuthenticationError, FilamentConnectionError
+from filament._exceptions import (
+    FilamentAuthenticationError,
+    FilamentConnectionError,
+    ResponseTooLargeError,
+)
+from filament._serialization import from_dict
 from filament.types.generated.enums import (
     DataProcessingStatus,
     ErrorCodes,
+    ReadMode,
     SubscriptionMode,
 )
 from filament.types.generated.misc import (
@@ -1341,3 +1347,290 @@ class TestPartReassembly:
 
         assert any("poisoned" in r.message for r in caplog.records)
         callback.assert_not_called()
+
+
+class _FakeReadServer:
+    """A minimal stand-in for the backend's ``ReadData`` endpoint.
+
+    Models a single entity type with ``len(entity_sizes)`` records, each of a
+    notional serialised size.  A page ``[offset, offset + limit)`` is rejected
+    with :attr:`ErrorCodes.ResponseTooLarge` when the summed size of its records
+    exceeds ``max_bytes`` — mirroring the server-side response-size filter — so
+    the client's recursive paging can be driven without a live hub.  ``limit <= 0``
+    means "all records" and ``ReadMode.Count`` returns just the total count.
+    """
+
+    def __init__(
+        self,
+        entity_sizes: list[int],
+        max_bytes: int,
+        *,
+        base_bytes: int = 0,
+        pending_delete: Optional[dict[int, str]] = None,
+    ) -> None:
+        self.entity_sizes = entity_sizes
+        self.max_bytes = max_bytes
+        self.base_bytes = base_bytes
+        # Maps an entity index to the request id of a pending delete on it.
+        self.pending_delete = pending_delete or {}
+        self.entities = [
+            {"entity": {"$type": "UserEntity", "id": str(uuid7()),
+                        "givenName": f"User{i}"}}
+            for i in range(len(entity_sizes))
+        ]
+        # Records (offset, limit, mode) for every invocation, in order.
+        self.calls: list[tuple[int, int, ReadMode]] = []
+
+    async def invoke(self, method: str, request_dict: Any) -> Any:
+        assert method == "ReadData"
+        request = from_dict(request_dict, ReadDataRequest)
+        assert request is not None
+        type_request = request.request
+        self.calls.append(
+            (type_request.offset, type_request.limit, type_request.mode)
+        )
+
+        total = len(self.entity_sizes)
+        if type_request.mode == ReadMode.Count:
+            return self._success(data=[], more_data=False, entity_count=total)
+
+        limit = type_request.limit if type_request.limit > 0 else total
+        start = type_request.offset
+        stop = min(total, start + limit)
+        would_be = self.base_bytes + sum(self.entity_sizes[start:stop])
+        if would_be > self.max_bytes:
+            return {
+                "success": False,
+                "message": (
+                    f"Response would be {would_be:,} bytes; "
+                    f"client limit is {self.max_bytes:,} bytes."
+                ),
+                "errorCode": ErrorCodes.ResponseTooLarge.value,
+                "errorId": None,
+                "data": None,
+            }
+        return self._success(
+            data=self.entities[start:stop],
+            more_data=stop < total,
+            entity_count=0,
+            pending_delete=self._pending_delete_for(start, stop),
+        )
+
+    def _pending_delete_for(self, start: int, stop: int) -> Optional[dict[str, Any]]:
+        """Pending-delete entries (entity id -> request id) for a page slice."""
+        page = {
+            self.entities[i]["entity"]["id"]: {"id": rid}
+            for i, rid in self.pending_delete.items()
+            if start <= i < stop
+        }
+        return page or None
+
+    @staticmethod
+    def _success(
+        *,
+        data: list[Any],
+        more_data: bool,
+        entity_count: int,
+        pending_delete: Optional[dict[str, Any]] = None,
+    ) -> Any:
+        return {
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "typeName": "UserEntity",
+                "data": data,
+                "entityCount": entity_count,
+                "moreData": more_data,
+                "pendingDeleteRequestIds": pending_delete,
+            },
+        }
+
+
+def _read_request(*, limit: int, offset: int = 0) -> ReadDataRequest:
+    return ReadDataRequest(
+        scenario_id=UUID(int=0),
+        request=ReadDataTypeRequest(
+            type_name="UserEntity", limit=limit, offset=offset,
+        ),
+    )
+
+
+class TestReadDataPaging:
+    @pytest.mark.asyncio
+    async def test_success_passes_through_without_paging(self) -> None:
+        """A response that fits is returned directly with a single invocation."""
+        server = _FakeReadServer([100] * 3, max_bytes=1000)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=3))
+
+        assert result.success is True
+        assert result.data is not None
+        assert len(result.data.data) == 3
+        assert len(server.calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_non_too_large_error_passes_through(self) -> None:
+        """Errors other than ResponseTooLarge are surfaced without paging."""
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": False,
+            "message": "nope",
+            "errorCode": ErrorCodes.PermissionDenied.value,
+            "errorId": None,
+            "data": None,
+        })
+
+        result = await client.read_data(_read_request(limit=10))
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.PermissionDenied
+        client._invoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_splits_into_pages_and_merges(self) -> None:
+        """An evenly-sized too-large response is paged and merged in full."""
+        server = _FakeReadServer([100] * 10, max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=10))
+
+        assert result.success is True
+        assert result.data is not None
+        # Every entity is returned exactly once, in order.
+        expected_ids = [w["entity"]["id"] for w in server.entities]
+        got_ids = [str(w.entity.id) for w in result.data.data]
+        assert got_ids == expected_ids
+        assert result.data.more_data is False
+
+    @pytest.mark.asyncio
+    async def test_recurses_on_unevenly_distributed_pages(self) -> None:
+        """A page that is still too large after the first split is split again."""
+        # First split yields a [0, 2) page (400 bytes) that itself exceeds the
+        # 250-byte limit and must be paged a second time.
+        server = _FakeReadServer([200, 200, 40, 40], max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=4))
+
+        assert result.success is True
+        assert result.data is not None
+        assert len(result.data.data) == 4
+        assert result.data.more_data is False
+        # A page of size 1 was needed to get the two 200-byte records through.
+        assert any(limit == 1 for _, limit, _ in server.calls)
+
+    @pytest.mark.asyncio
+    async def test_single_entity_still_too_large_raises(self) -> None:
+        """When one entity alone exceeds the limit, a ResponseTooLargeError is
+        raised carrying both sizes, and no further requests are made."""
+        # Entity 1 is 5000 bytes on its own; the full request is 5200 bytes.
+        server = _FakeReadServer([100, 5000, 100], max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        with pytest.raises(ResponseTooLargeError) as exc_info:
+            await client.read_data(_read_request(limit=3))
+
+        error = exc_info.value
+        assert error.entity_bytes == 5000
+        assert error.full_request_bytes == 5200
+        assert error.limit_bytes == 250
+        # Terminates: a single-entity page is never split further.
+        assert any(limit == 1 for _, limit, _ in server.calls)
+        assert len(server.calls) < 30
+
+    @pytest.mark.asyncio
+    async def test_top_level_single_entity_request_raises(self) -> None:
+        """A user request for a single oversized entity raises immediately,
+        with the entity and full-request sizes equal."""
+        server = _FakeReadServer([5000], max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        with pytest.raises(ResponseTooLargeError) as exc_info:
+            await client.read_data(_read_request(limit=1))
+
+        error = exc_info.value
+        assert error.entity_bytes == 5000
+        assert error.full_request_bytes == 5000
+        assert error.limit_bytes == 250
+        assert len(server.calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_more_data_preserved_when_limit_below_total(self) -> None:
+        """Paging within a user-supplied limit keeps ``more_data`` set when the
+        backend has further records beyond that limit."""
+        server = _FakeReadServer([100] * 10, max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=4))
+
+        assert result.success is True
+        assert result.data is not None
+        assert len(result.data.data) == 4
+        assert result.data.more_data is True
+
+    @pytest.mark.asyncio
+    async def test_unlimited_request_resolves_count_then_pages(self) -> None:
+        """An unlimited (limit=0) read first reads the count, then pages it."""
+        server = _FakeReadServer([100] * 6, max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=0))
+
+        assert result.success is True
+        assert result.data is not None
+        assert len(result.data.data) == 6
+        assert result.data.more_data is False
+        # A Count-mode probe was used to bound the otherwise-unlimited read.
+        assert any(mode == ReadMode.Count for _, _, mode in server.calls)
+
+    @pytest.mark.asyncio
+    async def test_pending_request_ids_merged_across_pages(self) -> None:
+        """Per-entity pending maps from every page survive the merge."""
+        rid_1 = str(uuid7())
+        rid_8 = str(uuid7())
+        # Entities 1 and 8 land in different pages once the read is split.
+        server = _FakeReadServer(
+            [100] * 10, max_bytes=250,
+            pending_delete={1: rid_1, 8: rid_8},
+        )
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=10))
+
+        assert result.success is True
+        assert result.data is not None
+        pending = result.data.pending_delete_request_ids
+        assert pending is not None
+        got = {str(eid): str(req.id) for eid, req in pending.items()}
+        assert got == {
+            server.entities[1]["entity"]["id"]: rid_1,
+            server.entities[8]["entity"]["id"]: rid_8,
+        }
+
+    @pytest.mark.asyncio
+    async def test_pages_preserve_request_offset(self) -> None:
+        """Paging honours a non-zero starting offset."""
+        server = _FakeReadServer([100] * 10, max_bytes=250)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=4, offset=2))
+
+        assert result.success is True
+        assert result.data is not None
+        # Records 2..5 (the 3rd through 6th entities) are returned.
+        expected_ids = [w["entity"]["id"] for w in server.entities[2:6]]
+        got_ids = [w.entity.id for w in result.data.data]
+        assert [str(i) for i in got_ids] == expected_ids
+        assert all(offset >= 2 for offset, _, _ in server.calls)
