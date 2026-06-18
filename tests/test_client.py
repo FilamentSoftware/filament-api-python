@@ -1594,6 +1594,22 @@ class TestReadDataPaging:
         assert any(mode == ReadMode.Count for _, _, mode in server.calls)
 
     @pytest.mark.asyncio
+    async def test_unlimited_request_with_no_remaining_rows_does_not_raise(self) -> None:
+        """When an unlimited read's count probe leaves no in-range rows (the
+        offset is at/after the total) and the response is pure envelope
+        overhead, the original error is surfaced rather than a misleading
+        single-entity ResponseTooLargeError."""
+        # base_bytes alone exceeds max_bytes, so even an empty page is rejected.
+        server = _FakeReadServer([100, 100], max_bytes=50, base_bytes=100)
+        client = _make_client()
+        client._invoke = AsyncMock(side_effect=server.invoke)
+
+        result = await client.read_data(_read_request(limit=0, offset=2))
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.ResponseTooLarge
+
+    @pytest.mark.asyncio
     async def test_pending_request_ids_merged_across_pages(self) -> None:
         """Per-entity pending maps from every page survive the merge."""
         rid_1 = str(uuid7())
