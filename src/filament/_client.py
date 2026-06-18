@@ -848,9 +848,16 @@ class FilamentClient:
                 return result
             limit = count - type_request.offset
 
-        if limit <= 1:
-            # A single entity (or none) is still too large — nothing left to
-            # split, so stop making requests and report the failure.
+        if limit <= 0:
+            # No records remain in range — e.g. the count probe on an unlimited
+            # read found ``offset >= entity_count`` and the response is all
+            # envelope overhead.  There is no single entity to blame, so surface
+            # the original error rather than misreporting an overflowing entity.
+            return result
+
+        if limit == 1:
+            # A single entity is still too large — nothing left to split, so
+            # stop making requests and report the failure.
             raise ResponseTooLargeError(
                 entity_bytes=would_be,
                 full_request_bytes=full_request_bytes,
