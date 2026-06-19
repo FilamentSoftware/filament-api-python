@@ -1,3 +1,10 @@
+## 0.3.0-dev.0.1.0 (2026-06-19 12:07)
+
+### Client
+
+#### FEATURE
+- read_data now transparently pages around the server's response-size limit, raising ResponseTooLargeError only when a single entity cannot fit
+
 ## 0.3.0-dev.0.0.4 (2026-06-17 10:09)
 
 ### Mypy Plugin
