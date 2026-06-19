@@ -9,6 +9,7 @@ from ._exceptions import (
     FilamentAuthenticationError,
     FilamentConnectionError,
     FilamentError,
+    ResponseTooLargeError,
 )
 from ._specified_properties import SpecifiedPropertiesBase
 from .types.generated.base.base import EntityBase
@@ -30,5 +31,6 @@ __all__ = [
     "FilamentAuthenticationError",
     "FilamentConnectionError",
     "FilamentError",
+    "ResponseTooLargeError",
     "SpecifiedPropertiesBase",
 ]
