@@ -1,3 +1,30 @@
+## 0.3.0 (2026-06-22 09:13)
+
+### Client
+
+#### FEATURE
+- read_data now transparently pages around the server's response-size limit, raising ResponseTooLargeError only when a single entity cannot fit
+
+### Mypy Plugin
+
+#### FIX
+- Condition.prop() now type-narrows fields inherited from base entities instead of flagging them as unknown
+
+### Serialization
+
+#### FIX
+- from_dict no longer overrides a dataclass field's own default or default_factory when the wire payload omits an optional field
+
+### Types
+
+#### FEATURE
+- Generated types now support recurring events (event repeat schedules, shared RepeatMode/RepeatDays enums, per-occurrence schedule keys and alignment settings)
+
+### Other
+
+#### OTHER
+- Internal package now uses relative imports throughout, so it can be vendored or renamed without rewriting import paths
+
 ## 0.2.0 (2026-06-15 13:15)
 
 ### Client
