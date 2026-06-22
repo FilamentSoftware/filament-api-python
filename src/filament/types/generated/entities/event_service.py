@@ -9,6 +9,7 @@ from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
 from ..entities.user_service import UserEntity
+from ..enums import RepeatDaysEnum, RepeatModeEnum
 
 __all__ = [
     "EventEntity",
@@ -32,6 +33,16 @@ class EventEntity(Entity):
     :param date_time_zone: What time zone the event is being called under.
     :param review_task_groups: A list of all review tasks group that this event will use to auto generate a task review list.
     :param include_review_task_users: Should the users who created content to be reviewed be automatically invited to the event?
+    :param repeat_mode: How often this event should repeat. <see cref="F:Filament.FSCore.Entities.Recurrence.RepeatModeEnum.None" /> means
+                        the event has a single occurrence.
+    :param repeat_days: If <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.RepeatMode" /> is <see cref="F:Filament.FSCore.Entities.Recurrence.RepeatModeEnum.Week" />, which days of
+                        the week the event repeats on. Ignored for other modes.
+    :param repeat_count: If it is a repeating event, how many occurrences to materialise. <c>0</c> means repeat
+                         indefinitely (bounded by <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.RepeatEnd" /> and
+                         <c>ScheduleSettingsEntity.MaxEventRepeat</c>).
+    :param repeat_end: If it is a repeating event, when to finish repeating. Takes precedence over
+                       <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.RepeatCount" />: if the repeat count has not been reached when this time
+                       arrives, repeating stops anyway.
     """
     name: str = field(default='')
     description: str = field(default='')
@@ -43,6 +54,10 @@ class EventEntity(Entity):
     date_time_zone: str = field(default='UTC')
     review_task_groups: list[str] = field(default_factory=list)
     include_review_task_users: bool = field(default=False)
+    repeat_mode: RepeatModeEnum = field(default=RepeatModeEnum.None_)
+    repeat_days: RepeatDaysEnum = field(default=RepeatDaysEnum.None_)
+    repeat_count: int = field(default=0)
+    repeat_end: Optional[datetime.datetime] = field(default=None)
 
 
 @dataclass(kw_only=True)

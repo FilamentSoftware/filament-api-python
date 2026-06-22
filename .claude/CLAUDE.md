@@ -103,6 +103,10 @@ Files in `src/filament/types/generated/` are **auto-generated** and must **never
 2. Identify what needs to change and describe the fix in terms of the code-generation logic.
 3. Share a clear description of the problem and a suggested prompt/instructions for fixing the codegen with the user, so they can address it upstream.
 
+## Changelog
+
+**Never edit `CHANGELOG_DEV.md` or `CHANGELOG.md`.** These are generated/maintained by the release tooling — manual edits cause version drift and merge conflicts.
+
 ## Code Conventions
 
 - **Python 3.10, 3.11, 3.12, 3.13** — avoid syntax only available in 3.11+ (e.g., `type` statement, `ExceptionGroup`)

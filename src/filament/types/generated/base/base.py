@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from typing import Generic, Optional, TypeVar
 
 from uuid_utils import UUID, uuid7
-from filament._specified_properties import SpecifiedPropertiesBase
+
+from ...._specified_properties import SpecifiedPropertiesBase
 
 __all__ = [
     "EntityBase",

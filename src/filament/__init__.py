@@ -3,15 +3,16 @@ __version__ = "0.0.0-dev"
 
 from typing import Optional, Type, TypeVar
 
-from filament._client import FilamentClient
-from filament._condition_builder import Condition
-from filament._exceptions import (
+from ._client import FilamentClient
+from ._condition_builder import Condition
+from ._exceptions import (
     FilamentAuthenticationError,
     FilamentConnectionError,
     FilamentError,
+    ResponseTooLargeError,
 )
-from filament._specified_properties import SpecifiedPropertiesBase
-from filament.types.generated.base.base import EntityBase
+from ._specified_properties import SpecifiedPropertiesBase
+from .types.generated.base.base import EntityBase
 
 _E = TypeVar("_E", bound=EntityBase)
 
@@ -30,5 +31,6 @@ __all__ = [
     "FilamentAuthenticationError",
     "FilamentConnectionError",
     "FilamentError",
+    "ResponseTooLargeError",
     "SpecifiedPropertiesBase",
 ]

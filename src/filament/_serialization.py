@@ -14,19 +14,19 @@ import datetime
 import re
 import types
 from collections.abc import Sequence as ABCSequence
-from dataclasses import fields, is_dataclass
+from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
 from typing import Any, Optional, TypeVar, Type, Union, get_origin, get_args
 
 import uuid_utils
 
-from filament.types.generated.base.base import EntityBase
+from .types.generated.base.base import EntityBase
 
 T = TypeVar("T")
 
 # Re-exported so external callers can keep importing from filament._serialization.
 # Explicit ``X as X`` aliases satisfy mypy strict's no-implicit-reexport rule.
-from filament._wire_formats import (  # noqa: E402
+from ._wire_formats import (  # noqa: E402
     DATETIME_FORMAT as DATETIME_FORMAT,
     instant_from_wire as instant_from_wire,
     instant_to_wire as instant_to_wire,
@@ -97,7 +97,7 @@ def _is_dataclass_type(tp: Any) -> bool:
 def _is_condition_type(tp: Any) -> bool:
     """Check if *tp* is ``DbConditionInstance`` or a subclass of it."""
     try:
-        from filament.types.conditions import DbConditionInstance
+        from .types.conditions import DbConditionInstance
         return isinstance(tp, type) and issubclass(tp, DbConditionInstance)
     except (TypeError, ImportError):
         return False
@@ -106,7 +106,7 @@ def _is_condition_type(tp: Any) -> bool:
 def _is_data_option_type(tp: Any) -> bool:
     """Check if *tp* is ``DataOption``."""
     try:
-        from filament.types.options import DataOption
+        from .types.options import DataOption
         return isinstance(tp, type) and issubclass(tp, DataOption)
     except (TypeError, ImportError):
         return False
@@ -114,7 +114,7 @@ def _is_data_option_type(tp: Any) -> bool:
 
 def _resolve_entity_type(type_name: str) -> Optional[type]:
     """Look up a concrete EntityBase subclass by name from $type tag."""
-    from filament.types.generated.base.base import EntityBase
+    from .types.generated.base.base import EntityBase
 
     def _walk(cls: type) -> Optional[type]:
         for sub in cls.__subclasses__():
@@ -211,12 +211,12 @@ def _convert_to_dict_value(
 
     # DbConditionInstance -> custom polymorphic serialization
     if _is_condition_type(field_type):
-        from filament.types.conditions import condition_to_dict
+        from .types.conditions import condition_to_dict
         return condition_to_dict(data)
 
     # DataOption -> custom serialization
     if _is_data_option_type(field_type):
-        from filament.types.options import option_to_dict
+        from .types.options import option_to_dict
         return option_to_dict(data)
 
     # Dataclass -> recurse
@@ -298,14 +298,14 @@ def _convert_from_dict_value(
     # DbConditionInstance -> custom polymorphic deserialization
     if _is_condition_type(field_type):
         if isinstance(data, dict):
-            from filament.types.conditions import condition_from_dict
+            from .types.conditions import condition_from_dict
             return condition_from_dict(data)
         return data
 
     # DataOption -> custom deserialization
     if _is_data_option_type(field_type):
         if isinstance(data, dict):
-            from filament.types.options import option_from_dict
+            from .types.options import option_from_dict
             return option_from_dict(data)
         return data
 
@@ -458,9 +458,16 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         camel_key = camel_case_from_snake_case(f.name)
         if camel_key not in data and f.name not in data:
             # Default missing Optional fields to None so dataclasses
-            # without explicit defaults still construct correctly.
+            # without explicit defaults still construct correctly. Skip
+            # fields that define their own default / default_factory so we
+            # don't clobber it — let the dataclass apply its own value.
             field_type = hints.get(f.name, f.type)
-            if f.name not in dataclass_data and _is_optional(field_type):
+            has_default = f.default is not MISSING or f.default_factory is not MISSING
+            if (
+                f.name not in dataclass_data
+                and _is_optional(field_type)
+                and not has_default
+            ):
                 dataclass_data[f.name] = None
             continue
 

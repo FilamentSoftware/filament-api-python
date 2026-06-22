@@ -4,8 +4,6 @@ from enum import Enum, Flag
 __all__ = [
     "ActualStatusEnum",
     "AvailabilityModeEnum",
-    "AvailabilityRepeatDaysEnum",
-    "AvailabilityRepeatModeEnum",
     "BlockUserReasonEnum",
     "CalendarUserAccess",
     "ChangedEntityStatus",
@@ -25,6 +23,8 @@ __all__ = [
     "PermissionType",
     "ProcessingRunStatus",
     "ReadMode",
+    "RepeatDaysEnum",
+    "RepeatModeEnum",
     "RequestStatus",
     "ScenarioEventAction",
     "ScenarioServiceTypeEnum",
@@ -86,52 +86,6 @@ class AvailabilityModeEnum(Enum):
     Unavailable = 1
     Available = 2
     AvailableIfRequired = 3
-
-
-class AvailabilityRepeatDaysEnum(Flag):
-    """
-    An enum to reference the days of the week that an <see cref="T:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity" /> repeats on. This enum supports
-    flags, so multiple values can be stored at the same time.
-    
-    :cvar None_: Invalid option - does not repeat on any day.
-    :cvar Monday: Repeats on Mondays.
-    :cvar Tuesday: Repeats on Tuesdays.
-    :cvar Wednesday: Repeats on Wednesdays.
-    :cvar Thursday: Repeats on Thursdays.
-    :cvar Friday: Repeats on Fridays.
-    :cvar Weekdays: Repeats on all weekdays.
-    :cvar Saturday: Repeats on Saturdays.
-    :cvar Sunday: Repeats on Sundays.
-    :cvar Weekend: Repeats on all weekend days.
-    """
-    None_ = 0
-    Monday = 1 << 1
-    Tuesday = 1 << 2
-    Wednesday = 1 << 3
-    Thursday = 1 << 4
-    Friday = 1 << 5
-    Weekdays = Monday | Tuesday | Wednesday | Thursday | Friday
-    Saturday = 1 << 6
-    Sunday = 1 << 7
-    Weekend = Saturday | Sunday
-
-
-class AvailabilityRepeatModeEnum(Enum):
-    """
-    An enum to specify how often an availability should repeat
-    
-    :cvar None_: No repeat.
-    :cvar Day: Repeat each day.
-    :cvar Week: Repeat each week (with optional repeating on multiple days of the week - see
-                <see cref="T:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityRepeatDaysEnum" />).
-    :cvar Month: Repeat each month.
-    :cvar Year: Repeat each year.
-    """
-    None_ = 0
-    Day = 1
-    Week = 2
-    Month = 3
-    Year = 4
 
 
 class BlockUserReasonEnum(Enum):
@@ -387,6 +341,8 @@ class ErrorCodes(Enum):
                             maximum message size the client negotiated via the connect-time capability handshake.
                             The response is not sent; instead this error is returned (carrying the actual and
                             limit byte counts) so the caller can narrow the query or raise the client's limit.
+    :cvar ProtectionError: The operation was blocked because downstream entities have protection records
+                           preventing deletion of the upstream entity.
     """
     None_ = 0
     NotSupported = 1
@@ -404,6 +360,7 @@ class ErrorCodes(Enum):
     TypeError = 13
     RateLimitExceeded = 23
     ResponseTooLarge = 25
+    ProtectionError = 26
 
 
 class EventUserConnectionStatus(Enum):
@@ -518,6 +475,52 @@ class ReadMode(Enum):
     Data = 0
     Count = 1
     Distinct = 2
+
+
+class RepeatDaysEnum(Flag):
+    """
+    An enum to reference the days of the week that a weekly recurring entity repeats on.
+    This enum supports flags, so multiple values can be stored at the same time.
+    
+    :cvar None_: Invalid option - does not repeat on any day.
+    :cvar Monday: Repeats on Mondays.
+    :cvar Tuesday: Repeats on Tuesdays.
+    :cvar Wednesday: Repeats on Wednesdays.
+    :cvar Thursday: Repeats on Thursdays.
+    :cvar Friday: Repeats on Fridays.
+    :cvar Weekdays: Repeats on all weekdays.
+    :cvar Saturday: Repeats on Saturdays.
+    :cvar Sunday: Repeats on Sundays.
+    :cvar Weekend: Repeats on all weekend days.
+    """
+    None_ = 0
+    Monday = 1 << 1
+    Tuesday = 1 << 2
+    Wednesday = 1 << 3
+    Thursday = 1 << 4
+    Friday = 1 << 5
+    Weekdays = Monday | Tuesday | Wednesday | Thursday | Friday
+    Saturday = 1 << 6
+    Sunday = 1 << 7
+    Weekend = Saturday | Sunday
+
+
+class RepeatModeEnum(Enum):
+    """
+    An enum to specify how often a recurring entity (availability, event, …) should repeat.
+    
+    :cvar None_: No repeat.
+    :cvar Day: Repeat each day.
+    :cvar Week: Repeat each week (with optional repeating on multiple days of the week - see
+                <see cref="T:Filament.FSCore.Entities.Recurrence.RepeatDaysEnum" />).
+    :cvar Month: Repeat each month.
+    :cvar Year: Repeat each year.
+    """
+    None_ = 0
+    Day = 1
+    Week = 2
+    Month = 3
+    Year = 4
 
 
 class RequestStatus(Enum):

@@ -12,3 +12,35 @@ class FilamentAuthenticationError(FilamentError):
 
 class FilamentConnectionError(FilamentError):
     """Raised when the SignalR connection fails."""
+
+
+class ResponseTooLargeError(FilamentError):
+    """Raised when a read response is too large to be paged any smaller.
+
+    :meth:`~filament.FilamentClient.read_data` automatically splits a response
+    the server rejects as too large into smaller pages.  When even a single
+    entity's response still exceeds the client's negotiated limit there is
+    nothing left to split, so this error is raised instead.
+
+    :ivar entity_bytes: Serialised size, in bytes, of the single-entity page
+        that could not be made to fit.
+    :ivar full_request_bytes: Serialised size, in bytes, the original
+        (un-paged) request would have produced.
+    :ivar limit_bytes: The maximum message size, in bytes, the client
+        negotiated for the connection.
+    """
+
+    def __init__(
+        self,
+        entity_bytes: int,
+        full_request_bytes: int,
+        limit_bytes: int,
+    ) -> None:
+        self.entity_bytes = entity_bytes
+        self.full_request_bytes = full_request_bytes
+        self.limit_bytes = limit_bytes
+        super().__init__(
+            f"A single entity's response is {entity_bytes:,} bytes, which still "
+            f"exceeds the client limit of {limit_bytes:,} bytes; the full request "
+            f"would have been {full_request_bytes:,} bytes."
+        )
