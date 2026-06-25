@@ -1,3 +1,13 @@
+## 0.4.0-dev.0.0.1 (2026-06-25 13:21)
+
+### Serialization
+
+#### FIX
+- Property names with leading or repeated underscores now convert to well-formed camelCase
+
+#### FEATURE
+- Property name lists in read/modify requests now accept snake_case and are de-duplicated
+
 ## 0.3.0-dev.0.1.0 (2026-06-19 12:07)
 
 ### Client
