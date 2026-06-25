@@ -57,6 +57,7 @@ class TestCaseConversion:
         assert camel_case_from_snake_case("_foo_bar") == "fooBar"
         assert camel_case_from_snake_case("foo__bar") == "fooBar"
         assert camel_case_from_snake_case("trailing_") == "trailing"
+        assert camel_case_from_snake_case("__") == ""
 
     def test_camel_to_snake(self) -> None:
         assert snake_case_from_camel_case("helloWorld") == "hello_world"
