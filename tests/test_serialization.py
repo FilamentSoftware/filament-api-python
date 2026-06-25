@@ -51,6 +51,13 @@ class TestCaseConversion:
         assert camel_case_from_snake_case("id") == "id"
         assert camel_case_from_snake_case("scenario_id") == "scenarioId"
 
+    def test_snake_to_camel_drops_empty_segments(self) -> None:
+        # Leading / trailing / doubled underscores yield empty segments that
+        # are dropped so the result stays well-formed camelCase.
+        assert camel_case_from_snake_case("_foo_bar") == "fooBar"
+        assert camel_case_from_snake_case("foo__bar") == "fooBar"
+        assert camel_case_from_snake_case("trailing_") == "trailing"
+
     def test_camel_to_snake(self) -> None:
         assert snake_case_from_camel_case("helloWorld") == "hello_world"
         assert snake_case_from_camel_case("scenarioId") == "scenario_id"
@@ -72,6 +79,16 @@ class TestCaseConversion:
         assert camel_case_property_names(
             ["schedule_status", "scheduleStatus", "id", "schedule_status"]
         ) == ["scheduleStatus", "id"]
+
+    def test_camel_case_property_names_empty_list(self) -> None:
+        assert camel_case_property_names([]) == []
+
+    def test_camel_case_property_names_handles_extra_underscores(self) -> None:
+        # Leading, trailing, and doubled underscores produce empty segments that
+        # are dropped, so the camelCase output stays well-formed.
+        assert camel_case_property_names(["_foo_bar"]) == ["fooBar"]
+        assert camel_case_property_names(["a__b"]) == ["aB"]
+        assert camel_case_property_names(["trailing_"]) == ["trailing"]
 
 
 # ---------------------------------------------------------------------------
