@@ -40,15 +40,32 @@ from ._wire_formats import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def camel_case_from_snake_case(s: str) -> str:
-    """Convert ``snake_case`` to ``camelCase``."""
-    if not s:
+    """Convert ``snake_case`` to ``camelCase``.
+
+    Empty segments produced by leading, trailing, or doubled underscores are
+    dropped, so ``"_foo_bar"`` and ``"foo__bar"`` both become ``"fooBar"``.
+    """
+    words = [word for word in s.split("_") if word]
+    if not words:
         return s
-    return s[0].lower() + "".join(word.title() for word in s.split("_"))[1:]
+    return words[0].lower() + "".join(word.title() for word in words[1:])
 
 
 def snake_case_from_camel_case(s: str) -> str:
     """Convert ``camelCase`` to ``snake_case``."""
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+
+def camel_case_wire_name(name: str) -> str:
+    """Return the camelCase wire form of a single property name.
+
+    Names already in wire form (i.e. contain no underscore) are passed through
+    unchanged: ``camel_case_from_snake_case`` is not idempotent on camelCase
+    input (it lowercases interior capitals, e.g. ``"scheduleStatus"`` would
+    become ``"schedulestatus"``), so passing such names through keeps callers
+    that already use the wire form working.
+    """
+    return camel_case_from_snake_case(name) if "_" in name else name
 
 
 def camel_case_property_names(names: ABCSequence[str]) -> list[str]:
@@ -64,7 +81,7 @@ def camel_case_property_names(names: ABCSequence[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
     for name in names:
-        wire = camel_case_from_snake_case(name) if "_" in name else name
+        wire = camel_case_wire_name(name)
         if wire not in seen:
             seen.add(wire)
             result.append(wire)
@@ -449,6 +466,9 @@ def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
         camel_key = camel_case_from_snake_case(f.name)
         value = getattr(data, f.name)
         converted = _convert_to_dict_value(value, field_type, None, convert_uuid)
+        # Property-name conversion is write-only: these fields are request
+        # inputs sent to the backend, never read back, so there is deliberately
+        # no from_dict counterpart.
         if f.name in _PROPERTY_NAME_LIST_FIELDS and isinstance(converted, list):
             converted = camel_case_property_names(converted)
         result[camel_key] = converted

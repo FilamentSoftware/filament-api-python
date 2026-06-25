@@ -15,7 +15,7 @@ from typing import Any, Generic, Optional, Type, TypeVar, get_args, get_origin, 
 
 import uuid_utils
 
-from ._serialization import DATETIME_FORMAT, camel_case_from_snake_case
+from ._serialization import DATETIME_FORMAT, camel_case_wire_name
 from .types.conditions import (
     DbConditionArrayComparison,
     DbConditionBetween,
@@ -452,7 +452,7 @@ class Condition(Generic[TEntity]):
         At runtime, validates that the field exists and classifies its type.
         The mypy plugin narrows the return type statically.
         """
-        wire_name = camel_case_from_snake_case(name)
+        wire_name = camel_case_wire_name(name)
         category, _inner = _classify_field(self._entity_cls, name)
 
         if category == "comparable":
