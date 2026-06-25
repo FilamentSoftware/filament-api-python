@@ -7,3 +7,6 @@ __pycache__/
 .mypy_cache/
 .idea/
 .codex-sessions/
+
+# Local audit-branch artifacts
+plans/temp/
