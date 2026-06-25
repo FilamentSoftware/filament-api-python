@@ -51,6 +51,40 @@ def snake_case_from_camel_case(s: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
 
 
+def camel_case_property_names(names: ABCSequence[str]) -> list[str]:
+    """Normalise a list of entity property names to the camelCase wire form.
+
+    Each name is converted from ``snake_case`` to ``camelCase`` so callers can
+    use the same names as the Python dataclass fields. Names that are already
+    in wire form (i.e. contain no underscore) are passed through unchanged, so
+    existing callers passing camelCase names keep working. Duplicates — whether
+    present in the input or produced by conversion — are removed while
+    preserving first-seen order.
+    """
+    seen: set[str] = set()
+    result: list[str] = []
+    for name in names:
+        wire = camel_case_from_snake_case(name) if "_" in name else name
+        if wire not in seen:
+            seen.add(wire)
+            result.append(wire)
+    return result
+
+
+# Request fields whose value is a list of entity property names. These are
+# converted from snake_case to camelCase (and de-duplicated) by ``to_dict`` so
+# callers can use the same names as the Python dataclass fields rather than the
+# camelCase wire names. Keyed by field name because the generated dataclasses
+# carry no metadata; the ``isinstance(value, list)`` guard in ``to_dict`` keeps
+# unrelated same-named fields (e.g. permission ``properties`` dicts) untouched.
+_PROPERTY_NAME_LIST_FIELDS: frozenset[str] = frozenset({
+    "properties",
+    "update_properties",
+    "connection_properties",
+    "entity_properties",
+})
+
+
 # ---------------------------------------------------------------------------
 # Internal type helpers
 # ---------------------------------------------------------------------------
@@ -410,7 +444,10 @@ def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
         field_type = hints.get(f.name, f.type)
         camel_key = camel_case_from_snake_case(f.name)
         value = getattr(data, f.name)
-        result[camel_key] = _convert_to_dict_value(value, field_type, None, convert_uuid)
+        converted = _convert_to_dict_value(value, field_type, None, convert_uuid)
+        if f.name in _PROPERTY_NAME_LIST_FIELDS and isinstance(converted, list):
+            converted = camel_case_property_names(converted)
+        result[camel_key] = converted
 
     if isinstance(data, EntityBase):
         result["$type"] = data.__class__.__name__
