@@ -7,11 +7,13 @@ from uuid_utils import UUID, uuid7
 
 from filament._serialization import (
     camel_case_from_snake_case,
+    camel_case_property_names,
     from_dict,
     snake_case_from_camel_case,
     to_dict,
 )
 from filament.types.generated.base.base import EntityBase
+from filament.types.generated.entities.permissions_service import PermissionEntity
 from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
@@ -26,6 +28,7 @@ from filament.types.generated.misc import (
     DbOrderLevel,
     ModifyDataRequest,
     ProcessingStatus,
+    ReadConnectedDataTypeRequest,
     ReadDataRequest,
     ReadDataTypeRequest,
     RequestId,
@@ -48,9 +51,45 @@ class TestCaseConversion:
         assert camel_case_from_snake_case("id") == "id"
         assert camel_case_from_snake_case("scenario_id") == "scenarioId"
 
+    def test_snake_to_camel_drops_empty_segments(self) -> None:
+        # Leading / trailing / doubled underscores yield empty segments that
+        # are dropped so the result stays well-formed camelCase.
+        assert camel_case_from_snake_case("_foo_bar") == "fooBar"
+        assert camel_case_from_snake_case("foo__bar") == "fooBar"
+        assert camel_case_from_snake_case("trailing_") == "trailing"
+        assert camel_case_from_snake_case("__") == ""
+
     def test_camel_to_snake(self) -> None:
         assert snake_case_from_camel_case("helloWorld") == "hello_world"
         assert snake_case_from_camel_case("scenarioId") == "scenario_id"
+
+    def test_camel_case_property_names_converts_snake_case(self) -> None:
+        assert camel_case_property_names(["schedule_status", "owner_user_id"]) == [
+            "scheduleStatus",
+            "ownerUserId",
+        ]
+
+    def test_camel_case_property_names_passes_through_camel_case(self) -> None:
+        # Names already in wire form (no underscore) are left untouched.
+        assert camel_case_property_names(["scheduleStatus", "id"]) == [
+            "scheduleStatus",
+            "id",
+        ]
+
+    def test_camel_case_property_names_dedupes_preserving_order(self) -> None:
+        assert camel_case_property_names(
+            ["schedule_status", "scheduleStatus", "id", "schedule_status"]
+        ) == ["scheduleStatus", "id"]
+
+    def test_camel_case_property_names_empty_list(self) -> None:
+        assert camel_case_property_names([]) == []
+
+    def test_camel_case_property_names_handles_extra_underscores(self) -> None:
+        # Leading, trailing, and doubled underscores produce empty segments that
+        # are dropped, so the camelCase output stays well-formed.
+        assert camel_case_property_names(["_foo_bar"]) == ["fooBar"]
+        assert camel_case_property_names(["a__b"]) == ["aB"]
+        assert camel_case_property_names(["trailing_"]) == ["trailing"]
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +174,63 @@ class TestToDict:
         result = to_dict(req)
         assert result is not None
         assert result["requestedAt"] == "2025-01-15T10:30:45.12345600Z"
+
+    def test_read_data_request_converts_property_names(self) -> None:
+        req = ReadDataTypeRequest(
+            type_name="UserEntity",
+            mode=ReadMode.Distinct,
+            properties=["schedule_status", "owner_user_id"],
+        )
+        result = to_dict(req)
+        assert result is not None
+        assert result["properties"] == ["scheduleStatus", "ownerUserId"]
+
+    def test_read_data_request_dedupes_property_names(self) -> None:
+        req = ReadDataTypeRequest(
+            type_name="UserEntity",
+            mode=ReadMode.Distinct,
+            # snake_case and the equivalent camelCase collapse to one entry.
+            properties=["schedule_status", "scheduleStatus", "schedule_status"],
+        )
+        result = to_dict(req)
+        assert result is not None
+        assert result["properties"] == ["scheduleStatus"]
+
+    def test_modify_data_request_converts_update_properties(self) -> None:
+        req = ModifyDataRequest(
+            action=DataRequestAction.Update,
+            update_properties=["schedule_status", "owner_user_id"],
+        )
+        result = to_dict(req)
+        assert result is not None
+        assert result["updateProperties"] == ["scheduleStatus", "ownerUserId"]
+
+    def test_read_connected_data_request_converts_property_lists(self) -> None:
+        req = ReadConnectedDataTypeRequest(
+            connection_type_name="WorksOn",
+            entity_type_name="UserEntity",
+            connection_properties=["start_date"],
+            entity_properties=["schedule_status", "owner_user_id"],
+        )
+        result = to_dict(req)
+        assert result is not None
+        assert result["connectionProperties"] == ["startDate"]
+        assert result["entityProperties"] == ["scheduleStatus", "ownerUserId"]
+
+    def test_property_names_default_none_is_preserved(self) -> None:
+        req = ReadDataTypeRequest(type_name="UserEntity", mode=ReadMode.Data)
+        result = to_dict(req)
+        assert result is not None
+        assert result["properties"] is None
+
+    def test_permission_entity_converts_property_names(self) -> None:
+        # PermissionEntity.properties is an entity field (not a request filter)
+        # but shares the "properties" name, so its property names are normalised
+        # the same way — callers can pass snake_case here too.
+        entity = PermissionEntity(properties=["schedule_status", "owner_user_id"])
+        result = to_dict(entity)
+        assert result is not None
+        assert result["properties"] == ["scheduleStatus", "ownerUserId"]
 
 
 # ---------------------------------------------------------------------------
