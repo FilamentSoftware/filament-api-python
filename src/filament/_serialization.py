@@ -71,12 +71,16 @@ def camel_case_property_names(names: ABCSequence[str]) -> list[str]:
     return result
 
 
-# Request fields whose value is a list of entity property names. These are
-# converted from snake_case to camelCase (and de-duplicated) by ``to_dict`` so
-# callers can use the same names as the Python dataclass fields rather than the
-# camelCase wire names. Keyed by field name because the generated dataclasses
-# carry no metadata; the ``isinstance(value, list)`` guard in ``to_dict`` keeps
-# unrelated same-named fields (e.g. permission ``properties`` dicts) untouched.
+# Fields whose value is a list of entity property names. When such a field holds
+# a list, ``to_dict`` converts each name from snake_case to camelCase (and
+# de-duplicates) so callers can use the same names as the Python dataclass fields
+# rather than the camelCase wire names. Keyed by field name because the generated
+# dataclasses carry no metadata to mark these fields. Conversion applies wherever
+# a list-valued field with one of these names appears — including the entity
+# field ``PermissionEntity.properties``, whose property names are normalised the
+# same way. The ``isinstance(value, list)`` guard in ``to_dict`` skips same-named
+# dict fields (e.g. the permission ``properties`` dicts on ``EntityTypePermissions``
+# / ``EntityPropertyPermissions``), which are not property-name lists.
 _PROPERTY_NAME_LIST_FIELDS: frozenset[str] = frozenset({
     "properties",
     "update_properties",
