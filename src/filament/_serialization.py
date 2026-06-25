@@ -47,7 +47,7 @@ def camel_case_from_snake_case(s: str) -> str:
     """
     words = [word for word in s.split("_") if word]
     if not words:
-        return s
+        return ""
     return words[0].lower() + "".join(word.title() for word in words[1:])
 
 
