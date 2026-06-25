@@ -13,6 +13,7 @@ from filament._serialization import (
     to_dict,
 )
 from filament.types.generated.base.base import EntityBase
+from filament.types.generated.entities.permissions_service import PermissionEntity
 from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
@@ -203,6 +204,15 @@ class TestToDict:
         result = to_dict(req)
         assert result is not None
         assert result["properties"] is None
+
+    def test_permission_entity_converts_property_names(self) -> None:
+        # PermissionEntity.properties is an entity field (not a request filter)
+        # but shares the "properties" name, so its property names are normalised
+        # the same way — callers can pass snake_case here too.
+        entity = PermissionEntity(properties=["schedule_status", "owner_user_id"])
+        result = to_dict(entity)
+        assert result is not None
+        assert result["properties"] == ["scheduleStatus", "ownerUserId"]
 
 
 # ---------------------------------------------------------------------------
