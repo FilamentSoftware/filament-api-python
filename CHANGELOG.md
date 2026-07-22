@@ -1,3 +1,10 @@
+## 0.5.0 (2026-07-22 13:12)
+
+### Types
+
+#### FEATURE
+- Subscriptions can narrow pushed entity properties; recurring-review gating, scope-step list, and task warnings type support
+
 ## 0.4.0 (2026-06-25 13:25)
 
 ### Serialization
