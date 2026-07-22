@@ -28,17 +28,14 @@ class ScopeMilestoneEntity(Entity):
                     If the Instant is null, then it if flexible and can be moved
     :param direction: Is this a start milestone or a delivery milestone.  StartAfter means connected tasks must start
                       after the milestone.  EndBefore means the tasks must be finished before this milestone.
-    :param automatically_assign: Automatically assign this milestone based on ScopeTaskTypeIds, ScopeTaskTypeStepIds, and ScopeGroupIds
-    :param scope_task_type_ids: A list of ScopeTaskType entity ids that this milestone should automatically be added to.
-    :param scope_task_type_step_ids: A list of ScopeTaskTypeStep entity ids that this milestone should automatically be added to.
-    :param scope_group_ids: A list of ScopeGroup entity ids that this milestone should automatically be added to.
+    :param scope_task_type_step_ids: The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to,
+                                     used by item connections that do not define their own step list. A connection's
+                                     <c>ScopeTaskTypeStepIds</c> overrides this; when both are empty the milestone attaches to
+                                     the item's leaf tasks instead.
     """
     name: str = field(default='')
     description: str = field(default='')
     mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Report)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: ScopeMilestoneDirectionEnum = field(default=ScopeMilestoneDirectionEnum.StartAfter)
-    automatically_assign: bool = field(default=False)
-    scope_task_type_ids: list[UUID] = field(default_factory=list)
     scope_task_type_step_ids: list[UUID] = field(default_factory=list)
-    scope_group_ids: list[UUID] = field(default_factory=list)

@@ -244,6 +244,67 @@ class TestSubscriptionRouting:
         assert client_id in client._backend_to_client[backend_id]
 
     @pytest.mark.asyncio
+    async def test_subscribe_converts_property_names_to_camel_case(self) -> None:
+        """The ``properties`` list is sent to the hub in camelCase wire form.
+
+        Callers pass snake_case names matching the Python dataclass fields;
+        ``subscribe`` (via ``to_dict``) normalises them to the camelCase names
+        the backend expects, matching every other property-name list field.
+        """
+        client = _make_client()
+        backend_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
+
+        await client.subscribe(
+            SubscriptionConfig(
+                scenario_id=UUID(int=0),
+                status=DataProcessingStatus.Pending,
+                type_name="TestEntity",
+                mode=SubscriptionMode.Data,
+                properties=["display_name", "status", "scenario_id"],
+            ),
+            callback=MagicMock(),
+        )
+
+        method, subscription_dict = client._invoke.call_args[0]
+        assert method == "Subscribe"
+        assert subscription_dict["properties"] == [
+            "displayName",
+            "status",
+            "scenarioId",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_subscribe_omits_no_properties_narrowing(self) -> None:
+        """A ``None`` (default) property set is sent as ``null`` = all properties."""
+        client = _make_client()
+        backend_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {"id": str(backend_id)},
+        })
+
+        await client.subscribe(
+            SubscriptionConfig(
+                scenario_id=UUID(int=0),
+                status=DataProcessingStatus.Pending,
+                type_name="TestEntity",
+                mode=SubscriptionMode.Data,
+            ),
+            callback=MagicMock(),
+        )
+
+        _, subscription_dict = client._invoke.call_args[0]
+        assert subscription_dict["properties"] is None
+
+    @pytest.mark.asyncio
     async def test_subscribe_multiple_same_backend_id(self) -> None:
         """Multiple subscribes returning the same backend ID get separate client IDs."""
         client = _make_client()
