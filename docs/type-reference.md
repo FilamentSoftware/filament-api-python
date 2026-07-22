@@ -1025,6 +1025,14 @@ Represents a connection between an event calendar and a user.
 | ----- | ---- | ------- | ----------- |
 | `access` | `CalendarUserAccess` | `CalendarUserAccess.None_` | The access a user has on an event calendar. |
 
+##### `EventReviewTaskConnection`
+
+Represents a link from an event to a task that is reviewed in that event. The task's downstream
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `occurrence_target_instant` | `Optional[datetime.datetime]` | `None` | The drift-free target instant of the specific occurrence the task is reviewed in. null for a non-recurring (single-occurrence) event; non-null for a specific occurrence of a recurring event. Mirrors ScheduleSegmentEntity.OccurrenceTargetInstant so that (FromId, OccurrenceTargetInstant) resolves to the same occurrence the planner placed. |
+
 ### Generic
 
 #### Entities
@@ -1333,6 +1341,7 @@ Represents the results of a scheduling process within the scheduling service.
 | `schedule_end_instant` | `datetime.datetime` | — | The end instant of the scheduling process. |
 | `unscheduled_events` | `dict[str, str]` | — | A mapping of per-occurrence diagnostic keys (see `OccurrenceKey`) -&gt; reason string for event occurrences the scheduler could not place (for example insufficient required users, required-user conflicts, or no feasible slot). Keys are composite "{eventId:N}:{ISO8601 target instant or empty}"; non-recurring events / event-level diagnostics use an empty instant part. Cleared and repopulated on each run. |
 | `events_excluding_required_users` | `dict[str, str]` | — | A mapping of per-occurrence diagnostic keys (see `OccurrenceKey`) -&gt; user ids (comma-separated) of required users excluded because they could not be made available at the chosen slot. Keys are composite "{eventId:N}:{ISO8601 target instant or empty}". Cleared and repopulated on each run. |
+| `degraded_review_gates` | `dict[str, str]` | — | A mapping of per-link diagnostic keys (see `ReviewGateKey`) -&gt; reason string for review links whose gate could not be applied on the most recent run, because the linked review event/occurrence could not be placed or the connection's OccurrenceTargetInstant resolved to no placed occurrence (a stale recurrence target). For these links the scheduler fell back to gating downstream tasks on the reviewed task's own end only — the review link silently did not constrain scheduling. Keys are composite "{taskId:N}:{eventId:N}:{ISO8601 target instant or empty}", so a task reviewed in more than one event/occurrence carries one entry per degraded link without collision. Cleared and repopulated on each run. |
 | `milestones_missed` | `dict[UUID, datetime.timedelta]` | — | A dictionary representing the milestones that were not achieved during the scheduling process, keyed by their unique identifiers, with the associated missed duration for each milestone. |
 | `early_placeholder_users` | `dict[UUID, datetime.datetime]` | — | A dictionary containing placeholder user ids that were required to start earlier than the expected earliest start time, with the associated instant representing the earliest start time required. |
 | `scores` | `dict[str, float]` | — | A dictionary representing scores associated with various items, identified by a string key and paired with a double value. |
@@ -1374,7 +1383,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[EntityBase]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | The name of the schedule segment. Represents a descriptive or identifying title for the segment. |
 | `description` | `str` | `''` | A brief textual explanation or characterization of the schedule segment. Provides additional context or details about the segment. |
-| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as a serialized JSON string. Lazy-serialised: setting `Reasons` stashes the object reference; serialisation happens on the first read of `ReasonsData` (typically the DB persistence path). Pass-2 in-memory work that never reads ReasonsData avoids the per-segment JSON cost entirely. Marked `ExcludeFromEqualityAttribute` so entity-equality comparisons do not trigger the lazy serialisation; reasons are an audit/diagnostic blob, not part of the segment's identity. |
+| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as a serialized JSON string. Written once, at segment construction, via the set-only `Reasons` property; never read back as an object server-side (the user-facing audit view ships the raw JSON to the frontend). Marked `ExcludeFromEqualityAttribute`; reasons are an audit/diagnostic blob, not part of the segment's identity. |
 | `start_instant` | `datetime.datetime` | — | Represents the starting point in time for the schedule segment as an instant. This property defines the exact timestamp from which the segment begins. |
 | `end_instant` | `datetime.datetime` | — | The end time of the schedule segment, represented as an instant in time. Defines the point at which this segment concludes. |
 | `user_type` | `str` | `''` | Specifies the type of user associated with the schedule segment. Represents a categorization or classification of the user, such as regular user, placeholder, etc. |
@@ -1610,8 +1619,7 @@ Represents a connection between a scope item and a scope milestone.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `scope_task_type_step_id` | `Optional[UUID]` | `None` | Connection to a task step. |
-| `scope_task_type_step` | `Optional[ScopeTaskTypeStepEntity]` | `None` | A helper method for setting the scope task type step. |
+| `scope_task_type_step_ids` | `list[UUID]` | — | The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item. Overrides the milestone entity's ScopeTaskTypeStepIds; when both are empty the milestone attaches to the item's leaf tasks instead. |
 | `task_combine_key` | `str` | `''` | The key used to define which combined group should be attached to the milestone. |
 
 ##### `ScopeItemGroupConnection`
@@ -1680,10 +1688,7 @@ Represents a milestone within a scope.
 | `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Report` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone begins or ends (depending on its Direction) If the Instant is null, then it if flexible and can be moved |
 | `direction` | `ScopeMilestoneDirectionEnum` | `ScopeMilestoneDirectionEnum.StartAfter` | Is this a start milestone or a delivery milestone. StartAfter means connected tasks must start after the milestone. EndBefore means the tasks must be finished before this milestone. |
-| `automatically_assign` | `bool` | `False` | Automatically assign this milestone based on ScopeTaskTypeIds, ScopeTaskTypeStepIds, and ScopeGroupIds |
-| `scope_task_type_ids` | `list[UUID]` | — | A list of ScopeTaskType entity ids that this milestone should automatically be added to. |
-| `scope_task_type_step_ids` | `list[UUID]` | — | A list of ScopeTaskTypeStep entity ids that this milestone should automatically be added to. |
-| `scope_group_ids` | `list[UUID]` | — | A list of ScopeGroup entity ids that this milestone should automatically be added to. |
+| `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections that do not define their own step list. A connection's ScopeTaskTypeStepIds overrides this; when both are empty the milestone attaches to the item's leaf tasks instead. |
 
 ### Scope Service
 
@@ -2006,6 +2011,7 @@ _Extends:_ `ReferenceEntityBase`
 | `mode` | `TaskMilestoneModeEnum` | `TaskMilestoneModeEnum.Report` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone is due. If the Instant is null, the milestone is flexible and can be moved |
 | `direction` | `TaskMilestoneDirectionEnum` | `TaskMilestoneDirectionEnum.EndBefore` | Should tasks start after this milestone, or end before it? |
+| `warnings_data` | `Optional[str]` | `None` | JSON-serialized list of warnings raised while processing this milestone - each is a `TaskMilestoneWarning` describing an issue, such as an assignment that attached to no tasks. Null when there are no warnings. |
 
 ##### `TaskGroupEntity`
 

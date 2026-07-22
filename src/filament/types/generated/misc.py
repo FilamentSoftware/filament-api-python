@@ -166,12 +166,20 @@ class SubscriptionConfig:
                  as defined by the flags in the <see cref="T:Filament.FilamentHub.Subscriptions.SubscriptionMode" /> enumeration.
                  Use this property to configure the behavior of the subscription mechanism
                  to process data or monitor progress according to specific requirements.
+    :param properties: The entity property names this subscription wants pushed. <c>null</c> (the default) means <b>all</b>
+                       properties, matching today's behaviour; a non-null set narrows what the subscriber receives. The
+                       subscription manager hydrates the union of every active subscription's property set for a type (plus
+                       its condition/permission and identity columns). Because it changes what a subscriber receives, it is
+                       part of the subscription's identity (see <see cref="M:Filament.FilamentHub.Subscriptions.SubscriptionConfig.Equals(Filament.FilamentHub.Subscriptions.SubscriptionConfig)" /> /
+                       <see cref="M:Filament.FilamentHub.Subscriptions.SubscriptionConfig.GetHashCode" />): two otherwise-identical subscriptions with different property sets are
+                       distinct <c>SubscriptionCache.ByConfig</c> entries, so one's narrowing never applies to the other.
     """
     scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
     type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
     mode: SubscriptionMode = field(default=SubscriptionMode.None_)
+    properties: Optional[list[str]] = field(default=None)
 
 
 @dataclass(kw_only=True)
