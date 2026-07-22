@@ -71,6 +71,15 @@ class ScheduleResultEntity(Entity):
                                             required users excluded because they could not be made available at the chosen slot.
                                             Keys are composite <c>"{eventId:N}:{ISO8601 target instant or empty}"</c>. Cleared and
                                             repopulated on each run.
+    :param degraded_review_gates: A mapping of per-link diagnostic keys (see
+                                  <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.ReviewGateKey(System.Guid,System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; reason string for review links whose gate
+                                  could not be applied on the most recent run, because the linked review event/occurrence could
+                                  not be placed or the connection's <c>OccurrenceTargetInstant</c> resolved to no placed
+                                  occurrence (a stale recurrence target). For these links the scheduler fell back to gating
+                                  downstream tasks on the reviewed task's own end only — the review link silently did not
+                                  constrain scheduling. Keys are composite <c>"{taskId:N}:{eventId:N}:{ISO8601 target instant
+                                  or empty}"</c>, so a task reviewed in more than one event/occurrence carries one entry per
+                                  degraded link without collision. Cleared and repopulated on each run.
     :param milestones_missed: A dictionary representing the milestones that were not achieved during the scheduling process,
                               keyed by their unique identifiers, with the associated missed duration for each milestone.
     :param early_placeholder_users: A dictionary containing placeholder user ids that were required to start earlier than the expected
@@ -98,6 +107,7 @@ class ScheduleResultEntity(Entity):
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     unscheduled_events: dict[str, str] = field(default_factory=dict)
     events_excluding_required_users: dict[str, str] = field(default_factory=dict)
+    degraded_review_gates: dict[str, str] = field(default_factory=dict)
     milestones_missed: dict[UUID, datetime.timedelta] = field(default_factory=dict)
     early_placeholder_users: dict[UUID, datetime.datetime] = field(default_factory=dict)
     scores: dict[str, float] = field(default_factory=dict)
@@ -139,14 +149,10 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param description: A brief textual explanation or characterization of the schedule segment.
                         Provides additional context or details about the segment.
     :param reasons_data: A descriptive field that provides justification or explanation related to the schedule segment,
-                         stored as a serialized JSON string. Lazy-serialised: setting
-                         <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Reasons" /> stashes the object reference; serialisation
-                         happens on the first read of <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.ReasonsData" /> (typically the
-                         DB persistence path). Pass-2 in-memory work that never reads
-                         ReasonsData avoids the per-segment JSON cost entirely.
-                         Marked <see cref="T:Filament.FSCore.Entities.Attributes.ExcludeFromEqualityAttribute" /> so entity-equality
-                         comparisons do not trigger the lazy serialisation; reasons are an
-                         audit/diagnostic blob, not part of the segment's identity.
+                         stored as a serialized JSON string. Written once, at segment construction, via the set-only
+                         <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Reasons" /> property; never read back as an object server-side (the user-facing audit
+                         view ships the raw JSON to the frontend). Marked <see cref="T:Filament.FSCore.Entities.Attributes.ExcludeFromEqualityAttribute" />;
+                         reasons are an audit/diagnostic blob, not part of the segment's identity.
     :param start_instant: Represents the starting point in time for the schedule segment as an instant.
                           This property defines the exact timestamp from which the segment begins.
     :param end_instant: The end time of the schedule segment, represented as an instant in time.

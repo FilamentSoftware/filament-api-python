@@ -45,12 +45,16 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     :param instant: The moment in time this milestone is due.
                     If the Instant is null, the milestone is flexible and can be moved
     :param direction: Should tasks start after this milestone, or end before it?
+    :param warnings_data: JSON-serialized list of warnings raised while processing this milestone - each is a
+                          <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneWarning" /> describing an issue, such as an assignment that
+                          attached to no tasks. Null when there are no warnings.
     """
     name: str = field(default='')
     description: str = field(default='')
     mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Report)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
+    warnings_data: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)

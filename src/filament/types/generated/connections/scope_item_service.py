@@ -9,7 +9,7 @@ from uuid_utils import UUID, uuid7
 from ..base.base import EntityConnection
 from ..connections.generic import GenericScopeTaskTypeConnection_2
 from ..entities.scope_item_service import ScopeItemCustomComplexityEntity, ScopeItemEntity
-from ..entities.scope_task_type_service import ScopeTaskTypeEntity, ScopeTaskTypeStepEntity
+from ..entities.scope_task_type_service import ScopeTaskTypeEntity
 from ..entities.scope_template_item_service import ScopeTemplateItemEntity
 
 __all__ = [
@@ -36,12 +36,12 @@ class ScopeItemMilestoneConnection(EntityConnection):
     """
     Represents a connection between a scope item and a scope milestone.
     
-    :param scope_task_type_step_id: Connection to a task step.
-    :param scope_task_type_step: A helper method for setting the scope task type step.
+    :param scope_task_type_step_ids: The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item.
+                                     Overrides the milestone entity's <c>ScopeTaskTypeStepIds</c>; when both are empty the
+                                     milestone attaches to the item's leaf tasks instead.
     :param task_combine_key: The key used to define which combined group should be attached to the milestone.
     """
-    scope_task_type_step_id: Optional[UUID] = field(default=None)
-    scope_task_type_step: Optional[ScopeTaskTypeStepEntity] = field(default=None)
+    scope_task_type_step_ids: list[UUID] = field(default_factory=list)
     task_combine_key: str = field(default='')
 
 
