@@ -1,3 +1,10 @@
+## 0.6.0-dev.0.0.1 (2026-07-23 15:46)
+
+### Types
+
+#### FEATURE
+- ProcessingRunEntity and ServiceProcessingInfo now expose progress fraction and start/end instants
+
 ## 0.5.0-dev.0.0.1 (2026-07-22 13:06)
 
 ### Types
