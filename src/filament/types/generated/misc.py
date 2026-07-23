@@ -66,10 +66,27 @@ class ServiceProcessingInfo:
                        a value; downstream services have higher values.
     :param status: Current execution status of the service within the run.
     :param mode: The role the service is playing in the run.
+    :param progress: The latest reported progress for this service within the run, between 0.0 and 1.0.
+                     Updated from the service's progress updates while <see cref="P:Filament.FSCore.CoreEntities.ServiceProcessingInfo.Status" /> is
+                     <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" />; monotonically non-decreasing within a
+                     single run attempt (a late-arriving lower value is clamped away). Reset by the seed/reuse
+                     write when a run is retried.
+    :param start_instant: When this service's processing started: stamped on the first transition to
+                          <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" /> and left untouched on any later re-entry
+                          (e.g. a failover re-dispatch — the first dispatch is the start). Null until the service
+                          starts.
+    :param end_instant: When this service's processing ended: stamped on the first transition out of
+                        <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" /> (to Publishing, Completed, Failed or
+                        Cancelled) and not overwritten by the later Publishing → Completed transition — so
+                        <c>EndInstant - StartInstant</c> is the service's own processing time, excluding the hub's
+                        publish phase. Null while running or if the service never started.
     """
     sort_order: int = field(default=0)
     status: ServiceProcessingStatus = field(default=ServiceProcessingStatus.Unknown)
     mode: ServiceProcessingMode = field(default=ServiceProcessingMode.Unknown)
+    progress: float = field(default=0)
+    start_instant: Optional[datetime.datetime] = field(default=None)
+    end_instant: Optional[datetime.datetime] = field(default=None)
 
 
 @dataclass(kw_only=True)

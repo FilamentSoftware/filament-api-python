@@ -669,6 +669,9 @@ Represents a single processing run for an organization. Created when a batch of 
 | `sequence` | `int` | `0` | The sequence number of the processing run. Monotonically increasing per organization. |
 | `status` | `ProcessingRunStatus` | `ProcessingRunStatus.Unknown` | The overall status of the processing run. |
 | `error_message` | `Optional[str]` | `None` | Error message if the processing run failed. |
+| `progress` | `float` | `0` | Run-level progress, between 0.0 and 1.0: the equal-weight mean over the participating services' per-service progress (Completed/Publishing count 1.0, Processing counts its reported fraction, Pending counts 0). Monotonically non-decreasing within a single run attempt; reset by the seed/reuse write when the run is retried. |
+| `start_instant` | `Optional[datetime.datetime]` | `None` | When the run's processing started: stamped on the first transition to `Processing` and left untouched on any later re-entry (e.g. a retry after an instance went offline — the first dispatch is the start). Null until the run starts. |
+| `end_instant` | `Optional[datetime.datetime]` | `None` | When the run reached a terminal state — marked `Completed`, `Failed` or `Cancelled`. Null while the run is pending or processing. EndInstant - StartInstant is the wall-clock time the run took, whether it succeeded or not. |
 | `request_ids` | `list[UUID]` | — | Identifiers of the requests/operations in this processing run. For runs created by the main processing pipeline or scenario-request processing these are RequestEntity.Id values; for runs created by scenario propagation this is a synthetic identifier for the propagation operation with no corresponding RequestEntity in the database. |
 | `processing_service_data` | `str` | `''` | JSON-serialized dictionary of service name → `ServiceProcessingInfo` for the services participating in this processing run. Use `ServiceData` for the strongly-typed view. |
 
