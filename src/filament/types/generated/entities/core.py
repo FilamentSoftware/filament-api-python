@@ -74,6 +74,18 @@ class ProcessingRunEntity(Entity):
     :param sequence: The sequence number of the processing run. Monotonically increasing per organization.
     :param status: The overall status of the processing run.
     :param error_message: Error message if the processing run failed.
+    :param progress: Run-level progress, between 0.0 and 1.0: the equal-weight mean over the participating
+                     services' per-service progress (Completed/Publishing count 1.0, Processing counts its
+                     reported fraction, Pending counts 0). Monotonically non-decreasing within a single run
+                     attempt; reset by the seed/reuse write when the run is retried.
+    :param start_instant: When the run's processing started: stamped on the first transition to
+                          <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Processing" /> and left untouched on any later re-entry
+                          (e.g. a retry after an instance went offline — the first dispatch is the start). Null
+                          until the run starts.
+    :param end_instant: When the run reached a terminal state — marked <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Completed" />,
+                        <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Failed" /> or <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Cancelled" />.
+                        Null while the run is pending or processing. <c>EndInstant - StartInstant</c> is the
+                        wall-clock time the run took, whether it succeeded or not.
     :param request_ids: Identifiers of the requests/operations in this processing run. For runs created by the
                         main processing pipeline or scenario-request processing these are <c>RequestEntity.Id</c>
                         values; for runs created by scenario propagation this is a synthetic identifier for the
@@ -85,6 +97,9 @@ class ProcessingRunEntity(Entity):
     sequence: int = field(default=0)
     status: ProcessingRunStatus = field(default=ProcessingRunStatus.Unknown)
     error_message: Optional[str] = field(default=None)
+    progress: float = field(default=0)
+    start_instant: Optional[datetime.datetime] = field(default=None)
+    end_instant: Optional[datetime.datetime] = field(default=None)
     request_ids: list[UUID] = field(default_factory=list)
     processing_service_data: str = field(default='')
 
