@@ -20,7 +20,7 @@ class UserLicenseEntity(Entity):
     exists per (<see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.LicenseType" />, <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.Instant" />) pair; subsequent propagations
     within the same hour merge the newly-computed holders into <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.UserIds" /> (union
     semantics), so a user that qualified at any point in the hour stays in the row even if they
-    no longer qualify by a later propagation in the same bucket. A new hour starts fresh.
+    no longer qualify by a later propagation in the same bucket. A new hour starts fresh. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param license_type: The license type this snapshot is for.
     :param instant: The hour bucket this snapshot represents, expressed as an <see cref="T:NodaTime.Instant" />

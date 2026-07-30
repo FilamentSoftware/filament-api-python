@@ -18,7 +18,7 @@ __all__ = [
 class CastUserConnection(EntityConnection):
     """
     Represents a connection between a cast and a user with additional properties
-    to define the nature and characteristics of the connection.
+    to define the nature and characteristics of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param duration_multiplier: The multiplier applied to the duration of tasks assigned to this user.
     :param over_qualified: Indicates whether the user is considered overqualified for the associated cast entity.
@@ -35,7 +35,7 @@ class CastUserConnection(EntityConnection):
 class CastTaskConnection(EntityConnection):
     """
     Represents a connection between a <see cref="T:Filament.Services.CoreServices.Entities.CastService.CastEntity" /> and a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />
-    in the context of casting service operations and task management.
+    in the context of casting service operations and task management. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     """
 
 
@@ -43,7 +43,7 @@ class CastTaskConnection(EntityConnection):
 class CastSkillConnection(GenericTaskSkillConnection_1[CastEntity]):
     """
     Represents a specific connection between a cast entity and a skill entity with task-related functionality.
-    Inherits from <see cref="T:Filament.Services.CoreServices.Entities.Other.GenericTaskSkillConnection`1" />.
+    Inherits from <see cref="T:Filament.Services.CoreServices.Entities.Other.GenericTaskSkillConnection`1" />. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     """
 
 
@@ -52,7 +52,7 @@ class CastOfficeLocationConnection(EntityConnection):
     """
     Represents the relationship between a cast entity and an office location entity.
     This connection may include additional metadata such as priority to determine
-    the importance or ranking of the connection.
+    the importance or ranking of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param priority: Represents the priority level assigned to the connection between a CastEntity and an OfficeLocationEntity.
     """

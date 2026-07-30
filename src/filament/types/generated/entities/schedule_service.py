@@ -26,7 +26,7 @@ __all__ = [
 class PlaceholderUserEntity(Entity):
     """
     Represents a placeholder user entity with associated properties and behaviors,
-    including office location linkage and a specified time interval.
+    including office location linkage and a specified time interval. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param name: The name of the placeholder user entity.
                  This property represents a string value used to identify or label the entity.
@@ -56,7 +56,7 @@ class PlaceholderUserEntity(Entity):
 @dataclass(kw_only=True)
 class ScheduleResultEntity(Entity):
     """
-    Represents the results of a scheduling process within the scheduling service.
+    Represents the results of a scheduling process within the scheduling service. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param schedule_start_instant: The start instant of the scheduling process.
     :param schedule_end_instant: The end instant of the scheduling process.
@@ -84,6 +84,15 @@ class ScheduleResultEntity(Entity):
                               keyed by their unique identifiers, with the associated missed duration for each milestone.
     :param early_placeholder_users: A dictionary containing placeholder user ids that were required to start earlier than the expected
                                     earliest start time, with the associated instant representing the earliest start time required.
+    :param deadline_window_infeasible_escape_count: Deadline diagnostic: how many times Pass 2's window-infeasible pre-check escaped to
+                                                    ignoring downstream milestones after the deadline-advance loop could not restore a feasible
+                                                    window (<c>EarliestStart &gt; LatestStart</c>). Global across all tasks. Reset per schedule
+                                                    attempt, so the value describes only the last pass that ran (the full-reschedule retry when
+                                                    it fires).
+    :param deadline_no_candidate_ignore_fallback_count: Deadline diagnostic: how many times Pass 2's no-candidate final fallback retried with
+                                                        downstream milestones ignored (window feasible, but no candidate placement fit even after
+                                                        placeholder creation and deadline advancing). Global across all tasks. Reset per schedule
+                                                        attempt, so the value describes only the last pass that ran.
     :param scores: A dictionary representing scores associated with various items, identified by a string key and paired with a double value.
     :param combined_score: Represents the combined score computed from individual scores, utilized for evaluating the overall performance or outcome.
     :param warnings: Non-fatal warnings raised during the most recent scheduling run — over-constrained
@@ -110,6 +119,8 @@ class ScheduleResultEntity(Entity):
     degraded_review_gates: dict[str, str] = field(default_factory=dict)
     milestones_missed: dict[UUID, datetime.timedelta] = field(default_factory=dict)
     early_placeholder_users: dict[UUID, datetime.datetime] = field(default_factory=dict)
+    deadline_window_infeasible_escape_count: int = field(default=0)
+    deadline_no_candidate_ignore_fallback_count: int = field(default=0)
     scores: dict[str, float] = field(default_factory=dict)
     combined_score: float = field(default=0)
     warnings: list[str] = field(default_factory=list)
@@ -123,7 +134,7 @@ class ScheduleResultEntity(Entity):
 @dataclass(kw_only=True)
 class ScheduleMilestoneEntity(ReferenceEntityBase):
     """
-    Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks.
+    Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param name: The given name for this milestone.
     :param description: The description of this milestone
@@ -143,7 +154,7 @@ class ScheduleMilestoneEntity(ReferenceEntityBase):
 @dataclass(kw_only=True)
 class ScheduleSegmentEntity(ReferenceEntityBase):
     """
-    Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships.
+    Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param name: The name of the schedule segment. Represents a descriptive or identifying title for the segment.
     :param description: A brief textual explanation or characterization of the schedule segment.

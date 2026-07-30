@@ -25,15 +25,21 @@ class EntityBase(SpecifiedPropertiesBase):
     :param id: The unique identifier for this entity.
     :param created_at: When this entity was created.
     :param created_by_id: The ID of the user who created this entity.
+    :param created_by_type: The kind of principal <see cref="P:Filament.FSCore.Entities.EntityBase.CreatedById" /> identifies — see
+                            <see cref="T:Filament.FSCore.Authentication.AuthPrincipalTypes" />.
     :param updated_at: When this entity was last updated.
     :param updated_by_id: The ID of the user who last updated this entity.
+    :param updated_by_type: The kind of principal <see cref="P:Filament.FSCore.Entities.EntityBase.UpdatedById" /> identifies — see
+                            <see cref="T:Filament.FSCore.Authentication.AuthPrincipalTypes" />.
     :param scope_id: The scope ID this entity belongs to.
     """
     id: UUID = field(default_factory=uuid7)
     created_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     created_by_id: Optional[UUID] = field(default=None)
+    created_by_type: Optional[str] = field(default=None)
     updated_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     updated_by_id: Optional[UUID] = field(default=None)
+    updated_by_type: Optional[str] = field(default=None)
     scope_id: Optional[UUID] = field(default=None)
 
 
