@@ -15,5 +15,5 @@ class PlaceholderUserSkillConnection(GenericUserSkillConnection_1[PlaceholderUse
     """
     Represents a connection between a PlaceholderUserEntity and a skill,
     inheriting functionality from the GenericUserSkillConnection class.
-    This class is used to associate a PlaceholderUserEntity with a specific skill and manage the relationship.
+    This class is used to associate a PlaceholderUserEntity with a specific skill and manage the relationship. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     """

@@ -51,7 +51,7 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     """
     name: str = field(default='')
     description: str = field(default='')
-    mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Report)
+    mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Fixed)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
     warnings_data: Optional[str] = field(default=None)

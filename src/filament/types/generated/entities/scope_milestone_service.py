@@ -35,7 +35,7 @@ class ScopeMilestoneEntity(Entity):
     """
     name: str = field(default='')
     description: str = field(default='')
-    mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Report)
+    mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Fixed)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: ScopeMilestoneDirectionEnum = field(default=ScopeMilestoneDirectionEnum.StartAfter)
     scope_task_type_step_ids: list[UUID] = field(default_factory=list)
