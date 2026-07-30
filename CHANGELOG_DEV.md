@@ -1,3 +1,10 @@
+## 0.6.0-dev.0.1.0 (2026-07-30 16:45)
+
+### Types
+
+#### FEATURE
+- Exposes structured schedule-segment reasons, principal-type fields on entities, and renames NoteUserConnection.type to recipient_type
+
 ## 0.6.0-dev.0.0.1 (2026-07-23 15:46)
 
 ### Types
