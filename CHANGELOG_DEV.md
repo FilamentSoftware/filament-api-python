@@ -1,3 +1,10 @@
+## 0.6.0-dev.0.2.0 (2026-08-04 15:44)
+
+### Types
+
+#### FEATURE
+- Add task deliverables and distinguish null vs empty milestone step overrides
+
 ## 0.6.0-dev.0.1.0 (2026-07-30 16:45)
 
 ### Types
