@@ -1624,7 +1624,7 @@ Represents a connection between a scope item and a scope milestone.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `scope_task_type_step_ids` | `list[UUID]` | — | The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item. Overrides the milestone entity's ScopeTaskTypeStepIds; when both are empty the milestone attaches to the item's leaf tasks instead. |
+| `scope_task_type_step_ids` | `Optional[list[UUID]]` | `None` | The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item. Null and empty are distinct: null means "no override" and defers to the milestone entity's ScopeTaskTypeStepIds, whereas an empty list is an explicit override that suppresses the milestone's default and attaches to the item as a whole (its leaf tasks) rather than to any particular steps. A non-empty list attaches to exactly those steps. |
 | `task_combine_key` | `str` | `''` | The key used to define which combined group should be attached to the milestone. |
 
 ##### `ScopeItemGroupConnection`
@@ -1693,7 +1693,7 @@ Represents a milestone within a scope.
 | `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone begins or ends (depending on its Direction) If the Instant is null, then it if flexible and can be moved |
 | `direction` | `ScopeMilestoneDirectionEnum` | `ScopeMilestoneDirectionEnum.StartAfter` | Is this a start milestone or a delivery milestone. StartAfter means connected tasks must start after the milestone. EndBefore means the tasks must be finished before this milestone. |
-| `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections that do not define their own step list. A connection's ScopeTaskTypeStepIds overrides this; when both are empty the milestone attaches to the item's leaf tasks instead. |
+| `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections whose own ScopeTaskTypeStepIds is null. A connection's non-null list overrides this (an empty one suppressing it entirely); when neither yields a step id the milestone attaches to the item's leaf tasks instead. |
 
 ### Scope Service
 
@@ -2060,6 +2060,7 @@ _Extends:_ `ReferenceEntityBase`
 | `description` | `str` | `''` | The description of this task |
 | `duration` | `datetime.timedelta` | — | This task's duration. |
 | `user_count` | `int` | `1` | How many users can simultaneously work on this task. |
+| `deliverables` | `list[str]` | — | Deliverables expected for this task to be complete, taken from the `ScopeTaskTypeStepEntity` this task was created from. |
 | `requires_review` | `bool` | `False` | If this task needs to go into reviews once it is done. |
 | `default_processing_duration` | `datetime.timedelta` | — | The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions. This will be used as the default processing duration to be filled in on `TaskStatusEntity`. |
 | `priority` | `float` | `1` | The priority of this task, derived from the scope and scope item priorities. |
