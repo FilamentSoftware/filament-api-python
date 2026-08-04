@@ -37,11 +37,15 @@ class ScopeItemMilestoneConnection(EntityConnection):
     Represents a connection between a scope item and a scope milestone.
     
     :param scope_task_type_step_ids: The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item.
-                                     Overrides the milestone entity's <c>ScopeTaskTypeStepIds</c>; when both are empty the
-                                     milestone attaches to the item's leaf tasks instead.
+                                     <para>
+                                     Null and empty are distinct: <c>null</c> means "no override" and defers to the milestone entity's
+                                     <c>ScopeTaskTypeStepIds</c>, whereas an empty list is an explicit override that suppresses the
+                                     milestone's default and attaches to the item as a whole (its leaf tasks) rather than to any
+                                     particular steps. A non-empty list attaches to exactly those steps.
+                                     </para>
     :param task_combine_key: The key used to define which combined group should be attached to the milestone.
     """
-    scope_task_type_step_ids: list[UUID] = field(default_factory=list)
+    scope_task_type_step_ids: Optional[list[UUID]] = field(default=None)
     task_combine_key: str = field(default='')
 
 
