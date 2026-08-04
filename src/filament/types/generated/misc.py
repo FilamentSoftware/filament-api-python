@@ -10,10 +10,14 @@ from uuid_utils import UUID, uuid7
 from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
-from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode
+from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode
 
 __all__ = [
-    "ServiceProcessingInfo",
+    "TaskMilestoneWarning",
+    "PriorityComponent",
+    "MilestoneReason",
+    "UpstreamTaskReason",
+    "SegmentReason",
     "ClientHelloRequest",
     "SuccessOrErrorBase",
     "EntityPermission",
@@ -26,6 +30,9 @@ __all__ = [
     "ServiceDataPreview",
     "StatusData",
     "EntityServiceDataUpdate",
+    "ServiceProcessingInfo",
+    "TaskPriorityReasons",
+    "UserPriorityReasons",
     "SuccessOrError",
     "ValueOrError_1",
     "EntityPermissions",
@@ -34,6 +41,8 @@ __all__ = [
     "RequestId",
     "UpdatedEntityServiceData_1",
     "DbOrderInstance",
+    "TaskReasons",
+    "UserOptionReason",
     "SuccessOrErrorPublic",
     "ValueOrErrorPublic_1",
     "DataUpdateRejectedNotification",
@@ -43,6 +52,7 @@ __all__ = [
     "ServiceDataUpdate",
     "ReadDataTypeRequest",
     "ReadConnectedDataTypeRequest",
+    "ScheduleSegmentReasons",
     "ServiceDataRead",
     "WrappedConnectedEntityWithPermissions",
     "ReadDataRequest",
@@ -56,20 +66,73 @@ T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
 
 @dataclass(kw_only=True)
-class ServiceProcessingInfo:
+class TaskMilestoneWarning:
     """
-    Per-service information for a processing run. SortOrder reflects the service's position in
-    the participating-node DAG (parallel services share a SortOrder, downstream services get
-    higher values). Mode is set once at run setup; Status is updated as the service progresses.
+    A structured warning payload. A milestone's warnings are serialized together as a single JSON
+    array into <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.WarningsData" />.
     
-    :param sort_order: Topological-level position in the processing DAG. Services that can run in parallel share
-                       a value; downstream services have higher values.
-    :param status: Current execution status of the service within the run.
-    :param mode: The role the service is playing in the run.
+    :param message: A human-readable description of the issue.
+    :param entity_type: The type name of the entity the warning relates to - for example an ineffective
+                        milestone assignment references a ScopeItemMilestoneConnection.
+    :param entity_id: The id of the entity the warning relates to.
     """
-    sort_order: int = field(default=0)
-    status: ServiceProcessingStatus = field(default=ServiceProcessingStatus.Unknown)
-    mode: ServiceProcessingMode = field(default=ServiceProcessingMode.Unknown)
+    message: str = field(default='')
+    entity_type: str = field(default='')
+    entity_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+
+
+@dataclass(kw_only=True)
+class PriorityComponent:
+    """
+    Represents a single component of a priority calculation, with a score and optional input value.
+    
+    :param score: The calculated priority score for this component.
+    :param value: The raw input value used to calculate the score.
+    """
+    score: float = field(default=0)
+    value: Optional[float] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class MilestoneReason:
+    """
+    Represents a milestone with its name and instant, used for upstream/downstream milestone reasons.
+    
+    :param name: The name of the milestone.
+    :param instant: The instant associated with the milestone.
+    """
+    name: str = field(default='')
+    instant: Optional[datetime.datetime] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class UpstreamTaskReason:
+    """
+    Represents an upstream task with its name and scheduled time range.
+    
+    :param name: The name of the upstream task.
+    :param start: The start instant of the upstream task's work segment.
+    :param end: The end instant of the upstream task.
+    """
+    name: str = field(default='')
+    start: Optional[datetime.datetime] = field(default=None)
+    end: Optional[datetime.datetime] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class SegmentReason:
+    """
+    Represents the details of the final schedule segment created for a task.
+    
+    :param mode: The mode of the schedule segment.
+    :param start: The start instant of the segment.
+    :param end: The end instant of the segment.
+    :param duration: The duration of the segment.
+    """
+    mode: ScheduleSegmentModeEnum = field(default=ScheduleSegmentModeEnum.Unknown)
+    start: datetime.datetime = field(default_factory=datetime.datetime.now)
+    end: datetime.datetime = field(default_factory=datetime.datetime.now)
+    duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
 
 
 @dataclass(kw_only=True)
@@ -280,6 +343,64 @@ class EntityServiceDataUpdate:
 
 
 @dataclass(kw_only=True)
+class ServiceProcessingInfo:
+    """
+    Per-service information for a processing run. SortOrder reflects the service's position in
+    the participating-node DAG (parallel services share a SortOrder, downstream services get
+    higher values). Mode is set once at run setup; Status is updated as the service progresses.
+    
+    :param sort_order: Topological-level position in the processing DAG. Services that can run in parallel share
+                       a value; downstream services have higher values.
+    :param status: Current execution status of the service within the run.
+    :param mode: The role the service is playing in the run.
+    :param progress: The latest reported progress for this service within the run, between 0.0 and 1.0.
+                     Updated from the service's progress updates while <see cref="P:Filament.FSCore.CoreEntities.ServiceProcessingInfo.Status" /> is
+                     <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" />; monotonically non-decreasing within a
+                     single run attempt (a late-arriving lower value is clamped away). Reset by the seed/reuse
+                     write when a run is retried.
+    :param start_instant: When this service's processing started: stamped on the first transition to
+                          <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" /> and left untouched on any later re-entry
+                          (e.g. a failover re-dispatch — the first dispatch is the start). Null until the service
+                          starts.
+    :param end_instant: When this service's processing ended: stamped on the first transition out of
+                        <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" /> (to Publishing, Completed, Failed or
+                        Cancelled) and not overwritten by the later Publishing → Completed transition — so
+                        <c>EndInstant - StartInstant</c> is the service's own processing time, excluding the hub's
+                        publish phase. Null while running or if the service never started.
+    """
+    sort_order: int = field(default=0)
+    status: ServiceProcessingStatus = field(default=ServiceProcessingStatus.Unknown)
+    mode: ServiceProcessingMode = field(default=ServiceProcessingMode.Unknown)
+    progress: float = field(default=0)
+    start_instant: Optional[datetime.datetime] = field(default=None)
+    end_instant: Optional[datetime.datetime] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class TaskPriorityReasons:
+    """
+    Structured priority reasons for a task, capturing each component of the priority calculation.
+    
+    :param priority: The overall combined priority score.
+    :param components: The individual priority components keyed by name.
+    """
+    priority: float = field(default=0)
+    components: dict[str, PriorityComponent] = field(default_factory=dict)
+
+
+@dataclass(kw_only=True)
+class UserPriorityReasons:
+    """
+    Structured priority reasons for a user option, capturing each component of the user priority calculation.
+    
+    :param priority: The overall combined priority score for this user option.
+    :param components: The individual priority components keyed by name.
+    """
+    priority: float = field(default=0)
+    components: dict[str, PriorityComponent] = field(default_factory=dict)
+
+
+@dataclass(kw_only=True)
 class SuccessOrError(SuccessOrErrorBase):
     """The SuccessOrError type is used to return either success, or an error message."""
 
@@ -358,6 +479,63 @@ class DbOrderInstance:
 
 
 @dataclass(kw_only=True)
+class TaskReasons:
+    """
+    Structured reasons related to a task being scheduled, including timing and priority data.
+    
+    :param name: The name of the task.
+    :param earliest_start: The earliest instant the task can start.
+    :param latest_start: The latest instant the task should start to meet downstream constraints.
+    :param earliest_finish: The earliest instant the task can finish.
+    :param latest_finish: The latest instant the task should finish to meet downstream constraints.
+    :param original_duration: The original reference duration of the task.
+    :param duration: The remaining duration of the task.
+    :param priority: The task priority breakdown.
+    :param expected_earliest: The Pass 1 expected-earliest centre instant for this task, if available.
+    :param expected_latest: The Pass 1 expected-latest centre instant for this task, if available.
+    :param solved: The Pass 1 solved centre instant for this task, if available.
+    :param solved_deviation: The normalised asymmetric deviation of the actual scheduled centre from the solved centre.
+    :param widened_beyond_expected: True if the chosen availability block lies outside the Pass 1 expected window
+                                    (i.e. the second-phase widened search produced the placement).
+    """
+    name: str = field(default='')
+    earliest_start: Optional[datetime.datetime] = field(default=None)
+    latest_start: Optional[datetime.datetime] = field(default=None)
+    earliest_finish: Optional[datetime.datetime] = field(default=None)
+    latest_finish: Optional[datetime.datetime] = field(default=None)
+    original_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    priority: TaskPriorityReasons = field(default_factory=TaskPriorityReasons)
+    expected_earliest: Optional[datetime.datetime] = field(default=None)
+    expected_latest: Optional[datetime.datetime] = field(default=None)
+    solved: Optional[datetime.datetime] = field(default=None)
+    solved_deviation: float = field(default=0)
+    widened_beyond_expected: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class UserOptionReason:
+    """
+    Represents a user option considered during scheduling, including duration, timing, and priority data.
+    
+    :param name: The name of the user.
+    :param duration: The duration of the task for this user.
+    :param duration_multiplier: The duration multiplier applied for this user.
+    :param start: The start instant of the scheduled work for this user.
+    :param end: The end instant of the scheduled work for this user.
+    :param buffer_end: The end instant of the buffer period for this user.
+    :param priority: The user priority breakdown.
+    """
+    name: str = field(default='')
+    duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    duration_multiplier: float = field(default=0)
+    start: Optional[datetime.datetime] = field(default=None)
+    end: Optional[datetime.datetime] = field(default=None)
+    buffer_end: Optional[datetime.datetime] = field(default=None)
+    priority: UserPriorityReasons = field(default_factory=UserPriorityReasons)
+
+
+@dataclass(kw_only=True)
 class SuccessOrErrorPublic(SuccessOrError):
     """
     Represents a public-facing version of the <see cref="T:Filament.FSCore.Structs.SuccessOrError" /> class.
@@ -431,6 +609,7 @@ class ModifyDataRequest(StructBase):
                         with the corresponding scenario in various processes.
     :param user_id: Represents the unique identifier associated with a user in the context of the operation.
                     This identifier is used to track and associate the request with the specific user initiating or responsible for it.
+    :param user_type: The kind of principal <see cref="P:Filament.FSCore.Structs.ModifyDataRequest.UserId" /> identifies — see <see cref="T:Filament.FSCore.Authentication.AuthPrincipalTypes" />.
     :param requested_at: Represents the timestamp at which the data modification request was created.
                          This property is used to track the specific time the request was initialized,
                          ensuring proper ordering and auditing of operations.
@@ -448,6 +627,7 @@ class ModifyDataRequest(StructBase):
     """
     scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     user_id: Optional[UUID] = field(default=None)
+    user_type: Optional[str] = field(default=None)
     requested_at: datetime.datetime = field(default_factory=datetime.datetime.now)
     request_id: RequestId = field(default_factory=RequestId)
     action: DataRequestAction = field(default=DataRequestAction.Unknown)
@@ -573,6 +753,31 @@ class ReadConnectedDataTypeRequest:
     connection_properties: Optional[list[str]] = field(default=None)
     entity_properties: Optional[list[str]] = field(default=None)
     apply_pending_requests: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class ScheduleSegmentReasons:
+    """
+    The complete structured reasons for why a schedule segment was created, including task data,
+    milestones, upstream tasks, user options, and the final segment details.
+    
+    :param task: The task-level reasons and priority data.
+    :param upstream_milestones: The upstream milestones that constrain this task's start.
+    :param downstream_milestones: The downstream milestones that constrain this task's finish.
+    :param upstream_tasks: The upstream tasks that must complete before this task can start.
+    :param user_options: All user options that were evaluated during scheduling.
+    :param selected_user: The name of the selected user, if any.
+    :param placeholder_user_created: Whether a placeholder user was created specifically for this task.
+    :param segment: The details of the specific schedule segment that was created.
+    """
+    task: TaskReasons = field(default_factory=TaskReasons)
+    upstream_milestones: list[MilestoneReason] = field(default_factory=list)
+    downstream_milestones: list[MilestoneReason] = field(default_factory=list)
+    upstream_tasks: list[UpstreamTaskReason] = field(default_factory=list)
+    user_options: list[UserOptionReason] = field(default_factory=list)
+    selected_user: Optional[str] = field(default=None)
+    placeholder_user_created: bool = field(default=False)
+    segment: SegmentReason = field(default_factory=SegmentReason)
 
 
 @dataclass(kw_only=True)

@@ -51,7 +51,7 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     """
     name: str = field(default='')
     description: str = field(default='')
-    mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Report)
+    mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Fixed)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
     warnings_data: Optional[str] = field(default=None)
@@ -118,6 +118,8 @@ class TaskEntity(ReferenceEntityBase):
     :param description: The description of this task
     :param duration: This task's duration.
     :param user_count: How many users can simultaneously work on this task.
+    :param deliverables: Deliverables expected for this task to be complete, taken from the
+                         <see cref="T:Filament.Services.CoreServices.Entities.ScopeTaskTypeService.ScopeTaskTypeStepEntity" /> this task was created from.
     :param requires_review: If this task needs to go into reviews once it is done.
     :param default_processing_duration: The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions.
                                         This will be used as the default processing duration to be filled in on <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity" />.
@@ -137,6 +139,7 @@ class TaskEntity(ReferenceEntityBase):
     description: str = field(default='')
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     user_count: int = field(default=1)
+    deliverables: list[str] = field(default_factory=list)
     requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     priority: float = field(default=1)

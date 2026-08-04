@@ -18,7 +18,7 @@ __all__ = [
 @dataclass(kw_only=True)
 class ActualEntity(ReferenceEntityBase):
     """
-    Defines actual time and cost spent on a task and details of when it was started and finished.
+    Defines actual time and cost spent on a task and details of when it was started and finished. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param duration_to_date: The total time duration worked on the task to date, derived from TimeLog schedule segments.
     :param duration_forecast_total: The total forecast duration for the task, derived from all qualifying schedule segments (Work and TimeLog).

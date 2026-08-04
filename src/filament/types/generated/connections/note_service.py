@@ -16,7 +16,7 @@ class NoteUserConnection(EntityConnection):
     Represents a connection between a note and a user, defining the relationship and properties of the connection.
     
     :param has_read: Has this user read the note?
-    :param type: What type of connection is this?  To or Cc?
+    :param recipient_type: What type of connection is this?  To or Cc?
     """
     has_read: bool = field(default=False)
-    type: NoteUserConnectionType = field(default=NoteUserConnectionType.To)
+    recipient_type: NoteUserConnectionType = field(default=NoteUserConnectionType.To)

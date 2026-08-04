@@ -29,13 +29,13 @@ class ScopeMilestoneEntity(Entity):
     :param direction: Is this a start milestone or a delivery milestone.  StartAfter means connected tasks must start
                       after the milestone.  EndBefore means the tasks must be finished before this milestone.
     :param scope_task_type_step_ids: The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to,
-                                     used by item connections that do not define their own step list. A connection's
-                                     <c>ScopeTaskTypeStepIds</c> overrides this; when both are empty the milestone attaches to
-                                     the item's leaf tasks instead.
+                                     used by item connections whose own <c>ScopeTaskTypeStepIds</c> is null. A connection's non-null
+                                     list overrides this (an empty one suppressing it entirely); when neither yields a step id the
+                                     milestone attaches to the item's leaf tasks instead.
     """
     name: str = field(default='')
     description: str = field(default='')
-    mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Report)
+    mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Fixed)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: ScopeMilestoneDirectionEnum = field(default=ScopeMilestoneDirectionEnum.StartAfter)
     scope_task_type_step_ids: list[UUID] = field(default_factory=list)

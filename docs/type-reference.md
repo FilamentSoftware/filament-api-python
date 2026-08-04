@@ -669,6 +669,9 @@ Represents a single processing run for an organization. Created when a batch of 
 | `sequence` | `int` | `0` | The sequence number of the processing run. Monotonically increasing per organization. |
 | `status` | `ProcessingRunStatus` | `ProcessingRunStatus.Unknown` | The overall status of the processing run. |
 | `error_message` | `Optional[str]` | `None` | Error message if the processing run failed. |
+| `progress` | `float` | `0` | Run-level progress, between 0.0 and 1.0: the equal-weight mean over the participating services' per-service progress (Completed/Publishing count 1.0, Processing counts its reported fraction, Pending counts 0). Monotonically non-decreasing within a single run attempt; reset by the seed/reuse write when the run is retried. |
+| `start_instant` | `Optional[datetime.datetime]` | `None` | When the run's processing started: stamped on the first transition to `Processing` and left untouched on any later re-entry (e.g. a retry after an instance went offline — the first dispatch is the start). Null until the run starts. |
+| `end_instant` | `Optional[datetime.datetime]` | `None` | When the run reached a terminal state — marked `Completed`, `Failed` or `Cancelled`. Null while the run is pending or processing. EndInstant - StartInstant is the wall-clock time the run took, whether it succeeded or not. |
 | `request_ids` | `list[UUID]` | — | Identifiers of the requests/operations in this processing run. For runs created by the main processing pipeline or scenario-request processing these are RequestEntity.Id values; for runs created by scenario propagation this is a synthetic identifier for the propagation operation with no corresponding RequestEntity in the database. |
 | `processing_service_data` | `str` | `''` | JSON-serialized dictionary of service name → `ServiceProcessingInfo` for the services participating in this processing run. Use `ServiceData` for the strongly-typed view. |
 
@@ -765,7 +768,7 @@ Tracks entity protection relationships. When a downstream entity depends on an u
 
 ##### `ActualEntity`
 
-Defines actual time and cost spent on a task and details of when it was started and finished.
+Defines actual time and cost spent on a task and details of when it was started and finished. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -1213,7 +1216,7 @@ Represents a connection between a note and a user, defining the relationship and
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `has_read` | `bool` | `False` | Has this user read the note? |
-| `type` | `NoteUserConnectionType` | `NoteUserConnectionType.To` | What type of connection is this? To or Cc? |
+| `recipient_type` | `NoteUserConnectionType` | `NoteUserConnectionType.To` | What type of connection is this? To or Cc? |
 
 ### Organization Service
 
@@ -1333,7 +1336,7 @@ Represents a placeholder user entity with associated properties and behaviors,
 
 ##### `ScheduleResultEntity`
 
-Represents the results of a scheduling process within the scheduling service.
+Represents the results of a scheduling process within the scheduling service. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1344,6 +1347,8 @@ Represents the results of a scheduling process within the scheduling service.
 | `degraded_review_gates` | `dict[str, str]` | — | A mapping of per-link diagnostic keys (see `ReviewGateKey`) -&gt; reason string for review links whose gate could not be applied on the most recent run, because the linked review event/occurrence could not be placed or the connection's OccurrenceTargetInstant resolved to no placed occurrence (a stale recurrence target). For these links the scheduler fell back to gating downstream tasks on the reviewed task's own end only — the review link silently did not constrain scheduling. Keys are composite "{taskId:N}:{eventId:N}:{ISO8601 target instant or empty}", so a task reviewed in more than one event/occurrence carries one entry per degraded link without collision. Cleared and repopulated on each run. |
 | `milestones_missed` | `dict[UUID, datetime.timedelta]` | — | A dictionary representing the milestones that were not achieved during the scheduling process, keyed by their unique identifiers, with the associated missed duration for each milestone. |
 | `early_placeholder_users` | `dict[UUID, datetime.datetime]` | — | A dictionary containing placeholder user ids that were required to start earlier than the expected earliest start time, with the associated instant representing the earliest start time required. |
+| `deadline_window_infeasible_escape_count` | `int` | `0` | Deadline diagnostic: how many times Pass 2's window-infeasible pre-check escaped to ignoring downstream milestones after the deadline-advance loop could not restore a feasible window (EarliestStart &gt; LatestStart). Global across all tasks. Reset per schedule attempt, so the value describes only the last pass that ran (the full-reschedule retry when it fires). |
+| `deadline_no_candidate_ignore_fallback_count` | `int` | `0` | Deadline diagnostic: how many times Pass 2's no-candidate final fallback retried with downstream milestones ignored (window feasible, but no candidate placement fit even after placeholder creation and deadline advancing). Global across all tasks. Reset per schedule attempt, so the value describes only the last pass that ran. |
 | `scores` | `dict[str, float]` | — | A dictionary representing scores associated with various items, identified by a string key and paired with a double value. |
 | `combined_score` | `float` | `0` | Represents the combined score computed from individual scores, utilized for evaluating the overall performance or outcome. |
 | `warnings` | `list[str]` | — | Non-fatal warnings raised during the most recent scheduling run — over-constrained graphs, degraded axis fallbacks, priority-milestone data-entry issues, etc. Cleared and repopulated on each run. |
@@ -1355,7 +1360,7 @@ Represents the results of a scheduling process within the scheduling service.
 
 ##### `ScheduleMilestoneEntity`
 
-Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks.
+Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -1372,7 +1377,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `ScheduleSegmentEntity`
 
-Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships.
+Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -1619,7 +1624,7 @@ Represents a connection between a scope item and a scope milestone.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `scope_task_type_step_ids` | `list[UUID]` | — | The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item. Overrides the milestone entity's ScopeTaskTypeStepIds; when both are empty the milestone attaches to the item's leaf tasks instead. |
+| `scope_task_type_step_ids` | `Optional[list[UUID]]` | `None` | The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item. Null and empty are distinct: null means "no override" and defers to the milestone entity's ScopeTaskTypeStepIds, whereas an empty list is an explicit override that suppresses the milestone's default and attaches to the item as a whole (its leaf tasks) rather than to any particular steps. A non-empty list attaches to exactly those steps. |
 | `task_combine_key` | `str` | `''` | The key used to define which combined group should be attached to the milestone. |
 
 ##### `ScopeItemGroupConnection`
@@ -1685,10 +1690,10 @@ Represents a milestone within a scope.
 | ----- | ---- | ------- | ----------- |
 | `name` | `str` | `''` | The name of the milestone. |
 | `description` | `str` | `''` | A description of the milestone. |
-| `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Report` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
+| `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone begins or ends (depending on its Direction) If the Instant is null, then it if flexible and can be moved |
 | `direction` | `ScopeMilestoneDirectionEnum` | `ScopeMilestoneDirectionEnum.StartAfter` | Is this a start milestone or a delivery milestone. StartAfter means connected tasks must start after the milestone. EndBefore means the tasks must be finished before this milestone. |
-| `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections that do not define their own step list. A connection's ScopeTaskTypeStepIds overrides this; when both are empty the milestone attaches to the item's leaf tasks instead. |
+| `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections whose own ScopeTaskTypeStepIds is null. A connection's non-null list overrides this (an empty one suppressing it entirely); when neither yields a step id the milestone attaches to the item's leaf tasks instead. |
 
 ### Scope Service
 
@@ -2008,7 +2013,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[EntityBase]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | The given name for this milestone. |
 | `description` | `str` | `''` | The description of this milestone |
-| `mode` | `TaskMilestoneModeEnum` | `TaskMilestoneModeEnum.Report` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
+| `mode` | `TaskMilestoneModeEnum` | `TaskMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone is due. If the Instant is null, the milestone is flexible and can be moved |
 | `direction` | `TaskMilestoneDirectionEnum` | `TaskMilestoneDirectionEnum.EndBefore` | Should tasks start after this milestone, or end before it? |
 | `warnings_data` | `Optional[str]` | `None` | JSON-serialized list of warnings raised while processing this milestone - each is a `TaskMilestoneWarning` describing an issue, such as an assignment that attached to no tasks. Null when there are no warnings. |
@@ -2055,6 +2060,7 @@ _Extends:_ `ReferenceEntityBase`
 | `description` | `str` | `''` | The description of this task |
 | `duration` | `datetime.timedelta` | — | This task's duration. |
 | `user_count` | `int` | `1` | How many users can simultaneously work on this task. |
+| `deliverables` | `list[str]` | — | Deliverables expected for this task to be complete, taken from the `ScopeTaskTypeStepEntity` this task was created from. |
 | `requires_review` | `bool` | `False` | If this task needs to go into reviews once it is done. |
 | `default_processing_duration` | `datetime.timedelta` | — | The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions. This will be used as the default processing duration to be filled in on `TaskStatusEntity`. |
 | `priority` | `float` | `1` | The priority of this task, derived from the scope and scope item priorities. |

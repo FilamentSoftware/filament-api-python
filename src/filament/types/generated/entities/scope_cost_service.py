@@ -20,7 +20,7 @@ __all__ = [
 class ScopeCostEntity(ReferenceEntityBase):
     """
     Represents a scope cost entity that includes chargeable and estimated costs,
-    as well as contextual references to related entities.
+    as well as contextual references to related entities. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param context_type: Represents the type of the context associated with the scope cost.
                          Typically stores the name of the entity type that the context refers to.

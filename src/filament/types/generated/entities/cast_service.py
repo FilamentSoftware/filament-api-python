@@ -17,7 +17,7 @@ __all__ = [
 class CastEntity(Entity):
     """
     An entity that is used to link together all tasks with the same skill requirements, and allows
-    all users who can work on these tasks to be linked to a single place.
+    all users who can work on these tasks to be linked to a single place. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param cast_key: String created from skill and office location data for easy lookup later.
     :param specialty_id: The id of the specialty that this Cast is most associated with
