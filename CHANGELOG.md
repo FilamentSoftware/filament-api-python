@@ -1,3 +1,12 @@
+## 0.6.0 (2026-08-04 17:18)
+
+### Types
+
+#### FEATURE
+- Add task deliverables and distinguish null vs empty milestone step overrides
+- Exposes structured schedule-segment reasons, principal-type fields on entities, and renames NoteUserConnection.type to recipient_type
+- ProcessingRunEntity and ServiceProcessingInfo now expose progress fraction and start/end instants
+
 ## 0.5.0 (2026-07-22 13:12)
 
 ### Types
