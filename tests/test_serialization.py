@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 
 from uuid_utils import UUID, uuid7
 
@@ -26,6 +27,7 @@ from filament.types.generated.misc import (
     DataUpdateRejectedNotification,
     DbOrderInstance,
     DbOrderLevel,
+    FileReference,
     ModifyDataRequest,
     ProcessingStatus,
     ReadConnectedDataTypeRequest,
@@ -517,3 +519,50 @@ class TestEntityBaseRoundTrip:
         )
         assert restored.given_name == "Alice"
         assert restored.family_name == "Smith"
+
+
+class TestJsonCompanionFields:
+    """`<name>` object fields auto-populated from their `<name>_data` JSON sibling.
+
+    The backend sends projections like ``UserEntity.imageData`` as a JSON string
+    with the object field ``image`` left unset; ``from_dict`` deserializes the
+    string into ``image``.
+    """
+
+    def test_image_populated_from_image_data(self) -> None:
+        image_json = json.dumps({
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "url": "https://storage/read/1",
+            "refreshable": True,
+            "metadata": {"contentType": "image/png", "size": 12, "width": 4, "height": 4},
+        })
+        user = from_dict({"id": str(uuid7()), "imageData": image_json}, UserEntity)
+
+        assert user is not None
+        # The raw projection is preserved...
+        assert user.image_data == image_json
+        # ...and the object field is deserialized from it.
+        assert isinstance(user.image, FileReference)
+        assert user.image.url == "https://storage/read/1"
+        assert user.image.metadata is not None
+        assert user.image.metadata.content_type == "image/png"
+
+    def test_absent_image_data_leaves_image_none(self) -> None:
+        user = from_dict({"id": str(uuid7())}, UserEntity)
+        assert user is not None
+        assert user.image_data is None
+        assert user.image is None
+
+    def test_empty_image_data_leaves_image_none(self) -> None:
+        user = from_dict({"id": str(uuid7()), "imageData": ""}, UserEntity)
+        assert user is not None
+        assert user.image is None
+
+    def test_malformed_image_data_leaves_image_none(self) -> None:
+        # A malformed projection must not fail the whole entity deserialization.
+        user = from_dict({"id": str(uuid7()), "imageData": "not json"}, UserEntity)
+        assert user is not None
+        assert user.image_data == "not json"
+        assert user.image is None
