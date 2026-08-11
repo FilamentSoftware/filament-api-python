@@ -11,6 +11,8 @@ Key differences from the original:
 from __future__ import annotations
 
 import datetime
+import json
+import logging
 import re
 import types
 from collections.abc import Sequence as ABCSequence
@@ -36,6 +38,8 @@ from ._wire_formats import (  # noqa: E402
     timedelta_from_wire as timedelta_from_wire,
     timedelta_to_wire as timedelta_to_wire,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -600,4 +604,52 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
     # Clear specified_properties for deserialized entities so all fields serialize.
     if hasattr(result, "specified_properties"):
         object.__setattr__(result, "specified_properties", None)
+    _populate_json_companion_fields(result, concrete_cls, hints)
     return result
+
+
+def _populate_json_companion_fields(
+    instance: Any, cls: Any, hints: dict[str, Any],
+) -> None:
+    """Populate object fields from their JSON-string ``<name>_data`` companions.
+
+    The backend emits certain read projections as a JSON string in a
+    ``<name>_data`` field alongside a matching object field ``<name>`` that
+    "arrives unset" — e.g. ``UserEntity.image_data`` (a serialized
+    :class:`FileReference`) and ``UserEntity.image``
+    (``Optional[FileReference]``).  Here we deserialize ``<name>_data`` into
+    ``<name>`` so callers get the ready object without a manual parse.
+
+    A field pair qualifies when ``<name>`` is (optionally) a dataclass type and a
+    sibling ``<name>_data`` field exists.  A missing, empty, non-string, or
+    malformed ``<name>_data`` leaves ``<name>`` as ``None``; an explicitly set
+    ``<name>`` is never overwritten.
+    """
+    field_names = {f.name for f in fields(cls)}
+    for f in fields(cls):
+        data_name = f"{f.name}_data"
+        if data_name not in field_names:
+            continue
+
+        field_type = hints.get(f.name, f.type)
+        inner = _unwrap_optional(field_type) if _is_optional(field_type) else field_type
+        if not (isinstance(inner, type) and is_dataclass(inner)):
+            continue
+
+        # The backend sends the object field unset; never clobber a real value.
+        if getattr(instance, f.name, None) is not None:
+            continue
+        raw = getattr(instance, data_name, None)
+        if not isinstance(raw, str) or not raw:
+            continue
+
+        try:
+            parsed = from_dict(json.loads(raw), inner)
+        except (ValueError, TypeError, KeyError):
+            logger.warning(
+                "Failed to deserialize %s.%s from its %s JSON projection",
+                getattr(cls, "__name__", cls), f.name, data_name,
+            )
+            continue
+        if parsed is not None:
+            object.__setattr__(instance, f.name, parsed)
