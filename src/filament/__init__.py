@@ -38,9 +38,15 @@ def file_reference_from_json(value: str) -> FileReference:
     bytes can be fetched with :meth:`FilamentClient.download_file_reference`
     without a separate ``get_file_urls`` call.
 
-    :raises ValueError: if *value* is not a valid serialized ``FileReference``.
+    :raises ValueError: if *value* is not a JSON object encoding a
+        ``FileReference`` (e.g. a JSON array, scalar, or ``null``).
     """
-    result = from_dict(json.loads(value), FileReference)
+    decoded = json.loads(value)
+    if not isinstance(decoded, dict):
+        raise ValueError(
+            f"Expected a JSON object for FileReference, got {type(decoded).__name__}"
+        )
+    result = from_dict(decoded, FileReference)
     if result is None:
         raise ValueError("Could not deserialize FileReference from projection")
     return result

@@ -644,7 +644,23 @@ def _populate_json_companion_fields(
             continue
 
         try:
-            parsed = from_dict(json.loads(raw), inner)
+            decoded = json.loads(raw)
+        except ValueError:
+            logger.warning(
+                "Failed to parse %s.%s from its %s JSON projection (invalid JSON)",
+                getattr(cls, "__name__", cls), f.name, data_name,
+            )
+            continue
+        # Only a JSON object maps onto the dataclass; an array or scalar is a
+        # malformed projection and must not produce a bogus default instance.
+        if not isinstance(decoded, dict):
+            logger.warning(
+                "Ignoring %s.%s: its %s projection is not a JSON object",
+                getattr(cls, "__name__", cls), f.name, data_name,
+            )
+            continue
+        try:
+            parsed = from_dict(decoded, inner)
         except (ValueError, TypeError, KeyError):
             logger.warning(
                 "Failed to deserialize %s.%s from its %s JSON projection",
