@@ -569,6 +569,14 @@ class TestJsonCompanionFields:
         assert user.image_data == "not json"
         assert user.image is None
 
+    @pytest.mark.parametrize("payload", ["[]", "123", '"text"', "null", "true"])
+    def test_non_object_image_data_leaves_image_none(self, payload: str) -> None:
+        # Valid JSON that is not an object (array/scalar) must be ignored, not
+        # coerced into a bogus default FileReference or raised.
+        user = from_dict({"id": str(uuid7()), "imageData": payload}, UserEntity)
+        assert user is not None
+        assert user.image is None
+
 
 class TestInstantWireFormat:
     """`instant_from_wire` parses the backend Instant format at any precision.

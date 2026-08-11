@@ -246,6 +246,37 @@ class TestUploadFile:
         client.cancel_file_upload.assert_awaited_once_with(file_id)
         client.complete_file_upload.assert_not_awaited()
 
+    @pytest.mark.asyncio
+    async def test_cancel_failure_does_not_mask_transfer_error(self) -> None:
+        # If the best-effort cancel raises, the original transfer error must
+        # still be returned rather than the cancellation exception escaping.
+        client = _make_client()
+        file_id = uuid7()
+        client._server_capabilities = None
+        client.request_file_upload = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.refresh_file_upload_grant = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.complete_file_upload = AsyncMock()  # type: ignore[method-assign]
+        client.cancel_file_upload = AsyncMock(  # type: ignore[method-assign]
+            side_effect=RuntimeError("cancel hub failed")
+        )
+
+        async with _mock_transport(lambda r: httpx.Response(403, text="denied")) as http:
+            result = await client.upload_file(
+                name="f",
+                content_type="text/plain",
+                data=b"x",
+                reference_type="UserEntity",
+                reference_id=uuid7(),
+                reference_property="Attachment",
+                http_client=http,
+            )
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.RequestError
+        assert "Storage rejected upload (403)" in result.message
+        client.cancel_file_upload.assert_awaited_once_with(file_id)
+        client.complete_file_upload.assert_not_awaited()
+
 
 # ---------------------------------------------------------------------------
 # download_file

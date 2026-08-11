@@ -66,6 +66,32 @@ class TestComputeChecksum:
         assert _CHECKSUM_MD5_BASE64 == FileChecksumAlgorithm.Md5Base64.value
         assert _CHECKSUM_CRC32C_BASE64 == FileChecksumAlgorithm.Crc32cBase64.value
 
+    def test_crc32c_base64_with_extra(self) -> None:
+        google_crc32c = pytest.importorskip("google_crc32c")
+        data = b"123456789"
+        expected = base64.b64encode(
+            google_crc32c.Checksum(data).digest()
+        ).decode("ascii")
+        assert compute_checksum(data, FileChecksumAlgorithm.Crc32cBase64) == expected
+
+    def test_crc32c_missing_extra_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Simulate the optional dependency being absent regardless of the
+        # environment, and confirm the guidance error is raised.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "google_crc32c":
+                raise ImportError("simulated missing extra")
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        with pytest.raises(RuntimeError, match="google-crc32c"):
+            compute_checksum(b"x", FileChecksumAlgorithm.Crc32cBase64)
+
 
 # ---------------------------------------------------------------------------
 # Multipart request construction
@@ -167,19 +193,34 @@ class TestBuildUploadRequest:
         )
         assert req.headers["x-custom"] == "1"
 
-    def test_empty_fields_still_uploads_file(self) -> None:
+    def test_none_fields_is_plain_body_upload(self) -> None:
+        # A null fields set means a plain-body upload: raw bytes as the request
+        # body, no multipart encoding.
         req = build_upload_request(
             url="https://storage.example.com/bucket",
-            method="POST",
+            method="PUT",
             fields=None,
             headers=None,
-            data=b"bytes",
+            data=b"raw bytes",
             content_type="text/plain",
         )
-        ctype = req.headers["content-type"]
-        boundary = ctype.split("boundary=", 1)[1]
-        parts = _split_parts(req.read(), boundary)
-        assert [_part_name(p) for p in parts] == ["file"]
+        assert req.method == "PUT"
+        assert req.read() == b"raw bytes"
+        assert req.headers["content-type"] == "text/plain"
+        assert "multipart" not in req.headers["content-type"]
+
+    def test_plain_body_merges_grant_headers(self) -> None:
+        req = build_upload_request(
+            url="https://storage.example.com/bucket",
+            method="PUT",
+            fields=None,
+            headers={"x-custom": "1"},
+            data=b"raw",
+            content_type="application/octet-stream",
+        )
+        assert req.read() == b"raw"
+        assert req.headers["x-custom"] == "1"
+        assert req.headers["content-type"] == "application/octet-stream"
 
     def test_content_type_field_matched_case_insensitively(self) -> None:
         # A lower-case "content-type" policy field should still drive the file
@@ -234,3 +275,9 @@ class TestFileReferenceFromJson:
     def test_invalid_json_raises(self) -> None:
         with pytest.raises(ValueError):
             filament.file_reference_from_json("not json")
+
+    @pytest.mark.parametrize("payload", ["null", "[]", '"text"', "123", "true"])
+    def test_non_object_json_raises(self, payload: str) -> None:
+        # json.loads accepts these, but they are not a FileReference object.
+        with pytest.raises(ValueError):
+            filament.file_reference_from_json(payload)

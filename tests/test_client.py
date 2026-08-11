@@ -966,6 +966,18 @@ class TestFileMethods:
         assert result.success is True
 
     @pytest.mark.asyncio
+    async def test_cancel_file_upload_deserialization_error(self) -> None:
+        # A malformed hub response must be turned into a failed result rather
+        # than leaking a deserialization exception.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={"errorCode": "NotAValidCode"})
+
+        result = await client.cancel_file_upload(uuid7())
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.InternalError
+
+    @pytest.mark.asyncio
     async def test_get_file_urls_returns_uuid_keyed_dict(self) -> None:
         client = _make_client()
         id1, id2 = uuid7(), uuid7()
