@@ -518,6 +518,8 @@ class FileReference:
     :param expires_at: When <see cref="P:Filament.FSCore.FileStore.FileReference.Url" /> stops being accepted. Null on failure.
     :param refreshable: Whether the URL expires and can be re-minted.
     :param metadata: Content type, size and, for images, dimensions — so a client can reserve space first.
+    :param name: The file's display name, as stored on the row. Null on failure.
+    :param description: Alternative text or a description, for accessibility and search. Null when the row has none.
     """
     success: bool = field(default=False)
     message: str = field(default='')
@@ -527,6 +529,8 @@ class FileReference:
     expires_at: Optional[datetime.datetime] = field(default=None)
     refreshable: bool = field(default=False)
     metadata: Optional[FileMetadata] = field(default=None)
+    name: Optional[str] = field(default=None)
+    description: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
