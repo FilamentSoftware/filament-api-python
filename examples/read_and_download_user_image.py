@@ -9,6 +9,7 @@ manual parsing needed.
 from __future__ import annotations
 
 import asyncio
+import mimetypes
 from pathlib import Path
 
 import filament
@@ -58,7 +59,15 @@ async def main() -> None:
                 print(f"{name}: download failed ({download.message})")
                 continue
 
-            destination = Path(f"{user.id}.image")
+            # Keep the uploaded file's extension: prefer the original filename
+            # the reference carries, falling back to one guessed from the
+            # content type.
+            suffix = Path(user.image.name).suffix if user.image.name else ""
+            if not suffix and user.image.metadata is not None:
+                suffix = (
+                    mimetypes.guess_extension(user.image.metadata.content_type) or ""
+                )
+            destination = Path(f"{user.id}{suffix}")
             destination.write_bytes(download.data)
             print(f"{name}: wrote {len(download.data)} bytes to {destination}")
 

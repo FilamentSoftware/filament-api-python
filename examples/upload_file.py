@@ -14,6 +14,11 @@ from pathlib import Path
 from uuid_utils import UUID
 
 import filament
+from filament.types import (
+    DataRequestAction,
+    ModifyDataRequest,
+    UserEntity,
+)
 
 
 async def main() -> None:
@@ -27,7 +32,7 @@ async def main() -> None:
     # anchor that gates who may attach a file here.
     reference_type = "UserEntity"
     reference_id = UUID("00000000-0000-0000-0000-000000000000")
-    reference_property = "Avatar"
+    reference_property = "ImageId"
 
     async with filament.FilamentClient(
         organization_id="your-organization-id",
@@ -52,6 +57,20 @@ async def main() -> None:
             f"Uploaded {path.name} as file {file.id} "
             f"({file.state.name}, {file.size} bytes)"
         )
+
+        # Attach the uploaded file to the user by writing its id into the
+        # ImageId slot (a partial update — only imageId is touched).
+        link_result = await f.modify_data(
+            ModifyDataRequest(
+                action=DataRequestAction.Update,
+                update_properties=["imageId"],
+                data={"UserEntity": [UserEntity(id=reference_id, image_id=file.id)]},
+            ),
+        )
+        if link_result.success:
+            print(f"Linked file to {reference_type} {reference_id}.ImageId")
+        else:
+            print(f"Link failed: {link_result.message}")
 
 
 if __name__ == "__main__":
