@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime
 import json
 
+import pytest
 from uuid_utils import UUID, uuid7
 
 from filament._serialization import (
@@ -13,6 +14,7 @@ from filament._serialization import (
     snake_case_from_camel_case,
     to_dict,
 )
+from filament._wire_formats import instant_from_wire, instant_to_wire
 from filament.types.generated.base.base import EntityBase
 from filament.types.generated.entities.permissions_service import PermissionEntity
 from filament.types.generated.entities.user_service import UserEntity
@@ -566,3 +568,44 @@ class TestJsonCompanionFields:
         assert user is not None
         assert user.image_data == "not json"
         assert user.image is None
+
+
+class TestInstantWireFormat:
+    """`instant_from_wire` parses the backend Instant format at any precision.
+
+    The canonical wire form carries up to 8 significant fractional digits (e.g.
+    ``...:57.23421050Z``); the parser must handle that, not only the special case
+    where the last two digits are ``00``.
+    """
+
+    def test_parses_eight_digit_fraction(self) -> None:
+        dt = instant_from_wire("2026-08-11T14:42:57.23421050Z")
+        assert dt == datetime.datetime(
+            2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
+        )
+
+    def test_parses_six_significant_digits_padded(self) -> None:
+        # The form to_wire emits: 6 microsecond digits + "00".
+        dt = instant_from_wire("2025-01-15T10:30:45.12345600Z")
+        assert dt.microsecond == 123456
+        assert dt.tzinfo == datetime.timezone.utc
+
+    def test_parses_without_fraction(self) -> None:
+        dt = instant_from_wire("2026-08-11T14:42:57Z")
+        assert dt.microsecond == 0
+        assert dt.tzinfo == datetime.timezone.utc
+
+    def test_truncates_sub_microsecond_digits(self) -> None:
+        # 9 fractional digits (nanoseconds) — truncate to microseconds.
+        dt = instant_from_wire("2026-08-11T14:42:57.123456789Z")
+        assert dt.microsecond == 123456
+
+    def test_requires_trailing_z(self) -> None:
+        with pytest.raises(ValueError):
+            instant_from_wire("2026-08-11T14:42:57.23421050")
+
+    def test_roundtrip_through_to_wire(self) -> None:
+        original = datetime.datetime(
+            2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
+        )
+        assert instant_from_wire(instant_to_wire(original)) == original
