@@ -19,6 +19,7 @@ An auto-generated catalogue of every entity, connection, and enum exported from 
   - [Currency Service](#currency-service)
   - [Current Instant Service](#current-instant-service)
   - [Event Service](#event-service)
+  - [File Settings Service](#file-settings-service)
   - [Generic](#generic)
   - [Note Service](#note-service)
   - [Organization Service](#organization-service)
@@ -219,6 +220,7 @@ Represents a set of predefined error codes that can be used to indicate
 | `RateLimitExceeded` | Indicates that the API key has exceeded its configured rate limit. This error code is used when too many requests have been made within the rate limit window. |
 | `ResponseTooLarge` | Indicates that a response (an invocation result or a pushed event) would exceed the maximum message size the client negotiated via the connect-time capability handshake. The response is not sent; instead this error is returned (carrying the actual and limit byte counts) so the caller can narrow the query or raise the client's limit. |
 | `ProtectionError` | The operation was blocked because downstream entities have protection records preventing deletion of the upstream entity. |
+| `ChecksumMismatch` | A completed upload's bytes did not match the checksum the client declared when it requested the grant. |
 
 ### `EventUserConnectionStatus` (`Enum`)
 
@@ -229,6 +231,28 @@ Represents a user's acceptance state for an event invitation.
 | `NotAccepted` | The user has not yet responded to the event invitation. |
 | `Accepted` | The user has accepted the event invitation. |
 | `Declined` | The user has declined the event invitation. |
+
+### `FileChecksumAlgorithm` (`Enum`)
+
+The checksum a file store computes, and the encoding it reports it in.
+
+| Member | Description |
+| ------ | ----------- |
+| `None_` | The store computes no checksum, and advertises no ServerSideChecksum. |
+| `Sha256Hex` | SHA-256, lower-case hexadecimal. The Filament storage service. |
+| `Md5Base64` | MD5, canonical padded base64. GCS md5Hash. |
+| `Crc32cBase64` | CRC32C, canonical padded base64. GCS crc32c. |
+
+### `FileState` (`Enum`)
+
+Where a file is in its upload lifecycle.
+
+| Member | Description |
+| ------ | ----------- |
+| `Pending` | A grant has been issued and the bytes have not been confirmed. Counts against the tenant's quota, so nobody can evade it by never completing. |
+| `Available` | The bytes arrived and were verified against what was declared. |
+| `Failed` | Verification failed and the object was deleted. Distinct from `Deleted` so the sweeper can tell a failed upload from a removed file, and so the quota can be released at the point of failure rather than at the next sweep. |
+| `Deleted` | Marked for removal. The row survives until the sweeper has removed the object, so a failed object delete never leaves a dangling row or vice versa. |
 
 ### `Industry` (`Enum`)
 
@@ -721,6 +745,39 @@ Per-organisation processing configuration. This is a singleton per tenant: the s
 | ----- | ---- | ------- | ----------- |
 | `success_snapshots` | `bool` | `False` | Whether processing-succeeded snapshots should be written for this organisation. Defaults to false. |
 
+##### `FileEntity`
+
+The record of one stored file. Hub-owned, with no providing service.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `name` | `str` | `''` | The display name, as supplied by the client and validated server-side. |
+| `description` | `Optional[str]` | `None` | Alternative text or a description, for accessibility and search. |
+| `reference_type` | `str` | `''` | The entity type that owns this file. Immutable after create. |
+| `reference_id` | `UUID` | — | The row that owns this file. Immutable after create. |
+| `reference_property` | `str` | `''` | The file-link property on `ReferenceType` that gates this file — the permission anchor. Required and immutable after create. |
+| `state` | `FileState` | `FileState.Pending` | Where this file is in its lifecycle. |
+| `grant_expires_at` | `Optional[datetime.datetime]` | `None` | When the most recent upload grant stops being accepted. |
+| `content_type` | `Optional[str]` | `None` | The content type observed at completion, not the one the client declared. |
+| `size` | `int` | `0` | The size observed at completion, in bytes. |
+| `checksum` | `Optional[str]` | `None` | The checksum observed at completion. |
+| `version_token` | `Optional[str]` | `None` | The provider's version identifier for the verified bytes, when the store advertises version pinning. Unused until versioning is enabled. |
+| `provider` | `str` | `''` | Which store holds this file, for migration and multi-region. |
+| `location` | `Optional[str]` | `None` | The region or location the object lives in. |
+| `container` | `Optional[str]` | `None` | The bucket or container holding the object. |
+| `object_key` | `str` | `''` | The server-derived object key. A client never supplies one, so this can never be used to address something the caller was not granted. |
+
+##### `FileStatsEntity`
+
+Per-tenant file usage. Hub-owned, and a singleton keyed on `Id` of
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `used_bytes` | `int` | `0` | Bytes counted against the quota: `Available` plus `Pending`. |
+| `pending_bytes` | `int` | `0` | The part of `UsedBytes` belonging to uploads that have not completed. |
+| `pending_count` | `int` | `0` | How many uploads are currently incomplete, for the per-user concurrency ceiling. |
+| `file_count` | `int` | `0` | How many files the tenant holds in total. |
+
 ##### `EventLogEntity`
 
 Represents an event log entry created when data is processed.
@@ -1101,6 +1158,22 @@ Represents a link from an event to a task that is reviewed in that event. The ta
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `occurrence_target_instant` | `Optional[datetime.datetime]` | `None` | The drift-free target instant of the specific occurrence the task is reviewed in. null for a non-recurring (single-occurrence) event; non-null for a specific occurrence of a recurring event. Mirrors ScheduleSegmentEntity.OccurrenceTargetInstant so that (FromId, OccurrenceTargetInstant) resolves to the same occurrence the planner placed. |
+
+### File Settings Service
+
+#### Entities
+
+##### `FileSettingsEntity`
+
+Per-tenant file settings. A singleton keyed on `Id` of
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `quota_bytes` | `int` | `0` | The tenant's total byte allowance across all files. |
+| `unreferenced_retention` | `Optional[datetime.timedelta]` | `None` | How long to keep a file that nothing currently links to. Null keeps them indefinitely. |
+| `max_files_per_link` | `Optional[int]` | `None` | How many files to keep per link slot, oldest deleted first. Null is unlimited. |
+| `max_pending_bytes` | `Optional[int]` | `None` | The ceiling on bytes held by uploads that have not completed. Null derives it. |
+| `max_pending_uploads_per_user` | `int` | `5` | The ceiling on concurrent incomplete uploads per user. |
 
 ### Generic
 
@@ -1652,7 +1725,9 @@ Represents a single item within a scope.
 | ----- | ---- | ------- | ----------- |
 | `name` | `str` | `''` | The name of this scope item. |
 | `description` | `str` | `''` | A short description of the item. |
-| `image_link` | `Optional[str]` | `None` | A link to an image to use when referencing this Scope Item |
+| `image_id` | `Optional[UUID]` | `None` | An image to use when referencing this Scope Item. |
+| `image_data` | `Optional[str]` | `None` | The hub-populated read projection of `ImageId`, carrying a FileReference. |
+| `image` | `Optional[FileReference]` | `None` | The image as a FileReference. Arrives unset — populate it from ImageData. |
 | `category_id` | `UUID` | — | The category of this entity. E.g. Shot, Asset, Development. |
 | `category` | `Optional[ScopeCategoryEntity]` | `None` | A helper method for setting the category id. |
 | `size` | `float` | `1` | The size of this item. In film this might be the frame count. |
@@ -1775,7 +1850,9 @@ Represents a specific entity with associated metadata and behaviors, categorized
 | `name` | `str` | `''` | The name of the scope/project. |
 | `description` | `str` | `''` | A description of the scope/project. |
 | `scope_type` | `ScopeType` | `ScopeType.Film` | The type of project this is. This will be used to auto set up some aspects of the project. |
-| `image_link` | `Optional[str]` | `None` | A link to an image to use when referencing this Scope |
+| `image_id` | `Optional[UUID]` | `None` | An image to use when referencing this Scope. |
+| `image_data` | `Optional[str]` | `None` | The hub-populated read projection of `ImageId`, carrying a FileReference. |
+| `image` | `Optional[FileReference]` | `None` | The image as a FileReference. Arrives unset — populate it from ImageData. |
 | `task_duration_multiplier` | `float` | `1` | An overall multiplier that applies to all task durations. This allows a project to effectively adjust the duration of all tasks in one place. |
 | `chargeable_multiplier` | `float` | `1` | An overall multiplier on chargeable costs. This is used to set global discounts for an entire project. |
 | `priority` | `float` | `1` | The priority of this scope. Used to influence task scheduling priority. Must be between 0 and 1 (inclusive). |
@@ -2269,7 +2346,9 @@ _Extends:_ `UserBaseEntity`
 | `password` | `Optional[str]` | `None` | Represents the user's password, used for authentication purposes. This property is marked as write-only to ensure secure handling and to restrict retrieval of its value. |
 | `email_address` | `str` | `''` | Represents the primary email address associated with the user. Used as a primary means of electronic communication for the user. |
 | `pronouns` | `Optional[str]` | `None` | The pronouns this user perfers to use. |
-| `image_link` | `Optional[str]` | `None` | Link path to the user profile image. |
+| `image_id` | `Optional[UUID]` | `None` | The user's profile image. |
+| `image_data` | `Optional[str]` | `None` | The hub-populated read projection of `ImageId`, carrying a FileReference. |
+| `image` | `Optional[FileReference]` | `None` | The image as a FileReference. Arrives unset — populate it from ImageData. |
 | `name` | `str` | `' '` | Gets the full name of the user formatted based on the specified display order. Includes the given name, optional middle names, and family name displayed in either "Given Name First" or "Family Name First" order. |
 | `tax_credit_location_id` | `UUID` | — | The Guid for the TaxCreditLocationEntity that defines where this user us based from a tax credit perspective. |
 | `office_location_id` | `UUID` | — | The Guid for the OfficeLocationEntity that defines which office this user works out of. |

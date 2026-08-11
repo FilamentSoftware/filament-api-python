@@ -10,15 +10,17 @@ from uuid_utils import UUID, uuid7
 from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
-from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType
+from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType
 
 __all__ = [
+    "FileMetadata",
     "TaskMilestoneWarning",
     "PriorityComponent",
     "MilestoneReason",
     "UpstreamTaskReason",
     "SegmentReason",
     "ClientHelloRequest",
+    "FileCapabilities",
     "SuccessOrErrorBase",
     "EntityPermission",
     "UserDefinedValidation",
@@ -29,12 +31,18 @@ __all__ = [
     "PreviewDataRequest",
     "ServiceDataPreview",
     "StatusData",
+    "FileUploadRequest",
+    "UploadGrant",
+    "FileUploadCompletion",
+    "GetFileUrlsRequest",
     "EntityServiceDataUpdate",
     "ServiceProcessingInfo",
+    "FileReference",
     "TaskPriorityReasons",
     "UserPriorityReasons",
-    "SuccessOrError",
+    "ServerCapabilities",
     "ValueOrError_1",
+    "SuccessOrError",
     "EntityPermissions",
     "UserDefinedPropertyInfo",
     "CreateUserDefinedPropertyRequest",
@@ -45,9 +53,9 @@ __all__ = [
     "DbOrderInstance",
     "TaskReasons",
     "UserOptionReason",
-    "SuccessOrErrorPublic",
     "ValueOrErrorPublic_1",
     "EntityPropertyPermission",
+    "SuccessOrErrorPublic",
     "DataUpdateRejectedNotification",
     "WrappedEntity",
     "ModifyDataRequest",
@@ -67,6 +75,22 @@ __all__ = [
 T = TypeVar("T")
 T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
+
+
+@dataclass(kw_only=True)
+class FileMetadata:
+    """
+    Metadata a read grant may carry so a client can lay out before the bytes arrive.
+    
+    :param content_type: The content type of the stored object.
+    :param size: The size of the stored object in bytes.
+    :param width: Pixel width, for image objects whose dimensions are known.
+    :param height: Pixel height, for image objects whose dimensions are known.
+    """
+    content_type: str
+    size: int
+    width: Optional[int] = field(default=None)
+    height: Optional[int] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -156,6 +180,18 @@ class ClientHelloRequest:
                                    values that are zero, negative, or below a small floor.
     """
     max_message_size_bytes: Optional[int] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class FileCapabilities:
+    """
+    What a deployment's configured file store can do.
+    
+    :param checksum_algorithm: The checksum algorithm and encoding a client must use if it wants to declare one.
+    :param server_side_checksum: Whether the store computes a checksum at all, and so whether one can be verified.
+    """
+    checksum_algorithm: FileChecksumAlgorithm
+    server_side_checksum: bool
 
 
 @dataclass(kw_only=True)
@@ -348,6 +384,80 @@ class StatusData:
 
 
 @dataclass(kw_only=True)
+class FileUploadRequest:
+    """
+    Asks for a grant to upload one file into one slot.
+    
+    :param name: The display name. Slugified server-side for the object key.
+    :param content_type: The content type the client intends to upload. Verified at completion.
+    :param size: The size the client intends to upload, in bytes.
+    :param reference_type: The entity type that will own the file.
+    :param reference_id: The row that will own the file.
+    :param reference_property: The file slot on the owner this upload is for — the permission anchor.
+    :param description: Alternative text or a description.
+    :param checksum: The checksum the client undertakes to upload, in the store's declared algorithm. Optional.
+    """
+    name: str
+    content_type: str
+    size: int
+    reference_type: str
+    reference_id: UUID
+    reference_property: str
+    description: Optional[str] = field(default=None)
+    checksum: Optional[str] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class UploadGrant:
+    """
+    Everything a client needs to upload one object, in a shape that is identical across providers.
+    
+    :param file_id: The id of the file entity this grant uploads for.
+    :param url: The absolute URL to submit to. Always the storage endpoint, never the hub.
+    :param method: The HTTP method to use. <c>POST</c> for every provider today.
+    :param expires_at: When the grant stops being accepted. Evaluated when the request is <i>received</i>, not when
+                       it completes, so a transfer that starts in time may finish afterwards.
+    :param max_bytes: The ceiling the policy enforces, in bytes. Equal to the declared size.
+    :param headers: Request headers the submission must carry. Normally <b>empty</b>, and that is load-bearing: a
+                    cross-origin <c>POST</c> whose only content type is <c>multipart/form-data</c> and which sends
+                    no custom headers is a CORS <i>simple</i> request, so no preflight is issued. Any entry here
+                    makes it non-simple. Nullable and omitted rather than required, so a client can skip it.
+    :param fields: Form fields the submission must carry — the policy document, its signature, the key, and
+                   whatever else the provider requires. Present for a policy upload; null for a plain-body one.
+                   <b>Order matters:</b> the file part must be appended last.
+    :param checksum_algorithm: The checksum algorithm the store will verify against, so a client holding only a grant knows the form.
+    """
+    file_id: UUID
+    url: str
+    method: str
+    expires_at: datetime.datetime
+    max_bytes: int
+    headers: Optional[dict[str, str]] = field(default=None)
+    fields: Optional[dict[str, str]] = field(default=None)
+    checksum_algorithm: FileChecksumAlgorithm = field(default=FileChecksumAlgorithm.None_)
+
+
+@dataclass(kw_only=True)
+class FileUploadCompletion:
+    """
+    Confirms that the bytes for one file arrived.
+    
+    :param file_id: The file whose upload is being completed.
+    """
+    file_id: UUID
+
+
+@dataclass(kw_only=True)
+class GetFileUrlsRequest:
+    """
+    Asks for read grants for a batch of files.
+    
+    :param file_ids: The files to mint read grants for.
+    """
+    file_ids: list[UUID]
+
+
+@dataclass(kw_only=True)
 class EntityServiceDataUpdate:
     """
     Represents a collection of entity changes including created, updated, and deleted entities.
@@ -396,6 +506,30 @@ class ServiceProcessingInfo:
 
 
 @dataclass(kw_only=True)
+class FileReference:
+    """
+    The outcome of resolving one file for a client: either everything needed to display it, or why not.
+    
+    :param success: Whether the file was resolved.
+    :param message: Why the file could not be resolved. Empty on success.
+    :param error_code: The machine-readable reason. <see cref="F:Filament.FSCore.Structs.ErrorCodes.None" /> on success.
+    :param url: A signed, expiring URL the client can fetch directly. Null on failure.
+    :param cache_key: A key safe for an application-level cache, stable for the life of the verified bytes.
+    :param expires_at: When <see cref="P:Filament.FSCore.FileStore.FileReference.Url" /> stops being accepted. Null on failure.
+    :param refreshable: Whether the URL expires and can be re-minted.
+    :param metadata: Content type, size and, for images, dimensions — so a client can reserve space first.
+    """
+    success: bool = field(default=False)
+    message: str = field(default='')
+    error_code: ErrorCodes = field(default=ErrorCodes.None_)
+    url: Optional[str] = field(default=None)
+    cache_key: Optional[str] = field(default=None)
+    expires_at: Optional[datetime.datetime] = field(default=None)
+    refreshable: bool = field(default=False)
+    metadata: Optional[FileMetadata] = field(default=None)
+
+
+@dataclass(kw_only=True)
 class TaskPriorityReasons:
     """
     Structured priority reasons for a task, capturing each component of the priority calculation.
@@ -420,8 +554,13 @@ class UserPriorityReasons:
 
 
 @dataclass(kw_only=True)
-class SuccessOrError(SuccessOrErrorBase):
-    """The SuccessOrError type is used to return either success, or an error message."""
+class ServerCapabilities:
+    """
+    Everything the server can tell a client about itself before the client does any work.
+    
+    :param files: What this deployment can do with files, or <see langword="null" /> when it has no file store.
+    """
+    files: Optional[FileCapabilities] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -433,6 +572,11 @@ class ValueOrError_1(SuccessOrErrorBase, Generic[T]):
     :param data: The internal data if in a success state
     """
     data: Optional[T] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class SuccessOrError(SuccessOrErrorBase):
+    """The SuccessOrError type is used to return either success, or an error message."""
 
 
 @dataclass(kw_only=True)
@@ -616,10 +760,11 @@ class UserOptionReason:
 
 
 @dataclass(kw_only=True)
-class SuccessOrErrorPublic(SuccessOrError):
+class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
     """
-    Represents a public-facing version of the <see cref="T:Filament.FSCore.Structs.SuccessOrError" /> class.
-    This class is used to expose results while ensuring only public errors and messages are shared externally.
+    Represents a public-facing abstraction derived from <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
+    This class is used to expose data and error information in a way that is
+    consumable by external systems or APIs.
     
     :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
                      This identifier can be used for logging, debugging, or correlation purposes.
@@ -628,11 +773,10 @@ class SuccessOrErrorPublic(SuccessOrError):
 
 
 @dataclass(kw_only=True)
-class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
+class SuccessOrErrorPublic(SuccessOrError):
     """
-    Represents a public-facing abstraction derived from <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
-    This class is used to expose data and error information in a way that is
-    consumable by external systems or APIs.
+    Represents a public-facing version of the <see cref="T:Filament.FSCore.Structs.SuccessOrError" /> class.
+    This class is used to expose results while ensuring only public errors and messages are shared externally.
     
     :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
                      This identifier can be used for logging, debugging, or correlation purposes.
@@ -807,6 +951,7 @@ class ReadDataTypeRequest:
     :param offset: The number of records to skip before returning results.
     :param properties: The list of properties to include in the results. Required when Mode is Distinct.
     :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is true.
+    :param populate_file_data: Whether the hub should populate any requested <c>[FileDataProperty]</c> projections on the results.
     """
     type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
@@ -816,6 +961,7 @@ class ReadDataTypeRequest:
     offset: int = field(default=0)
     properties: Optional[list[str]] = field(default=None)
     apply_pending_requests: bool = field(default=True)
+    populate_file_data: bool = field(default=False)
 
 
 @dataclass(kw_only=True)
@@ -836,6 +982,7 @@ class ReadConnectedDataTypeRequest:
     :param entity_properties: The list of entity properties to include in the results.
     :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is false,
                                    as this is not currently supported on ReadConnectedData.
+    :param populate_file_data: Whether the hub should populate any requested <c>[FileDataProperty]</c> projections, on either side.
     """
     connection_type_name: str = field(default='')
     entity_type_name: str = field(default='')
@@ -849,6 +996,7 @@ class ReadConnectedDataTypeRequest:
     connection_properties: Optional[list[str]] = field(default=None)
     entity_properties: Optional[list[str]] = field(default=None)
     apply_pending_requests: bool = field(default=False)
+    populate_file_data: bool = field(default=False)
 
 
 @dataclass(kw_only=True)
