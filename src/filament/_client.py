@@ -1532,7 +1532,12 @@ class FilamentClient:
         already completed.
         """
         result_dict: Any = await self._invoke("CancelFileUpload", str(file_id))
-        result = from_dict(result_dict, SuccessOrErrorPublic)
+        try:
+            result = from_dict(result_dict, SuccessOrErrorPublic)
+        except (TypeError, ValueError, KeyError):
+            return _error_result_public(
+                "Failed to deserialize CancelFileUpload response"
+            )
         if result is not None:
             return result
         return _error_result_public("Failed to deserialize CancelFileUpload response")
@@ -1627,8 +1632,16 @@ class FilamentClient:
                         client, grant, data, content_type, name
                     )
             if not ok:
-                # Best-effort release of the reservation (idempotent).
-                await self.cancel_file_upload(file_id)
+                # Best-effort release of the reservation (idempotent).  A failure
+                # here must not mask the transfer error we are about to return.
+                try:
+                    await self.cancel_file_upload(file_id)
+                except Exception:
+                    logger.warning(
+                        "Failed to cancel upload reservation for %s",
+                        file_id,
+                        exc_info=True,
+                    )
                 return _value_error(message, error_code)
         finally:
             if owns_client:
@@ -1701,12 +1714,13 @@ class FilamentClient:
     ) -> ValueOrErrorPublic_1[bytes]:
         """Fetch the bytes for an already-resolved :class:`FileReference`.
 
-        Use this when you already hold a reference — e.g. from a populated
-        ``[FileDataProperty]`` read projection such as ``UserEntity.image_data``
-        (deserialize it with :func:`filament.file_reference_from_json`) — to
-        download directly, skipping the extra :meth:`get_file_urls` round trip.
-        Returns the bytes, or a failed result if the reference did not resolve or
-        the transfer failed.
+        Use this when you already hold a reference — e.g. ``UserEntity.image``,
+        which is populated automatically from its ``[FileDataProperty]`` read
+        projection (a raw projection string can also be parsed with
+        :func:`filament.file_reference_from_json`) — to download directly,
+        skipping the extra :meth:`get_file_urls` round trip.  Returns the bytes,
+        or a failed result if the reference did not resolve or the transfer
+        failed.
         """
         if not reference.success or reference.url is None:
             return _value_error(
