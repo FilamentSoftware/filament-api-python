@@ -97,6 +97,9 @@ def build_upload_request(
 
     Enforces the provider contract exactly:
 
+    - When ``fields`` is ``None`` the grant is a **plain-body** upload: the raw
+      bytes are sent as the request body (carrying the content type), not a
+      multipart form.  A policy upload is used only when ``fields`` is present.
     - The policy ``fields`` are emitted first, **in order**, as plain form parts
       with a quoted ``name`` and **no per-part ``Content-Type``**.
     - The ``Content-Type`` policy field carries the real content type being
@@ -109,7 +112,21 @@ def build_upload_request(
 
     :returns: A ready-to-send :class:`httpx.Request`.
     """
-    form_fields = dict(fields or {})
+    if fields is None:
+        # Plain-body upload: send the raw bytes as the request body with the
+        # content type.  ``UploadGrant.fields`` is null precisely for providers
+        # that expect a plain body rather than a multipart policy form.
+        plain_headers = {"Content-Type": content_type}
+        if headers:
+            plain_headers.update(headers)
+        return httpx.Request(
+            method or "POST",
+            url,
+            content=data,
+            headers=plain_headers,
+        )
+
+    form_fields = dict(fields)
 
     # The file part must carry the exact content type the policy pinned, so
     # resolve it case-insensitively from the fields, falling back to the caller
