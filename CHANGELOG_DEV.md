@@ -1,3 +1,10 @@
+## 0.6.1-dev.0.0.1 (2026-08-12 16:06)
+
+### Codex
+
+#### OTHER
+- Added Codex workflow skill wrappers for repository development.
+
 ## 0.6.0-dev.0.2.0 (2026-08-04 15:44)
 
 ### Types
