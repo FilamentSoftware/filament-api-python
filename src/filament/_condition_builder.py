@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime
 import types
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import fields as dc_fields
 from enum import Enum
 from typing import Any, Generic, Optional, Type, TypeVar, get_args, get_origin, Union
@@ -44,6 +44,7 @@ T = TypeVar("T")
 TKey = TypeVar("TKey")
 TValue = TypeVar("TValue")
 TEntity = TypeVar("TEntity")
+ValueConverter = Callable[[Any], Optional[str]]
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +89,15 @@ def _values_to_wire(values: Sequence[Any]) -> list[Optional[str]]:
     if isinstance(values, (str, bytes)):
         raise TypeError("Expected a sequence of values, not a scalar string")
     return [_value_to_wire(v) for v in values]
+
+
+def _values_with_converter(
+    values: Sequence[Any], converter: ValueConverter,
+) -> list[Optional[str]]:
+    """Convert a non-scalar sequence with a field-specific converter."""
+    if isinstance(values, (str, bytes)):
+        raise TypeError("Expected a sequence of values, not a scalar string")
+    return [converter(value) for value in values]
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +192,7 @@ class DbConditionProperty(Generic[T]):
         key: Optional[str] = None,
         *,
         _invert: bool = False,
+        _value_converter: ValueConverter = _value_to_wire,
     ) -> None:
         """Initialise the property wrapper.
 
@@ -195,6 +206,7 @@ class DbConditionProperty(Generic[T]):
         self._mode = mode
         self._key = key
         self._invert = _invert
+        self._value_converter = _value_converter
 
     def _wrap(self, condition: DbConditionInstance) -> DbConditionInstance:
         """Wrap *condition* in a ``DbConditionNot`` if this property is inverted."""
@@ -206,7 +218,8 @@ class DbConditionProperty(Generic[T]):
     def not_(self) -> DbConditionProperty[T]:
         """Return a negated version of this property wrapper."""
         return DbConditionProperty[T](
-            self._wire_name, self._mode, self._key, _invert=not self._invert
+            self._wire_name, self._mode, self._key,
+            _invert=not self._invert, _value_converter=self._value_converter,
         )
 
     def equal_to(self, value: T) -> DbConditionInstance:
@@ -214,7 +227,7 @@ class DbConditionProperty(Generic[T]):
         return self._wrap(DbConditionComparison(
             condition_type=DbConditionType.EqualTo,
             property=self._wire_name,
-            value=_value_to_wire(value),
+            value=self._value_converter(value),
             mode=self._mode,
             key=self._key,
         ))
@@ -223,7 +236,7 @@ class DbConditionProperty(Generic[T]):
         """Create an ``In`` membership condition."""
         return self._wrap(DbConditionComparisonArray(
             property=self._wire_name,
-            values=_values_to_wire(values),
+            values=_values_with_converter(values, self._value_converter),
             mode=self._mode,
             key=self._key,
         ))
@@ -270,7 +283,8 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
     def not_(self) -> DbConditionComparableProperty[T]:
         """Return a negated version of this comparable property wrapper."""
         return DbConditionComparableProperty[T](
-            self._wire_name, self._mode, self._key, _invert=not self._invert
+            self._wire_name, self._mode, self._key,
+            _invert=not self._invert, _value_converter=self._value_converter,
         )
 
     def less_than(self, value: T) -> DbConditionInstance:
@@ -278,7 +292,7 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionComparison(
             condition_type=DbConditionType.LessThan,
             property=self._wire_name,
-            value=_value_to_wire(value),
+            value=self._value_converter(value),
             mode=self._mode,
             key=self._key,
         ))
@@ -288,7 +302,7 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionComparison(
             condition_type=DbConditionType.LessThanOrEqualTo,
             property=self._wire_name,
-            value=_value_to_wire(value),
+            value=self._value_converter(value),
             mode=self._mode,
             key=self._key,
         ))
@@ -298,7 +312,7 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionComparison(
             condition_type=DbConditionType.GreaterThan,
             property=self._wire_name,
-            value=_value_to_wire(value),
+            value=self._value_converter(value),
             mode=self._mode,
             key=self._key,
         ))
@@ -308,7 +322,7 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionComparison(
             condition_type=DbConditionType.GreaterThanOrEqualTo,
             property=self._wire_name,
-            value=_value_to_wire(value),
+            value=self._value_converter(value),
             mode=self._mode,
             key=self._key,
         ))
@@ -322,8 +336,8 @@ class DbConditionComparableProperty(DbConditionProperty[T]):
         inclusive_max: bool = True,
     ) -> DbConditionInstance:
         """Create a ``Between`` range condition."""
-        min_wire = _value_to_wire(min_val)
-        max_wire = _value_to_wire(max_val)
+        min_wire = self._value_converter(min_val)
+        max_wire = self._value_converter(max_val)
         if min_wire is None or max_wire is None:
             raise ValueError("between() bounds must not be None")
         return self._wrap(DbConditionBetween(
@@ -344,14 +358,15 @@ class DbConditionListProperty(DbConditionProperty[T]):
     def not_(self) -> DbConditionListProperty[T]:
         """Return a negated version of this list property wrapper."""
         return DbConditionListProperty[T](
-            self._wire_name, self._mode, self._key, _invert=not self._invert
+            self._wire_name, self._mode, self._key,
+            _invert=not self._invert, _value_converter=self._value_converter,
         )
 
     def contains(self, value: T) -> DbConditionInstance:
         """Create a ``Contains`` membership condition."""
         return self._wrap(DbConditionContains(
             property=self._wire_name,
-            value=_value_to_wire(value),
+            value=self._value_converter(value),
             mode=self._mode,
         ))
 
@@ -360,7 +375,7 @@ class DbConditionListProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionArrayComparison(
             condition_type=DbConditionType.Intersects,
             property=self._wire_name,
-            values=_values_to_wire(values),
+            values=_values_with_converter(values, self._value_converter),
             mode=self._mode,
         ))
 
@@ -369,7 +384,7 @@ class DbConditionListProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionArrayComparison(
             condition_type=DbConditionType.SubsetOf,
             property=self._wire_name,
-            values=_values_to_wire(values),
+            values=_values_with_converter(values, self._value_converter),
             mode=self._mode,
         ))
 
@@ -378,7 +393,7 @@ class DbConditionListProperty(DbConditionProperty[T]):
         return self._wrap(DbConditionArrayComparison(
             condition_type=DbConditionType.SupersetOf,
             property=self._wire_name,
-            values=_values_to_wire(values),
+            values=_values_with_converter(values, self._value_converter),
             mode=self._mode,
         ))
 
@@ -386,12 +401,20 @@ class DbConditionListProperty(DbConditionProperty[T]):
 class DbConditionDictProperty(Generic[TKey, TValue]):
     """Typed property wrapper for dict fields — provides key/keys/values accessors."""
 
-    def __init__(self, wire_name: str) -> None:
+    def __init__(
+        self,
+        wire_name: str,
+        *,
+        _key_converter: ValueConverter = _value_to_wire,
+        _value_converter: ValueConverter = _value_to_wire,
+    ) -> None:
         """Initialise the dict property wrapper.
 
         :param wire_name: The camelCase property name used in the wire format.
         """
         self._wire_name = wire_name
+        self._key_converter = _key_converter
+        self._value_converter = _value_converter
 
     def key(self, key_value: TKey) -> DbConditionProperty[TValue]:
         """Access a specific dictionary key (mode=DictionaryValue).
@@ -399,13 +422,14 @@ class DbConditionDictProperty(Generic[TKey, TValue]):
         :param key_value: The dictionary key to match against.
         :raises ValueError: If *key_value* is ``None``.
         """
-        wire_key = _value_to_wire(key_value)
+        wire_key = self._key_converter(key_value)
         if wire_key is None:
             raise ValueError("Dictionary key must not be None")
         return DbConditionProperty[TValue](
             self._wire_name,
             mode=DbConditionMode.DictionaryValue,
             key=wire_key,
+            _value_converter=self._value_converter,
         )
 
     def keys(self) -> DbConditionListProperty[TKey]:
@@ -413,6 +437,7 @@ class DbConditionDictProperty(Generic[TKey, TValue]):
         return DbConditionListProperty[TKey](
             self._wire_name,
             mode=DbConditionMode.DictionaryKeys,
+            _value_converter=self._key_converter,
         )
 
     def values(self) -> DbConditionListProperty[TValue]:
@@ -420,6 +445,7 @@ class DbConditionDictProperty(Generic[TKey, TValue]):
         return DbConditionListProperty[TValue](
             self._wire_name,
             mode=DbConditionMode.DictionaryValues,
+            _value_converter=self._value_converter,
         )
 
 
