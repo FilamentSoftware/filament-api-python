@@ -17,6 +17,7 @@ read [Getting Started](getting-started.md) first, then dip into the topic you ne
 | [Reading Data](reading-data.md) | `read_data`, request shapes, ordering, paging, projections, counting, and parsing results back into typed entities. |
 | [Building Conditions](conditions.md) | The typed `Condition` builder, every operator, dictionary/list/comparable fields, combining conditions, the mypy plugin, link (join) conditions, and the untyped API. |
 | [Modifying Data](modifying-data.md) | Creating, updating, and deleting entities; partial updates and the `specified_properties` mechanism. |
+| [User-defined Properties](user-defined-properties.md) | Discovering, reading, constructing, querying, and administering tenant-defined entity fields. |
 | [Subscriptions](subscriptions.md) | Real-time `DataUpdated` events, subscription modes and status flags, callbacks, condition filtering, unsubscribing, and processing-lifecycle events. |
 | [Data Options](data-options.md) | The typed `DataOption` key-value type and its constructors. |
 | [API Reference](api-reference.md) | `FilamentClient` method-by-method reference, the response envelope, and the exception hierarchy. |

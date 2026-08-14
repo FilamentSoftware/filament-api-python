@@ -12,6 +12,7 @@ Full, multi-page documentation lives in [`docs/`](docs/README.md):
 - [Reading Data](docs/reading-data.md) — queries, ordering, paging, projections
 - [Building Conditions](docs/conditions.md) — the typed condition builder and operators
 - [Modifying Data](docs/modifying-data.md) — create, update, delete, partial updates
+- [User-defined Properties](docs/user-defined-properties.md) — discover, read, write, query, and administer runtime properties
 - [Subscriptions](docs/subscriptions.md) — real-time updates and lifecycle events
 - [Data Options](docs/data-options.md) — the typed `DataOption` key-value type
 - [API Reference](docs/api-reference.md) — `FilamentClient`, the response envelope, exceptions

@@ -40,6 +40,11 @@ All methods are coroutines and must be `await`ed.
 
 Read entity data. Takes a `ReadDataRequest`. See [Reading Data](reading-data.md).
 
+#### `read_connected_data(request) -> ValueOrErrorPublic_1[ServiceDataReadConnected]`
+
+Read entities through a connection type. User-defined values on both returned
+sides are hydrated; automatic response-size paging is not applied.
+
 #### `modify_data(request) -> ValueOrErrorPublic_1[RequestId]`
 
 Create, update, or delete entities. Takes a `ModifyDataRequest`. On success
@@ -69,7 +74,20 @@ Retrieve entity-level permissions for the authenticated user.
 #### `get_entity_property_permissions(entity_type_name) -> ValueOrErrorPublic_1[EntityPropertyPermissions]`
 
 Retrieve property-level permissions for a given entity type (passed as a
-class-name string).
+class-name string). This map is also the authoritative discovery source for
+[user-defined properties](user-defined-properties.md).
+
+#### User-defined property methods
+
+- `get_user_defined_properties(entity_type_name)` returns cached runtime property
+  helpers keyed by Python `udp_snake_case` name.
+- `invalidate_user_defined_property_cache(entity_type_name=None)` clears one or
+  every definition map.
+- `create_user_defined_property(request)` creates a definition.
+- `update_user_defined_property(request)` edits the mutable definition fields.
+
+See [User-defined Properties](user-defined-properties.md) for construction,
+conversion, permissions, conditions, and cache behavior.
 
 ### Event-callback registration
 
@@ -91,7 +109,7 @@ SignalR contract is declared as Protocol classes in
 `filament/types/generated/api.py`:
 
 - `ClientMethods` — every method the server accepts. In addition to the
-  implemented ones, it declares `read_connected_data`, `preview_data`,
+  implemented ones, it declares `preview_data`,
   `switch_user`, `set_permissions_roles`, `resubscribe`, and `get_status`, which
   are **not yet wrapped** by a dedicated client method.
 - `ServerEvents` — every event the server pushes: `authentication_failed`,
