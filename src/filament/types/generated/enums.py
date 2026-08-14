@@ -47,7 +47,9 @@ __all__ = [
     "TimeLogModeEnum",
     "TimeLogStatusEnum",
     "TrainingType",
+    "TypeSchemaPropertyType",
     "UserAddressType",
+    "UserDefinedPropertyStatus",
     "UserEmailType",
     "UserLicenseType",
     "UserPhoneType",
@@ -910,6 +912,59 @@ class TrainingType(Enum):
     WithMentor = 1
 
 
+class TypeSchemaPropertyType(Enum):
+    """
+    Represents the data types that can be assigned to a property in a type schema definition.
+    
+    :cvar Invalid: Specifies an invalid or uninitialized state for a property type in a type schema definition.
+    :cvar String: Represents a property type in a type schema definition that holds textual data.
+    :cvar Bool: Represents a boolean property type in a type schema definition.
+    :cvar Short: Represents a 16-bit signed integer data type for a property in a type schema definition.
+    :cvar Int: Represents a 32-bit signed integer data type that can be assigned to a property in a type schema definition.
+    :cvar Long: Represents a property type in a type schema definition that stores 64-bit signed integer values.
+    :cvar Float: Represents a property type in a type schema definition that stores a single-precision floating-point numeric value.
+    :cvar Double: Represents a property type in a type schema definition that stores
+                  double-precision floating-point numeric values.
+    :cvar Decimal: Represents a property type in a type schema definition that is used to store high-precision decimal numbers.
+    :cvar Guid: Represents a globally unique identifier (GUID) as a property type in a type schema definition.
+    :cvar Instant: Represents a property type in a type schema that stores an instantaneous point on the timeline,
+                   typically used for timestamps or precise temporal events.
+    :cvar Duration: Represents a property type in a type schema definition that stores a duration,
+                    typically used to define an amount of time with a specific granularity or precision.
+    :cvar Interval: Represents a range or span of values, typically defined by a start and end point, as a property type in a type schema definition.
+    :cvar LocalDate: Represents a property type in a type schema definition that stores a date value without a time-of-day or timezone component.
+    :cvar LocalTime: Represents a property type in a type schema definition that stores a time value without a date or timezone context.
+    :cvar LocalDateTime: Represents a property type in a type schema that defines a combination of local date and time without an associated time zone.
+    :cvar DateTimeZone: Represents a property type in a type schema definition that specifies a date and time with associated timezone information.
+    :cvar Enum: Represents an enumerated type, indicating that the property should store a predefined set of constant values.
+    :cvar List: Represents a collection of values of a specified type in a type schema definition.
+    :cvar Array: Represents a property type in a type schema definition
+                 that defines a collection of elements stored in an array structure.
+    :cvar Dictionary: Represents a key-value pair collection where both keys and values conform to specified data types within a type schema definition.
+    """
+    Invalid = 0
+    String = 1
+    Bool = 2
+    Short = 3
+    Int = 4
+    Long = 5
+    Float = 6
+    Double = 7
+    Decimal = 8
+    Guid = 9
+    Instant = 10
+    Duration = 11
+    Interval = 12
+    LocalDate = 13
+    LocalTime = 14
+    LocalDateTime = 15
+    DateTimeZone = 16
+    Enum = 17
+    List = 18
+    Array = 19
+    Dictionary = 20
+
+
 class UserAddressType(Enum):
     """
     An enum that defines valid types of addresses.
@@ -921,6 +976,21 @@ class UserAddressType(Enum):
     Home = 0
     Business = 1
     Other = 2
+
+
+class UserDefinedPropertyStatus(Enum):
+    """
+    The lifecycle of a user-defined property definition, which exists because creating one is two operations
+    with very different durations: claiming the name and adding the column take milliseconds, while seeding
+    every existing entity is a table-sized write.
+    
+    :cvar Pending: Set at creation, inside the lock that claims the name. The property is invisible to clients — absent
+                   from the permission map, the join, conditions and orders — and cannot be written.
+    :cvar Active: Set once the backfill has completed. The property is fully usable: visible to clients, readable,
+                  writable, and available to conditions and orders.
+    """
+    Pending = 0
+    Active = 1
 
 
 class UserEmailType(Enum):
