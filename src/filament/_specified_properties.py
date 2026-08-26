@@ -27,6 +27,12 @@ class SpecifiedPropertiesBase:
     specified_properties: Optional[list[str]] = field(
         init=False, repr=False, compare=False,
     )
+    # Reads of this name are deliberately left unguarded: they resolve to the
+    # residual ``None`` class attribute.  ``dataclasses.replace()`` reads every
+    # defaulted ``InitVar`` with ``getattr()`` to rebuild the instance, so any
+    # guard that raises on read -- a ``__getattribute__`` hook or a data
+    # descriptor -- breaks ``replace()`` for every entity on all supported
+    # Python versions.  ``__setattr__`` still rejects assignment.
     _user_defined_properties: InitVar[Optional[Mapping[str, Any]]] = None
 
     def __new__(cls, **kwargs: Any) -> "SpecifiedPropertiesBase":
@@ -66,20 +72,8 @@ class SpecifiedPropertiesBase:
             if specified is not None and name not in specified:
                 specified.append(name)
 
-    def __getattribute__(self, name: str) -> Any:
-        """Keep the constructor-only UDP mapping unreadable after initialization."""
-        if name == "_user_defined_properties":
-            raise AttributeError(
-                "_user_defined_properties is a constructor-only input"
-            )
-        return object.__getattribute__(self, name)
-
     def __getattr__(self, name: str) -> Any:
         """Provide the mypy plugin a hook point while preserving normal runtime errors."""
-        if name == "_user_defined_properties":
-            raise AttributeError(
-                "_user_defined_properties is a constructor-only input"
-            )
         raise AttributeError(
             f"{type(self).__name__!r} object has no attribute {name!r}"
         )
