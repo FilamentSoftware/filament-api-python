@@ -52,6 +52,15 @@ _FLOAT_TYPES = {
     TypeSchemaPropertyType.Float,
     TypeSchemaPropertyType.Double,
 }
+# Ordering operators are refused by the backend's user-defined condition policy
+# for Bool and Interval, and Enum is restricted to equality and In.  Every other
+# scalar type -- including LocalDate, LocalTime, LocalDateTime and DateTimeZone,
+# which are ordered domains despite serializing as text -- supports ordering.
+_NON_COMPARABLE_TYPES = {
+    TypeSchemaPropertyType.Bool,
+    TypeSchemaPropertyType.Enum,
+    TypeSchemaPropertyType.Interval,
+}
 _COLLECTION_TYPES = {
     TypeSchemaPropertyType.List,
     TypeSchemaPropertyType.Array,
@@ -282,11 +291,7 @@ class UserDefinedProperty:
                 _key_converter=self.adapter.key_condition_to_wire,
                 _value_converter=self.adapter.value_condition_to_wire,
             )
-        if property_type is TypeSchemaPropertyType.Enum:
-            return DbConditionProperty[Any](
-                self.wire_name, _value_converter=self.adapter.condition_to_wire,
-            )
-        if property_type not in _TEXT_TYPES or property_type is TypeSchemaPropertyType.String:
+        if property_type not in _NON_COMPARABLE_TYPES:
             return DbConditionComparableProperty[Any](
                 self.wire_name, _value_converter=self.adapter.condition_to_wire,
             )
