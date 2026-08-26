@@ -1,3 +1,12 @@
+## 0.7.0-dev.0.0.1 (2026-08-26 14:30)
+
+### Client
+
+#### FEATURE
+- Tenant-defined fields are now readable and writable as typed udp_* attributes on entities and connections, across reads, connected reads, writes, and subscription updates
+- get_user_defined_properties() reports each field's declared type, effective permission, and a condition factory for filtering on it
+- Field definitions refresh automatically, so definition changes are picked up without reconnecting
+
 ## 0.6.1-dev.0.0.2 (2026-08-14 00:00)
 
 ### Client
