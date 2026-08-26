@@ -530,7 +530,12 @@ class FilamentClient:
         """Fan out a (possibly merged) ``ServiceDataUpdate`` to every client callback."""
         if backend_id == self._user_defined_subscription_id:
             await self._handle_user_defined_property_update(update)
-            return
+            # The backend returns the same subscription ID for duplicate
+            # type/permission combinations, so a caller who subscribes to
+            # UserDefinedPropertyEntity with a matching config shares this ID.
+            # Keep dispatching so their callback still runs.
+            if backend_id not in self._backend_to_client:
+                return
         if not await self._hydrate_data_update(update):
             logger.error(
                 "Dropping DataUpdated for subscription %s because UDP hydration failed",
@@ -616,10 +621,13 @@ class FilamentClient:
             cached_names = sorted(cached)
             self._evict_user_defined_properties(cached)
             results = await asyncio.gather(
-                *(self._ensure_user_defined_properties(name) for name in cached_names),
+                *(
+                    self._ensure_user_defined_properties(name, reconcile=False)
+                    for name in cached_names
+                ),
                 return_exceptions=True,
             )
-            for name, result in zip(cached_names, results):
+            for name, result in zip(cached_names, results, strict=True):
                 if isinstance(result, BaseException):
                     logger.error(
                         "Could not refresh UDP definitions for %s: %s", name, result,
@@ -900,11 +908,19 @@ class FilamentClient:
         return properties
 
     async def _ensure_user_defined_properties(
-        self, entity_type_name: str,
+        self, entity_type_name: str, *, reconcile: bool = True,
     ) -> Mapping[str, UserDefinedProperty]:
+        """Load and cache one type's UDP definitions.
+
+        Pass ``reconcile=False`` when loading a batch of types: each reconcile
+        issues its own ``Subscribe`` plus an ``Unsubscribe`` for the superseded
+        ID, so reconciling per type costs 2N hub calls and leaves every
+        intermediate subscription covering only part of the desired set.  The
+        caller is then responsible for reconciling once after the batch.
+        """
         cached = self._user_defined_properties.get(entity_type_name)
         if cached is not None:
-            if (
+            if reconcile and (
                 entity_type_name not in self._user_defined_subscription_types
                 or self._user_defined_subscription_id is None
             ):
@@ -927,12 +943,15 @@ class FilamentClient:
         cached = self._user_defined_properties.get(entity_type_name)
         if cached is None:
             # The load was invalidated while in flight; retry under the new generation.
-            return await self._ensure_user_defined_properties(entity_type_name)
-        try:
-            await self._reconcile_user_defined_property_subscription()
-        except _UserDefinedPropertyLoadError:
-            self._user_defined_properties.pop(entity_type_name, None)
-            raise
+            return await self._ensure_user_defined_properties(
+                entity_type_name, reconcile=reconcile,
+            )
+        if reconcile:
+            try:
+                await self._reconcile_user_defined_property_subscription()
+            except _UserDefinedPropertyLoadError:
+                self._user_defined_properties.pop(entity_type_name, None)
+                raise
         return cached
 
     async def _reconcile_user_defined_property_subscription(self) -> None:
@@ -1477,6 +1496,20 @@ class FilamentClient:
                 if not client_ids:
                     # Last client for this backend subscription — tell backend
                     del self._backend_to_client[backend_id]
+                    if backend_id == self._user_defined_subscription_id:
+                        # The private UDP-definition subscription shares this
+                        # backend ID.  Sending Unsubscribe would cancel it while
+                        # _user_defined_subscription_id still points at it, and
+                        # _reconcile_user_defined_property_subscription would
+                        # then early-return and never restore it.  Leave the
+                        # backend subscription — and its in-flight buffers —
+                        # alone.
+                        return SuccessOrErrorPublic(
+                            success=True,
+                            message="",
+                            error_code=ErrorCodes.None_,
+                            error_id=None,
+                        )
                     # Drop any in-flight partial reassemblies / poisoned
                     # sequences for this backend sub — nothing left to
                     # dispatch them to.
@@ -1525,16 +1558,26 @@ class FilamentClient:
         if result.success and cached_type_names:
             await self.invalidate_user_defined_property_cache()
             refreshes = await asyncio.gather(
-                *(self._ensure_user_defined_properties(name) for name in cached_type_names),
+                *(
+                    self._ensure_user_defined_properties(name, reconcile=False)
+                    for name in cached_type_names
+                ),
                 return_exceptions=True,
             )
-            for name, refresh in zip(cached_type_names, refreshes):
+            for name, refresh in zip(cached_type_names, refreshes, strict=True):
                 if isinstance(refresh, BaseException):
                     logger.error(
                         "Could not restore UDP metadata subscription for %s: %s",
                         name,
                         refresh,
                     )
+            try:
+                await self._reconcile_user_defined_property_subscription()
+            except _UserDefinedPropertyLoadError:
+                logger.exception(
+                    "Could not restore UDP definition subscription after "
+                    "UnsubscribeAll"
+                )
         return result
 
 
