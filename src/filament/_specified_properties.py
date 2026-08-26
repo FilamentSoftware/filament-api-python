@@ -1,5 +1,11 @@
 """Base class for tracking which properties were explicitly specified."""
-from __future__ import annotations
+# NOTE: this module deliberately does NOT use ``from __future__ import
+# annotations``.  The ``InitVar`` pseudo-field below must stay a real
+# ``InitVar`` object rather than the string ``"InitVar[...]"``: on Python 3.10
+# ``typing.get_type_hints`` evaluates such a string and rejects the result with
+# ``TypeError: Forward references must evaluate to types``.  Python 3.11
+# relaxed that check, so re-adding the import here breaks 3.10 only.  Forward
+# references in this module must therefore be quoted explicitly.
 
 from collections.abc import Mapping
 from dataclasses import InitVar, dataclass, field
@@ -23,7 +29,7 @@ class SpecifiedPropertiesBase:
     )
     _user_defined_properties: InitVar[Optional[Mapping[str, Any]]] = None
 
-    def __new__(cls, **kwargs: Any) -> SpecifiedPropertiesBase:
+    def __new__(cls, **kwargs: Any) -> "SpecifiedPropertiesBase":
         instance = super().__new__(cls)
         specified = [
             name for name in kwargs if name != "_user_defined_properties"
