@@ -1,6 +1,7 @@
 """Runtime tests for user-defined-property construction and conversion."""
 from __future__ import annotations
 
+import dataclasses
 import datetime
 from decimal import Decimal
 
@@ -169,3 +170,26 @@ def test_registry_property_builds_definition_aware_condition() -> None:
     assert isinstance(condition, DbConditionComparison)
     assert condition.property == "udpBudget"
     assert condition.value == "7.25"
+
+
+def test_specified_properties_base_initvar_annotation_is_not_stringified() -> None:
+    """``InitVar`` must stay a real object so ``get_type_hints`` works on 3.10.
+
+    ``_specified_properties`` deliberately omits ``from __future__ import
+    annotations``.  With it, the annotation becomes the string
+    ``"InitVar[...]"``, which Python 3.10's ``typing.get_type_hints`` evaluates
+    and then rejects with ``TypeError: Forward references must evaluate to
+    types``.  Python 3.11 relaxed that check, so a regression here is invisible
+    on every version except 3.10.
+    """
+    import typing
+
+    from filament._specified_properties import SpecifiedPropertiesBase
+
+    annotation = SpecifiedPropertiesBase.__annotations__["_user_defined_properties"]
+    assert not isinstance(annotation, str)
+    assert isinstance(annotation, dataclasses.InitVar)
+
+    # The real guarantee: resolving hints on a UDP-capable entity must not raise.
+    hints = typing.get_type_hints(TaskEntity)
+    assert hints["id"] is not None
