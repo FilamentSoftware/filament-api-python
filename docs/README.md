@@ -17,6 +17,7 @@ read [Getting Started](getting-started.md) first, then dip into the topic you ne
 | [Reading Data](reading-data.md) | `read_data`, request shapes, ordering, paging, projections, counting, and parsing results back into typed entities. |
 | [Building Conditions](conditions.md) | The typed `Condition` builder, every operator, dictionary/list/comparable fields, combining conditions, the mypy plugin, link (join) conditions, and the untyped API. |
 | [Modifying Data](modifying-data.md) | Creating, updating, and deleting entities; partial updates and the `specified_properties` mechanism. |
+| [User-defined Properties](user-defined-properties.md) | Discovering, reading, constructing, querying, and administering tenant-defined entity fields. |
 | [Subscriptions](subscriptions.md) | Real-time `DataUpdated` events, subscription modes and status flags, callbacks, condition filtering, unsubscribing, and processing-lifecycle events. |
 | [Data Options](data-options.md) | The typed `DataOption` key-value type and its constructors. |
 | [API Reference](api-reference.md) | `FilamentClient` method-by-method reference, the response envelope, and the exception hierarchy. |
@@ -84,6 +85,11 @@ this documentation refers to:
 - `read_with_conditions.py` — read with the typed condition builder
 - `subscribe_users.py` — subscribe to real-time changes
 - `subscribe_with_conditions.py` — subscribe with a condition filter
+- `create_user_defined_properties.py` — create example UDP definitions (admin)
+- `discover_user_defined_properties.py` — discover, query, and read UDPs
+- `create_user_with_user_defined_properties.py` — set several UDPs on creation
+- `update_user_defined_property_values.py` — partially update several UDPs
+- `subscribe_users_with_user_defined_properties.py` — receive converted UDP values
 
 ## Conventions used in these docs
 

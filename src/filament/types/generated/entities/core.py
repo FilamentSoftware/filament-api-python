@@ -8,7 +8,7 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus
+from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus, TypeSchemaPropertyType, UserDefinedPropertyStatus
 
 __all__ = [
     "ErrorEntity",
@@ -21,6 +21,8 @@ __all__ = [
     "ScenarioEventEntity",
     "ChangedEntity",
     "EntityProtectionEntity",
+    "UserDefinedTableEntity",
+    "UserDefinedPropertyEntity",
 ]
 
 @dataclass(kw_only=True)
@@ -54,7 +56,7 @@ class RequestEntity(Entity):
     :param requested_at: When the request was requested.
     :param status: The status of the request.
     :param error_message: Error message if the request failed.
-    :param affected_entities: List of affected entity IDs.
+    :param affected_entities: List of affected entity types.
     :param request_data: The serialized request data associated with this entity.
     """
     sequence: int = field(default=0)
@@ -261,3 +263,51 @@ class EntityProtectionEntity(Entity):
     protection_source_property: Optional[str] = field(default=None)
     protection_source_connection_type: Optional[str] = field(default=None)
     protection_source_connection_id: Optional[UUID] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class UserDefinedTableEntity(Entity):
+    """
+    One row per sidecar table — a single row for each (organisation, entity type) pair that carries user-defined
+    properties. The row names the sidecar table that holds those properties' values.
+    
+    :param entity_type_name: The name of the entity or connection type the sidecar table sits on top of.
+    :param table_name: What the sidecar table is actually called.
+    """
+    entity_type_name: str = field(default='')
+    table_name: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class UserDefinedPropertyEntity(Entity):
+    """
+    One user-defined property definition — a single column on the sidecar table named by the
+    <see cref="T:Filament.FSCore.CoreEntities.UserDefinedTableEntity" /> this row points at.
+    
+    :param table_id: The sidecar table this property is a column of.
+    :param entity_type_name: The name of the entity or connection type this property is defined on.
+    :param name: The property's identifier, carrying the reserved prefix that keeps user-defined names disjoint from
+                 schema property names.
+    :param name_key: The snake_case normalisation of <see cref="P:Filament.FSCore.CoreEntities.UserDefinedPropertyEntity.Name" />.
+    :param label: The display text a client shows for this property.
+    :param description: Optional longer client-facing text describing what the property is for.
+    :param property_type: The property's declared type, reusing the existing wire enum rather than introducing a second type
+                          vocabulary.
+    :param sub_property_types: The element, key and value types of a collection property.
+    :param nullable: Whether the property's value may be null.
+    :param default_value: The value every existing and newly created entity starts with, in wire format.
+    :param validation: The property's constraints, serialised as JSON.
+    :param status: Where the definition is in its lifecycle.
+    """
+    table_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    entity_type_name: str = field(default='')
+    name: str = field(default='')
+    name_key: str = field(default='')
+    label: str = field(default='')
+    description: Optional[str] = field(default=None)
+    property_type: TypeSchemaPropertyType = field(default=TypeSchemaPropertyType.Invalid)
+    sub_property_types: list[TypeSchemaPropertyType] = field(default_factory=list)
+    nullable: bool = field(default=False)
+    default_value: Optional[str] = field(default=None)
+    validation: Optional[str] = field(default=None)
+    status: UserDefinedPropertyStatus = field(default=UserDefinedPropertyStatus.Pending)

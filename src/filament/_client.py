@@ -8,7 +8,7 @@ import inspect
 import logging
 import math
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import replace
 from types import TracebackType
 from typing import Any, Optional, Type, Union
@@ -23,26 +23,44 @@ from ._exceptions import (
     FilamentError,
     ResponseTooLargeError,
 )
+from ._condition_builder import Condition
 from ._serialization import from_dict, to_dict
+from .user_defined_properties import (
+    UserDefinedProperty,
+    build_user_defined_properties,
+    hydrate_user_defined_properties,
+)
+from .types.generated.entities.core import UserDefinedPropertyEntity
 from .types.generated.misc import (
     ClientHelloRequest,
+    CreateUserDefinedPropertyRequest,
     DataUpdateRejectedNotification,
     EntityPermissions,
     EntityPropertyPermissions,
     EntityServiceDataUpdate,
     ModifyDataRequest,
     ProcessingStatus,
+    ReadConnectedDataRequest,
     ReadDataRequest,
     RequestId,
     ServiceDataRead,
+    ServiceDataReadConnected,
     ServiceDataUpdate,
     SubscriptionConfig,
     SubscriptionId,
     SuccessOrErrorPublic,
+    UpdateUserDefinedPropertyRequest,
+    UserDefinedPropertyInfo,
     ValueOrErrorPublic_1,
     WrappedEntity,
 )
-from .types.generated.enums import ErrorCodes, ReadMode
+from .types.generated.enums import (
+    DataProcessingStatus,
+    DataRequestAction,
+    ErrorCodes,
+    ReadMode,
+    SubscriptionMode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +141,18 @@ class FilamentClient:
         self._client_error_callbacks: dict[UUID, Callback] = {}
         # client sub ID  →  backend sub ID  (reverse lookup for unsubscribe)
         self._client_to_backend: dict[UUID, UUID] = {}
+
+        self._user_defined_properties: dict[str, Mapping[str, UserDefinedProperty]] = {}
+        self._user_defined_property_tasks: dict[
+            str, asyncio.Task[Mapping[str, UserDefinedProperty]]
+        ] = {}
+        self._all_user_defined_property_tasks: set[
+            asyncio.Task[Mapping[str, UserDefinedProperty]]
+        ] = set()
+        self._user_defined_property_generations: dict[str, int] = {}
+        self._user_defined_subscription_id: Optional[UUID] = None
+        self._user_defined_subscription_types: frozenset[str] = frozenset()
+        self._user_defined_subscription_lock = asyncio.Lock()
 
         # Reassembly buffers for chunked DataUpdated events.
         # Key: (backend_subscription_id, sequence_idx) — the logical update being reassembled.
@@ -259,6 +289,7 @@ class FilamentClient:
             self._run_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._run_task
+        self._clear_user_defined_property_state()
 
     # ------------------------------------------------------------------
     # SignalR invoke helper
@@ -410,6 +441,18 @@ class FilamentClient:
         # `if` block from accidentally dropping the clears.
         self._part_buffers.clear()
         self._poisoned_part_buffer_keys.clear()
+        self._clear_user_defined_property_state()
+
+    def _clear_user_defined_property_state(self) -> None:
+        """Discard UDP metadata and private-subscription state without I/O."""
+        for task in self._all_user_defined_property_tasks:
+            task.cancel()
+        self._user_defined_property_tasks.clear()
+        self._all_user_defined_property_tasks.clear()
+        self._user_defined_properties.clear()
+        self._user_defined_property_generations.clear()
+        self._user_defined_subscription_id = None
+        self._user_defined_subscription_types = frozenset()
 
     async def _handle_authentication_failed(self, message: str = "") -> None:
         """Record an ``AuthenticationFailed`` event from the server."""
@@ -441,7 +484,10 @@ class FilamentClient:
 
         # 1. Drop updates for unknown subscriptions before any other work.
         # Prevents post-unsubscribe parts from leaking into _part_buffers.
-        if backend_id not in self._backend_to_client:
+        if (
+            backend_id not in self._backend_to_client
+            and backend_id != self._user_defined_subscription_id
+        ):
             return
 
         # 2. Reject malformed chunk metadata.  A non-positive part_count is a backend
@@ -482,6 +528,20 @@ class FilamentClient:
         self, backend_id: UUID, update: ServiceDataUpdate,
     ) -> None:
         """Fan out a (possibly merged) ``ServiceDataUpdate`` to every client callback."""
+        if backend_id == self._user_defined_subscription_id:
+            await self._handle_user_defined_property_update(update)
+            # The backend returns the same subscription ID for duplicate
+            # type/permission combinations, so a caller who subscribes to
+            # UserDefinedPropertyEntity with a matching config shares this ID.
+            # Keep dispatching so their callback still runs.
+            if backend_id not in self._backend_to_client:
+                return
+        if not await self._hydrate_data_update(update):
+            logger.error(
+                "Dropping DataUpdated for subscription %s because UDP hydration failed",
+                backend_id,
+            )
+            return
         client_ids = self._backend_to_client.get(backend_id)
         if client_ids is None:
             return
@@ -496,6 +556,87 @@ class FilamentClient:
                     "Error in DataUpdated callback for subscription %s (client %s)",
                     backend_id,
                     client_id,
+                )
+
+    async def _hydrate_entities_for_type(
+        self, entity_type_name: str, entities: list[Any],
+    ) -> bool:
+        """Hydrate a group of entities, refreshing once for unknown UDP names."""
+        try:
+            properties = await self._ensure_user_defined_properties(entity_type_name)
+            unknown: set[str] = set()
+            for entity in entities:
+                if entity is not None:
+                    unknown.update(
+                        hydrate_user_defined_properties(entity, properties)
+                    )
+            if not unknown:
+                return True
+
+            self._evict_user_defined_properties({entity_type_name})
+            properties = await self._ensure_user_defined_properties(entity_type_name)
+            still_unknown: set[str] = set()
+            for entity in entities:
+                if entity is not None:
+                    still_unknown.update(
+                        hydrate_user_defined_properties(entity, properties)
+                    )
+            if still_unknown:
+                logger.error(
+                    "Backend returned unknown UDP properties for %s after refresh: %s",
+                    entity_type_name,
+                    ", ".join(sorted(still_unknown)),
+                )
+                return False
+            return True
+        except (TypeError, ValueError, _UserDefinedPropertyLoadError):
+            logger.exception(
+                "Could not hydrate UDP properties for %s", entity_type_name
+            )
+            return False
+
+    async def _hydrate_data_update(self, update: ServiceDataUpdate) -> bool:
+        for entity_type_name, changes in update.modified_entities.items():
+            entities: list[Any] = list(changes.created) + list(changes.deleted)
+            entities.extend(item.entity for item in changes.updated if item.entity is not None)
+            if not await self._hydrate_entities_for_type(entity_type_name, entities):
+                return False
+        return True
+
+    async def _handle_user_defined_property_update(
+        self, update: ServiceDataUpdate,
+    ) -> None:
+        """Refresh cached type registries affected by a definition push."""
+        affected: set[str] = set()
+        for type_name, changes in update.modified_entities.items():
+            if type_name.rsplit(".", 1)[-1] != "UserDefinedPropertyEntity":
+                continue
+            entities: list[Any] = list(changes.created) + list(changes.deleted)
+            entities.extend(item.entity for item in changes.updated if item.entity is not None)
+            for entity in entities:
+                if isinstance(entity, UserDefinedPropertyEntity) and entity.entity_type_name:
+                    affected.add(entity.entity_type_name)
+        cached = affected.intersection(self._user_defined_properties)
+        if cached:
+            cached_names = sorted(cached)
+            self._evict_user_defined_properties(cached)
+            results = await asyncio.gather(
+                *(
+                    self._ensure_user_defined_properties(name, reconcile=False)
+                    for name in cached_names
+                ),
+                return_exceptions=True,
+            )
+            for name, result in zip(cached_names, results, strict=True):
+                if isinstance(result, BaseException):
+                    logger.error(
+                        "Could not refresh UDP definitions for %s: %s", name, result,
+                    )
+            try:
+                await self._reconcile_user_defined_property_subscription()
+            except _UserDefinedPropertyLoadError:
+                logger.exception(
+                    "Could not reconcile UDP definition subscription after refresh"
                 )
 
     def _buffer_part(
@@ -729,6 +870,186 @@ class FilamentClient:
         self._on_processing_failed_callbacks.append(callback)
 
     # ------------------------------------------------------------------
+    # User-defined property metadata
+    # ------------------------------------------------------------------
+
+    async def _get_entity_property_permissions_uncached(
+        self, entity_type_name: str,
+    ) -> ValueOrErrorPublic_1[EntityPropertyPermissions]:
+        result_dict: Any = await self._invoke(
+            "GetEntityPropertyPermissions", entity_type_name
+        )
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPropertyPermissions])
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        return result if result is not None else _deserialization_error()
+
+    async def _load_user_defined_properties(
+        self, entity_type_name: str, generation: int,
+    ) -> Mapping[str, UserDefinedProperty]:
+        permissions = await self._get_entity_property_permissions_uncached(entity_type_name)
+        if not permissions.success or permissions.data is None:
+            raise _UserDefinedPropertyLoadError(
+                permissions.message or f"Could not load permissions for {entity_type_name}",
+                permissions.error_code,
+            )
+        try:
+            properties = build_user_defined_properties(
+                entity_type_name, permissions.data
+            )
+        except (TypeError, ValueError) as exc:
+            raise _UserDefinedPropertyLoadError(
+                f"Invalid UDP definitions for {entity_type_name}: {exc}",
+                ErrorCodes.InternalError,
+            ) from exc
+        if self._user_defined_property_generations.get(entity_type_name, 0) == generation:
+            self._user_defined_properties[entity_type_name] = properties
+        return properties
+
+    async def _ensure_user_defined_properties(
+        self, entity_type_name: str, *, reconcile: bool = True,
+    ) -> Mapping[str, UserDefinedProperty]:
+        """Load and cache one type's UDP definitions.
+
+        Pass ``reconcile=False`` when loading a batch of types: each reconcile
+        issues its own ``Subscribe`` plus an ``Unsubscribe`` for the superseded
+        ID, so reconciling per type costs 2N hub calls and leaves every
+        intermediate subscription covering only part of the desired set.  The
+        caller is then responsible for reconciling once after the batch.
+        """
+        cached = self._user_defined_properties.get(entity_type_name)
+        if cached is not None:
+            if reconcile and (
+                entity_type_name not in self._user_defined_subscription_types
+                or self._user_defined_subscription_id is None
+            ):
+                await self._reconcile_user_defined_property_subscription()
+            return cached
+        task = self._user_defined_property_tasks.get(entity_type_name)
+        if task is None:
+            generation = self._user_defined_property_generations.get(entity_type_name, 0)
+            task = asyncio.create_task(
+                self._load_user_defined_properties(entity_type_name, generation)
+            )
+            self._user_defined_property_tasks[entity_type_name] = task
+            self._all_user_defined_property_tasks.add(task)
+            task.add_done_callback(self._all_user_defined_property_tasks.discard)
+        try:
+            await task
+        finally:
+            if self._user_defined_property_tasks.get(entity_type_name) is task:
+                del self._user_defined_property_tasks[entity_type_name]
+        cached = self._user_defined_properties.get(entity_type_name)
+        if cached is None:
+            # The load was invalidated while in flight; retry under the new generation.
+            return await self._ensure_user_defined_properties(
+                entity_type_name, reconcile=reconcile,
+            )
+        if reconcile:
+            try:
+                await self._reconcile_user_defined_property_subscription()
+            except _UserDefinedPropertyLoadError:
+                self._user_defined_properties.pop(entity_type_name, None)
+                raise
+        return cached
+
+    async def _reconcile_user_defined_property_subscription(self) -> None:
+        """Subscribe privately to definition changes for every cached type."""
+        async with self._user_defined_subscription_lock:
+            # Include active refreshes so a temporarily evicted map does not
+            # shrink the still-needed maintenance subscription mid-refresh.
+            desired = frozenset(
+                set(self._user_defined_properties) | set(self._user_defined_property_tasks)
+            )
+            old_id = self._user_defined_subscription_id
+            if desired == self._user_defined_subscription_types and (
+                old_id is not None or not desired
+            ):
+                return
+
+            new_id: Optional[UUID] = None
+            if desired:
+                config = SubscriptionConfig(
+                    scenario_id=UUID("00000000-0000-0000-0000-000000000000"),
+                    status=DataProcessingStatus.All,
+                    type_name="UserDefinedPropertyEntity",
+                    condition=Condition(UserDefinedPropertyEntity).prop(
+                        "entity_type_name"
+                    ).in_(sorted(desired)),
+                    mode=SubscriptionMode.Data,
+                )
+                response_dict: Any = await self._invoke("Subscribe", to_dict(config))
+                response = from_dict(
+                    response_dict, ValueOrErrorPublic_1[SubscriptionId]
+                )
+                if response is None or not response.success or response.data is None:
+                    raise _UserDefinedPropertyLoadError(
+                        response.message if response is not None else (
+                            "Invalid response while subscribing to UDP definition changes"
+                        ),
+                        response.error_code if response is not None else (
+                            ErrorCodes.InternalError
+                        ),
+                    )
+                new_id = response.data.id
+
+            self._user_defined_subscription_id = new_id
+            self._user_defined_subscription_types = desired
+            if old_id is not None and old_id != new_id:
+                response_dict = await self._invoke(
+                    "Unsubscribe", to_dict(SubscriptionId(id=old_id)),
+                )
+                unsubscribe_response = from_dict(
+                    response_dict, SuccessOrErrorPublic
+                )
+                if unsubscribe_response is None or not unsubscribe_response.success:
+                    logger.warning(
+                        "Could not remove superseded UDP definition subscription %s",
+                        old_id,
+                    )
+
+    async def invalidate_user_defined_property_cache(
+        self, entity_type_name: Optional[str] = None,
+    ) -> None:
+        """Invalidate one type's cached UDP definitions, or every cached type."""
+        names = (
+            {entity_type_name}
+            if entity_type_name is not None
+            else set(self._user_defined_properties) | set(self._user_defined_property_tasks)
+        )
+        self._evict_user_defined_properties(names)
+        await self._reconcile_user_defined_property_subscription()
+
+    def _evict_user_defined_properties(self, names: set[str]) -> None:
+        """Evict maps without changing the still-covering private subscription."""
+        for name in names:
+            self._user_defined_property_generations[name] = (
+                self._user_defined_property_generations.get(name, 0) + 1
+            )
+            self._user_defined_properties.pop(name, None)
+            # Detach rather than cancel: current callers may still be awaiting
+            # the old generation. Its loader is forbidden from publishing and
+            # those callers will transparently retry under the new generation.
+            self._user_defined_property_tasks.pop(name, None)
+
+    async def get_user_defined_properties(
+        self, entity_type_name: str,
+    ) -> ValueOrErrorPublic_1[Mapping[str, UserDefinedProperty]]:
+        """Return the cached/discovered UDP properties for an entity type."""
+        try:
+            properties = await self._ensure_user_defined_properties(entity_type_name)
+        except _UserDefinedPropertyLoadError as exc:
+            return _value_error(exc.message, exc.error_code)
+        return ValueOrErrorPublic_1(
+            success=True,
+            message="",
+            error_code=ErrorCodes.None_,
+            error_id=None,
+            data=properties,
+        )
+
+    # ------------------------------------------------------------------
     # API methods
     # ------------------------------------------------------------------
 
@@ -749,17 +1070,26 @@ class FilamentClient:
         self,
         entity_type_name: str,
     ) -> ValueOrErrorPublic_1[EntityPropertyPermissions]:
-        """Retrieve property-level permissions for a given entity type."""
-        result_dict: Any = await self._invoke(
-            "GetEntityPropertyPermissions", entity_type_name
-        )
-        try:
-            result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPropertyPermissions])
-        except (TypeError, ValueError, KeyError):
-            return _deserialization_error()
-        if result is not None:
-            return result
-        return _deserialization_error()
+        """Retrieve permissions and refresh this type's UDP metadata cache."""
+        result = await self._get_entity_property_permissions_uncached(entity_type_name)
+        if result.success and result.data is not None:
+            self._user_defined_property_generations[entity_type_name] = (
+                self._user_defined_property_generations.get(entity_type_name, 0) + 1
+            )
+            try:
+                self._user_defined_properties[entity_type_name] = (
+                    build_user_defined_properties(entity_type_name, result.data)
+                )
+            except (TypeError, ValueError) as exc:
+                return _value_error(
+                    f"Invalid UDP definitions for {entity_type_name}: {exc}"
+                )
+            try:
+                await self._reconcile_user_defined_property_subscription()
+            except _UserDefinedPropertyLoadError as exc:
+                self._user_defined_properties.pop(entity_type_name, None)
+                return _value_error(exc.message, exc.error_code)
+        return result
 
     async def read_data(
         self,
@@ -783,7 +1113,19 @@ class FilamentClient:
         offending single-entity response and the size the full request would
         have produced.
         """
-        return await self._read_data_paged(request)
+        entity_type_name = request.request.type_name
+        try:
+            await self._ensure_user_defined_properties(entity_type_name)
+        except _UserDefinedPropertyLoadError as exc:
+            return _value_error(exc.message, exc.error_code)
+        result = await self._read_data_paged(request)
+        if result.success and result.data is not None:
+            entities = [wrapped.entity for wrapped in result.data.data]
+            if not await self._hydrate_entities_for_type(entity_type_name, entities):
+                return _value_error(
+                    f"Could not hydrate user-defined properties for {entity_type_name}"
+                )
+        return result
 
     async def _read_data_once(
         self,
@@ -960,7 +1302,29 @@ class FilamentClient:
         request: ModifyDataRequest,
     ) -> ValueOrErrorPublic_1[RequestId]:
         """Create, update, or delete entity data."""
+        try:
+            properties_by_type = (
+                dict(zip(
+                    request.data,
+                    await asyncio.gather(*(
+                        self._ensure_user_defined_properties(name) for name in request.data
+                    )),
+                ))
+                if request.action in (DataRequestAction.Create, DataRequestAction.Update)
+                else {}
+            )
+        except _UserDefinedPropertyLoadError as exc:
+            return _value_error(exc.message, exc.error_code)
         request_dict = to_dict(request)
+        if request_dict is None:
+            return _deserialization_error()
+        request_dict["data"] = {
+            type_name: [
+                to_dict(entity, user_defined_properties=properties_by_type.get(type_name))
+                for entity in entities
+            ]
+            for type_name, entities in request.data.items()
+        }
         result_dict: Any = await self._invoke("ModifyData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
@@ -969,6 +1333,86 @@ class FilamentClient:
         if result is not None:
             return result
         return _deserialization_error()
+
+    async def read_connected_data(
+        self,
+        request: ReadConnectedDataRequest,
+    ) -> ValueOrErrorPublic_1[ServiceDataReadConnected]:
+        """Read connected data and hydrate both connection and entity UDPs."""
+        connection_type = request.request.connection_type_name
+        entity_type = request.request.entity_type_name
+        try:
+            await asyncio.gather(
+                self._ensure_user_defined_properties(connection_type),
+                self._ensure_user_defined_properties(entity_type),
+            )
+        except _UserDefinedPropertyLoadError as exc:
+            return _value_error(exc.message, exc.error_code)
+        result_dict: Any = await self._invoke("ReadConnectedData", to_dict(request))
+        try:
+            result = from_dict(
+                result_dict, ValueOrErrorPublic_1[ServiceDataReadConnected]
+            )
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is None:
+            return _deserialization_error()
+        if result.success and result.data is not None:
+            connections = [item.connection.entity for item in result.data.data]
+            entities = [item.entity.entity for item in result.data.data]
+            if not await self._hydrate_entities_for_type(connection_type, connections):
+                return _value_error(
+                    f"Could not hydrate user-defined properties for {connection_type}"
+                )
+            if not await self._hydrate_entities_for_type(entity_type, entities):
+                return _value_error(
+                    f"Could not hydrate user-defined properties for {entity_type}"
+                )
+        return result
+
+    async def create_user_defined_property(
+        self,
+        request: CreateUserDefinedPropertyRequest,
+    ) -> ValueOrErrorPublic_1[UserDefinedPropertyInfo]:
+        """Create a UDP definition and refresh its entity type's cache."""
+        result_dict: Any = await self._invoke(
+            "CreateUserDefinedProperty", to_dict(request),
+        )
+        try:
+            result = from_dict(
+                result_dict, ValueOrErrorPublic_1[UserDefinedPropertyInfo]
+            )
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is None:
+            return _deserialization_error()
+        if result.success:
+            self._evict_user_defined_properties({request.entity_type_name})
+            try:
+                await self._ensure_user_defined_properties(request.entity_type_name)
+            except _UserDefinedPropertyLoadError as exc:
+                return _value_error(exc.message, exc.error_code)
+        return result
+
+    async def update_user_defined_property(
+        self,
+        request: UpdateUserDefinedPropertyRequest,
+    ) -> ValueOrErrorPublic_1[UserDefinedPropertyInfo]:
+        """Update a UDP definition and clear all caches on success."""
+        result_dict: Any = await self._invoke(
+            "UpdateUserDefinedProperty", to_dict(request),
+        )
+        try:
+            result = from_dict(
+                result_dict, ValueOrErrorPublic_1[UserDefinedPropertyInfo]
+            )
+        except (TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is None:
+            return _deserialization_error()
+        if result.success:
+            await self.invalidate_user_defined_property_cache()
+        return result
 
     async def subscribe(
         self,
@@ -994,6 +1438,10 @@ class FilamentClient:
         type/permission combinations.  The backend ``Unsubscribe`` is only
         sent when the last client subscription sharing a backend ID is removed.
         """
+        try:
+            await self._ensure_user_defined_properties(subscription.type_name)
+        except _UserDefinedPropertyLoadError as exc:
+            return _value_error(exc.message, exc.error_code)
         subscription_dict = to_dict(subscription)
         result_dict: Any = await self._invoke("Subscribe", subscription_dict)
         try:
@@ -1048,6 +1496,20 @@ class FilamentClient:
                 if not client_ids:
                     # Last client for this backend subscription — tell backend
                     del self._backend_to_client[backend_id]
+                    if backend_id == self._user_defined_subscription_id:
+                        # The private UDP-definition subscription shares this
+                        # backend ID.  Sending Unsubscribe would cancel it while
+                        # _user_defined_subscription_id still points at it, and
+                        # _reconcile_user_defined_property_subscription would
+                        # then early-return and never restore it.  Leave the
+                        # backend subscription — and its in-flight buffers —
+                        # alone.
+                        return SuccessOrErrorPublic(
+                            success=True,
+                            message="",
+                            error_code=ErrorCodes.None_,
+                            error_id=None,
+                        )
                     # Drop any in-flight partial reassemblies / poisoned
                     # sequences for this backend sub — nothing left to
                     # dispatch them to.
@@ -1080,6 +1542,7 @@ class FilamentClient:
 
     async def unsubscribe_all(self) -> SuccessOrErrorPublic:
         """Cancel all active subscriptions."""
+        cached_type_names = list(self._user_defined_properties)
         result_dict = await self._invoke("UnsubscribeAll")
         self._backend_to_client.clear()
         self._client_callbacks.clear()
@@ -1087,10 +1550,44 @@ class FilamentClient:
         self._client_to_backend.clear()
         self._part_buffers.clear()
         self._poisoned_part_buffer_keys.clear()
+        self._user_defined_subscription_id = None
+        self._user_defined_subscription_types = frozenset()
         result = from_dict(result_dict, SuccessOrErrorPublic)
-        if result is not None:
-            return result
-        return _error_result_public("Failed to deserialize UnsubscribeAll response")
+        if result is None:
+            return _error_result_public("Failed to deserialize UnsubscribeAll response")
+        if result.success and cached_type_names:
+            await self.invalidate_user_defined_property_cache()
+            refreshes = await asyncio.gather(
+                *(
+                    self._ensure_user_defined_properties(name, reconcile=False)
+                    for name in cached_type_names
+                ),
+                return_exceptions=True,
+            )
+            for name, refresh in zip(cached_type_names, refreshes, strict=True):
+                if isinstance(refresh, BaseException):
+                    logger.error(
+                        "Could not restore UDP metadata subscription for %s: %s",
+                        name,
+                        refresh,
+                    )
+            try:
+                await self._reconcile_user_defined_property_subscription()
+            except _UserDefinedPropertyLoadError:
+                logger.exception(
+                    "Could not restore UDP definition subscription after "
+                    "UnsubscribeAll"
+                )
+        return result
+
+
+class _UserDefinedPropertyLoadError(Exception):
+    """Internal error carrying the backend envelope details for a cache load."""
+
+    def __init__(self, message: str, error_code: ErrorCodes) -> None:
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
 
 def _deserialization_error() -> ValueOrErrorPublic_1[Any]:
     """Return a failed ``ValueOrErrorPublic_1`` for deserialization failures."""
@@ -1098,6 +1595,20 @@ def _deserialization_error() -> ValueOrErrorPublic_1[Any]:
         success=False,
         message="Failed to deserialize server response",
         error_code=ErrorCodes.InternalError,
+        error_id=None,
+        data=None,
+    )
+
+
+def _value_error(
+    message: str,
+    error_code: ErrorCodes = ErrorCodes.InternalError,
+) -> ValueOrErrorPublic_1[Any]:
+    """Return a failed generic value envelope."""
+    return ValueOrErrorPublic_1(
+        success=False,
+        message=message,
+        error_code=error_code,
         error_id=None,
         data=None,
     )

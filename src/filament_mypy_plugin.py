@@ -1,4 +1,4 @@
-"""Mypy plugin for typed condition builder.
+"""Mypy plugin for typed conditions and dynamic user-defined properties.
 
 Narrows the return type of ``Condition(Entity).prop("field_name")`` based on
 the entity's actual field type, enabling mypy to validate property names and
@@ -8,15 +8,17 @@ from __future__ import annotations
 
 from typing import Callable, Optional, Type
 
-from mypy.nodes import TypeInfo, Var
-from mypy.plugin import MethodContext, Plugin
+from mypy.nodes import DictExpr, StrExpr, TypeInfo, Var
+from mypy.plugin import AttributeContext, FunctionContext, MethodContext, Plugin
 from mypy.types import (
+    AnyType,
     Instance,
     LiteralType,
     NoneType,
     ProperType,
     Type as MypyType,
     UnionType,
+    TypeOfAny,
     get_proper_type,
 )
 
@@ -37,6 +39,8 @@ _PROPERTY_CLASS = "filament._condition_builder.DbConditionProperty"
 _COMPARABLE_CLASS = "filament._condition_builder.DbConditionComparableProperty"
 _LIST_CLASS = "filament._condition_builder.DbConditionListProperty"
 _DICT_CLASS = "filament._condition_builder.DbConditionDictProperty"
+_ENTITY_BASE = "filament.types.generated.base.base.EntityBase"
+_GENERATED_ENTITY_PREFIX = "filament.types.generated.entities."
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +104,61 @@ class FilamentConditionPlugin(Plugin):
         if fullname == _PROP_FULLNAME:
             return self._prop_hook
         return None
+
+    def get_attribute_hook(
+        self, fullname: str,
+    ) -> Optional[Callable[[AttributeContext], MypyType]]:
+        """Type UDP attributes and retain strictness around all other names."""
+        name = fullname.rsplit(".", 1)[-1]
+        return lambda ctx: self._entity_attribute_hook(ctx, name)
+
+    def get_function_hook(
+        self, fullname: str,
+    ) -> Optional[Callable[[FunctionContext], MypyType]]:
+        """Validate literal constructor mappings for generated entity classes."""
+        if fullname.startswith(_GENERATED_ENTITY_PREFIX) or fullname == _ENTITY_BASE:
+            return self._entity_constructor_hook
+        return None
+
+    @staticmethod
+    def _is_entity_instance(tp: ProperType) -> bool:
+        return isinstance(tp, Instance) and any(
+            base.fullname == _ENTITY_BASE for base in tp.type.mro
+        )
+
+    def _entity_attribute_hook(
+        self, ctx: AttributeContext, name: str,
+    ) -> MypyType:
+        owner = get_proper_type(ctx.type)
+        if not self._is_entity_instance(owner):
+            return ctx.default_attr_type
+        if name.startswith("udp_"):
+            return AnyType(TypeOfAny.explicit)
+        if isinstance(owner, Instance) and owner.type.get(name) is None:
+            ctx.api.fail(
+                f'{owner.type.name} has no attribute "{name}"', ctx.context,
+            )
+        return ctx.default_attr_type
+
+    def _entity_constructor_hook(self, ctx: FunctionContext) -> MypyType:
+        result_type = get_proper_type(ctx.default_return_type)
+        if not self._is_entity_instance(result_type):
+            return ctx.default_return_type
+        for index, names in enumerate(ctx.arg_names):
+            if "_user_defined_properties" not in names or not ctx.args[index]:
+                continue
+            expression = ctx.args[index][0]
+            if not isinstance(expression, DictExpr):
+                continue
+            for key, _value in expression.items:
+                if key is None:
+                    continue
+                if not isinstance(key, StrExpr) or not key.value.startswith("udp_"):
+                    ctx.api.fail(
+                        "_user_defined_properties keys must start with 'udp_'",
+                        key,
+                    )
+        return ctx.default_return_type
 
     def _lookup_type(self, fullname: str) -> Optional[TypeInfo]:
         """Look up a TypeInfo by fully qualified name."""

@@ -16,11 +16,14 @@ import types
 from collections.abc import Sequence as ABCSequence
 from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
-from typing import Any, Optional, TypeVar, Type, Union, get_origin, get_args
+from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, get_origin, get_args
 
 import uuid_utils
 
 from .types.generated.base.base import EntityBase
+
+if TYPE_CHECKING:
+    from .user_defined_properties import UserDefinedProperty
 
 T = TypeVar("T")
 
@@ -54,6 +57,14 @@ def camel_case_from_snake_case(s: str) -> str:
 def snake_case_from_camel_case(s: str) -> str:
     """Convert ``camelCase`` to ``snake_case``."""
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+
+def user_defined_python_name(name: str) -> Optional[str]:
+    """Return the canonical ``udp_snake`` name for a reserved wire name."""
+    if len(name) <= 3 or name[:3].lower() != "udp":
+        return None
+    suffix = snake_case_from_camel_case(name[3:]).lstrip("_")
+    return f"udp_{suffix}" if suffix else None
 
 
 def camel_case_wire_name(name: str) -> str:
@@ -439,7 +450,12 @@ def _convert_from_dict_value(
 # Public API
 # ---------------------------------------------------------------------------
 
-def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
+def to_dict(
+    data: Any,
+    convert_uuid: bool = True,
+    *,
+    user_defined_properties: Optional[Mapping[str, UserDefinedProperty]] = None,
+) -> Optional[dict[str, Any]]:
     """Convert a dataclass instance to a camelCase dict for the SignalR wire format.
 
     Returns ``None`` if *data* is not a dataclass instance.
@@ -474,6 +490,37 @@ def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
         result[camel_key] = converted
 
     if isinstance(data, EntityBase):
+        for name, value in vars(data).items():
+            if not name.startswith("udp_"):
+                continue
+            if specified_properties is not None and name not in specified_properties:
+                continue
+            udp_property = (
+                user_defined_properties.get(name) if user_defined_properties else None
+            )
+            if udp_property is None and user_defined_properties is not None:
+                # The caller supplied an authoritative definition map (modify_data
+                # does for Create/Update), so an unmatched name is a typo rather
+                # than a property we simply have no metadata for.  Guessing a wire
+                # name here would send the raw Python value: Decimal, UUID,
+                # datetime and timedelta then fail in the JSON encoder with an
+                # error that never names the offending property.
+                raise ValueError(
+                    f"{name!r} is not a known user-defined property of "
+                    f"{data.__class__.__name__}"
+                )
+            wire_name = (
+                udp_property.wire_name
+                if udp_property is not None
+                else camel_case_from_snake_case(name)
+            )
+            if wire_name in result:
+                continue
+            result[wire_name] = (
+                udp_property.adapter.to_wire(value)
+                if udp_property is not None
+                else value
+            )
         result["$type"] = data.__class__.__name__
 
     return result
@@ -537,6 +584,19 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
 
     result: T = concrete_cls(**dataclass_data)
+    if isinstance(result, EntityBase):
+        known_keys = {
+            camel_case_from_snake_case(f.name)
+            for f in dc_fields
+            if not f.metadata.get("ignore", False)
+        }
+        known_keys.update(f.name for f in dc_fields)
+        for key, value in data.items():
+            if key in known_keys or key == "$type":
+                continue
+            python_name = user_defined_python_name(key)
+            if python_name is not None:
+                object.__setattr__(result, python_name, value)
     # Clear specified_properties for deserialized entities so all fields serialize.
     if hasattr(result, "specified_properties"):
         object.__setattr__(result, "specified_properties", None)

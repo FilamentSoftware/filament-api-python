@@ -222,6 +222,11 @@ Both return a `SuccessOrErrorPublic`. Leaving the `async with` block also tears
 down the connection (and therefore all subscriptions); explicit unsubscribing is
 good practice when you want to stop receiving events but keep the client open.
 
+For types with [user-defined properties](user-defined-properties.md), the client
+loads definitions before subscribing and converts UDP values before invoking
+your callback. Its separate private definition subscription is automatically
+restored after `unsubscribe_all()` and is never returned as a user subscription.
+
 When unwinding on cancellation, wrap the unsubscribe call in `asyncio.shield` so it
 isn't itself cancelled mid-flight (as the examples do).
 

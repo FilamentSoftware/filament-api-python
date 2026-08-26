@@ -58,6 +58,12 @@ def _make_client(*, mock_invoke: bool = True, **kwargs: Any) -> FilamentClient:
         )
         if mock_invoke:
             client._invoke = AsyncMock()
+        # Existing client tests predate UDP discovery and focus on the hub method
+        # under test.  Prime the two fixture types with authoritative empty maps;
+        # dedicated UDP tests below exercise discovery and maintenance itself.
+        client._user_defined_properties.update({"UserEntity": {}, "TestEntity": {}})
+        client._user_defined_subscription_types = frozenset({"UserEntity", "TestEntity"})
+        client._user_defined_subscription_id = uuid7()
         return client
 
 

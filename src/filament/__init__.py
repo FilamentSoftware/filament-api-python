@@ -12,6 +12,7 @@ from ._exceptions import (
     ResponseTooLargeError,
 )
 from ._specified_properties import SpecifiedPropertiesBase
+from .user_defined_properties import UserDefinedProperty, UserDefinedValueAdapter
 from .types.generated.base.base import EntityBase
 
 _E = TypeVar("_E", bound=EntityBase)
@@ -33,4 +34,6 @@ __all__ = [
     "FilamentError",
     "ResponseTooLargeError",
     "SpecifiedPropertiesBase",
+    "UserDefinedProperty",
+    "UserDefinedValueAdapter",
 ]

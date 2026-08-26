@@ -138,6 +138,10 @@ Two practical consequences:
 See [Finding Types](finding-types.md#the-base-class-hierarchy) for where
 `SpecifiedPropertiesBase` sits in the hierarchy.
 
+Tenant-specific properties use the same partial-update bookkeeping. See
+[User-defined Properties](user-defined-properties.md#create-or-update-entities)
+for the constructor-only `_user_defined_properties` input and typed conversion.
+
 ## `DataRequestAction` values
 
 | Value | Use |

@@ -43,6 +43,7 @@ class PermissionEntity(Entity):
     :param type_name: The type name this permission applies to.
     :param action: The permission actions allowed.
     :param properties: The list of properties this permission applies to.
+    :param user_defined_properties: The list of user-defined properties this permission applies to.
     :param condition_data: Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic.
     :param super_admin: Whether this permission grants super admin access.
     :param organization_admin: Whether this permission grants organization admin access.
@@ -53,6 +54,7 @@ class PermissionEntity(Entity):
     type_name: str = field(default='')
     action: PermissionAction = field(default=PermissionAction.None_)
     properties: Optional[list[str]] = field(default=None)
+    user_defined_properties: Optional[list[str]] = field(default=None)
     condition_data: Optional[str] = field(default=None)
     super_admin: bool = field(default=False)
     organization_admin: bool = field(default=False)

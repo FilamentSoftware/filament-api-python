@@ -10,7 +10,7 @@ from uuid_utils import UUID, uuid7
 from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
-from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode
+from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType
 
 __all__ = [
     "TaskMilestoneWarning",
@@ -21,9 +21,9 @@ __all__ = [
     "ClientHelloRequest",
     "SuccessOrErrorBase",
     "EntityPermission",
-    "EntityPropertyPermission",
-    "SubscriptionConfig",
+    "UserDefinedValidation",
     "StructBase",
+    "SubscriptionConfig",
     "DbOrderLevel",
     "EntityTypePermissions",
     "PreviewDataRequest",
@@ -36,7 +36,9 @@ __all__ = [
     "SuccessOrError",
     "ValueOrError_1",
     "EntityPermissions",
-    "EntityPropertyPermissions",
+    "UserDefinedPropertyInfo",
+    "CreateUserDefinedPropertyRequest",
+    "UpdateUserDefinedPropertyRequest",
     "SubscriptionId",
     "RequestId",
     "UpdatedEntityServiceData_1",
@@ -45,6 +47,7 @@ __all__ = [
     "UserOptionReason",
     "SuccessOrErrorPublic",
     "ValueOrErrorPublic_1",
+    "EntityPropertyPermission",
     "DataUpdateRejectedNotification",
     "WrappedEntity",
     "ModifyDataRequest",
@@ -53,6 +56,7 @@ __all__ = [
     "ReadDataTypeRequest",
     "ReadConnectedDataTypeRequest",
     "ScheduleSegmentReasons",
+    "EntityPropertyPermissions",
     "ServiceDataRead",
     "WrappedConnectedEntityWithPermissions",
     "ReadDataRequest",
@@ -144,9 +148,12 @@ class ClientHelloRequest:
     <c>ClientHello</c> hub-method signature.
     
     :param max_message_size_bytes: The maximum number of bytes the client can accept in a single SignalR message (an invocation
-                                   response or a pushed event). <c>null</c> (or absent) means unlimited — the client opts out of
-                                   the cap, preserving the default behaviour. The server rejects values that are zero, negative,
-                                   or below a small floor.
+                                   response or a pushed event). <c>null</c> (or absent) means the client does not specify one, so
+                                   invocation responses are held to the server default (<c>--default-max-message-size</c>) — a
+                                   client cannot opt out of that cap. The server default does <em>not</em> extend to pushed
+                                   events: a connection that never negotiated has no byte ceiling on pushes, which remain bounded
+                                   only by the per-update entity count. A negotiated value applies to both. The server rejects
+                                   values that are zero, negative, or below a small floor.
     """
     max_message_size_bytes: Optional[int] = field(default=None)
 
@@ -183,17 +190,34 @@ class EntityPermission:
 
 
 @dataclass(kw_only=True)
-class EntityPropertyPermission:
+class UserDefinedValidation:
     """
-    Represents permission settings for a single entity property.
+    The constraints declared against a user-defined property — the rules every written value must satisfy.
     
-    :param actions: Gets or sets the unconditional permission actions for the property.
-    :param conditional_actions: Gets or sets the conditional permission actions for the property.
-                                Each key is an individual permission action, and the value is the combined condition
-                                (OR'd together if multiple conditions apply) that must be satisfied for that action.
+    :param max_length: Gets or sets the maximum length of a string value. Null for no maximum.
+    :param min_length: Gets or sets the minimum length of a string value. Null for no minimum.
+    :param pattern: Gets or sets the regular expression a string value must match. Null for no pattern.
+    :param min: Gets or sets the inclusive lower bound of an ordered value. Null for no lower bound.
+    :param max: Gets or sets the inclusive upper bound of an ordered value. Null for no upper bound.
+    :param options: Gets or sets the permitted values of a pseudo-enum. Null when the value is not drawn from a fixed set.
+    :param max_items: Gets or sets the maximum number of entries a collection value may hold. Null for no maximum.
+    :param key_validation: Gets or sets the validation applied to a dictionary's keys. Null for unconstrained keys.
+    :param value_validation: Gets or sets the validation applied to the values a collection holds. Null for unconstrained values.
     """
-    actions: PermissionAction = field(default=PermissionAction.None_)
-    conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
+    max_length: Optional[int] = field(default=None)
+    min_length: Optional[int] = field(default=None)
+    pattern: Optional[str] = field(default=None)
+    min: Optional[str] = field(default=None)
+    max: Optional[str] = field(default=None)
+    options: Optional[list[str]] = field(default=None)
+    max_items: Optional[int] = field(default=None)
+    key_validation: Optional[UserDefinedValidation] = field(default=None)
+    value_validation: Optional[UserDefinedValidation] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class StructBase:
+    """Abstract base class for all struct types in the Filament system."""
 
 
 @dataclass(kw_only=True)
@@ -243,11 +267,6 @@ class SubscriptionConfig:
     condition: Optional[DbConditionInstance] = field(default=None)
     mode: SubscriptionMode = field(default=SubscriptionMode.None_)
     properties: Optional[list[str]] = field(default=None)
-
-
-@dataclass(kw_only=True)
-class StructBase:
-    """Abstract base class for all struct types in the Filament system."""
 
 
 @dataclass(kw_only=True)
@@ -427,13 +446,74 @@ class EntityPermissions:
 
 
 @dataclass(kw_only=True)
-class EntityPropertyPermissions:
+class UserDefinedPropertyInfo:
     """
-    Represents a collection of entity property permissions keyed by property name.
+    The wire shape a client sees for a single user-defined property definition on the permission map.
     
-    :param properties: Gets or sets the dictionary of property permissions, keyed by property name.
+    :param id: Gets or sets the identifier of the definition this describes.
+    :param name: Gets or sets the property's name — the identifier used on the wire and in conditions, carrying the
+                 reserved prefix that marks it as user-defined.
+    :param label: Gets or sets the property's display text, shown by the user interface in place of its name.
+    :param property_type: Gets or sets the property's declared type.
+    :param sub_property_types: Gets or sets the element, key and value types of a collection property.
+    :param nullable: Gets or sets whether the property accepts a null value.
+    :param default_value: Gets or sets the property's default value, in wire format, or null if it has none.
+    :param description: Gets or sets the property's description, or null if it has none.
+    :param validation: Gets or sets the constraints every written value must satisfy, or null if the property is unconstrained.
     """
-    properties: dict[str, EntityPropertyPermission] = field(default_factory=dict)
+    id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    name: str = field(default='')
+    label: str = field(default='')
+    property_type: TypeSchemaPropertyType = field(default=TypeSchemaPropertyType.Invalid)
+    sub_property_types: list[TypeSchemaPropertyType] = field(default_factory=list)
+    nullable: bool = field(default=False)
+    default_value: Optional[str] = field(default=None)
+    description: Optional[str] = field(default=None)
+    validation: Optional[UserDefinedValidation] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class CreateUserDefinedPropertyRequest(StructBase):
+    """
+    A request to define a new user-defined property on one of the organization's entity or connection types.
+    
+    :param entity_type_name: Gets or sets the entity or connection type the property is defined on.
+    :param name: Gets or sets the property's name, which must carry the reserved user-defined prefix.
+    :param label: Gets or sets the display text a client shows for the property.
+    :param description: Gets or sets the optional longer client-facing text describing what the property is for.
+    :param property_type: Gets or sets the property's declared type.
+    :param sub_property_types: Gets or sets the element, key and value types of a collection property.
+    :param nullable: Gets or sets whether the property's value may be null.
+    :param default_value: Gets or sets the value every existing and newly created entity starts with, in wire format.
+    :param validation: Gets or sets the constraints every written value must satisfy, or null for an unconstrained property.
+    """
+    entity_type_name: str = field(default='')
+    name: str = field(default='')
+    label: str = field(default='')
+    description: Optional[str] = field(default=None)
+    property_type: TypeSchemaPropertyType = field(default=TypeSchemaPropertyType.Invalid)
+    sub_property_types: list[TypeSchemaPropertyType] = field(default_factory=list)
+    nullable: bool = field(default=False)
+    default_value: Optional[str] = field(default=None)
+    validation: Optional[UserDefinedValidation] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class UpdateUserDefinedPropertyRequest(StructBase):
+    """
+    A request to edit an existing user-defined property definition.
+    
+    :param id: Gets or sets the identifier of the definition to edit.
+    :param label: Gets or sets the new display text, or null to leave it unchanged.
+    :param description: Gets or sets the new description, or null to leave it unchanged.
+    :param default_value: Gets or sets the new default value in wire format, or null to leave it unchanged.
+    :param validation: Gets or sets the new constraints, or null to leave them unchanged.
+    """
+    id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    label: Optional[str] = field(default=None)
+    description: Optional[str] = field(default=None)
+    default_value: Optional[str] = field(default=None)
+    validation: Optional[UserDefinedValidation] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -558,6 +638,22 @@ class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
                      This identifier can be used for logging, debugging, or correlation purposes.
     """
     error_id: Optional[UUID]
+
+
+@dataclass(kw_only=True)
+class EntityPropertyPermission:
+    """
+    Represents permission settings for a single entity property.
+    
+    :param actions: Gets or sets the unconditional permission actions for the property.
+    :param conditional_actions: Gets or sets the conditional permission actions for the property.
+                                Each key is an individual permission action, and the value is the combined condition
+                                (OR'd together if multiple conditions apply) that must be satisfied for that action.
+    :param user_defined_data: Gets or sets the definition this permission entry describes, when the property is user-defined.
+    """
+    actions: PermissionAction = field(default=PermissionAction.None_)
+    conditional_actions: dict[PermissionAction, DbConditionInstance] = field(default_factory=dict)
+    user_defined_data: Optional[UserDefinedPropertyInfo] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -778,6 +874,16 @@ class ScheduleSegmentReasons:
     selected_user: Optional[str] = field(default=None)
     placeholder_user_created: bool = field(default=False)
     segment: SegmentReason = field(default_factory=SegmentReason)
+
+
+@dataclass(kw_only=True)
+class EntityPropertyPermissions:
+    """
+    Represents a collection of entity property permissions keyed by property name.
+    
+    :param properties: Gets or sets the dictionary of property permissions, keyed by property name.
+    """
+    properties: dict[str, EntityPropertyPermission] = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)

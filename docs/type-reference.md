@@ -345,6 +345,7 @@ The status of a request.
 | `Completed` | Request has been completed. |
 | `Failed` | Request has failed. |
 | `Cancelled` | Request has been cancelled. |
+| `Resubmitted` | Request has been resubmitted. A request that ended `Cancelled` or `Failed` can be moved to this status, which retires it and queues a fresh copy of it as a new `Pending` request. This is a terminal status for the original request - the copy carries the work from here, and nothing moves a request out of it. |
 
 ### `ScenarioEventAction` (`Enum`)
 
@@ -570,6 +571,34 @@ An enum that defines valid training methods
 | `OnTheJob` | Represents training conducted directly in a practical work environment, where skills are acquired through hands-on tasks and real-world application. Often involves learning while performing job-related duties. |
 | `WithMentor` | Represents training conducted with the guidance and support of a mentor, where the mentor facilitates the learning process by providing expertise, personalized feedback, and hands-on oversight to enhance the learner's skills and knowledge. |
 
+### `TypeSchemaPropertyType` (`Enum`)
+
+Represents the data types that can be assigned to a property in a type schema definition.
+
+| Member | Description |
+| ------ | ----------- |
+| `Invalid` | Specifies an invalid or uninitialized state for a property type in a type schema definition. |
+| `String` | Represents a property type in a type schema definition that holds textual data. |
+| `Bool` | Represents a boolean property type in a type schema definition. |
+| `Short` | Represents a 16-bit signed integer data type for a property in a type schema definition. |
+| `Int` | Represents a 32-bit signed integer data type that can be assigned to a property in a type schema definition. |
+| `Long` | Represents a property type in a type schema definition that stores 64-bit signed integer values. |
+| `Float` | Represents a property type in a type schema definition that stores a single-precision floating-point numeric value. |
+| `Double` | Represents a property type in a type schema definition that stores double-precision floating-point numeric values. |
+| `Decimal` | Represents a property type in a type schema definition that is used to store high-precision decimal numbers. |
+| `Guid` | Represents a globally unique identifier (GUID) as a property type in a type schema definition. |
+| `Instant` | Represents a property type in a type schema that stores an instantaneous point on the timeline, typically used for timestamps or precise temporal events. |
+| `Duration` | Represents a property type in a type schema definition that stores a duration, typically used to define an amount of time with a specific granularity or precision. |
+| `Interval` | Represents a range or span of values, typically defined by a start and end point, as a property type in a type schema definition. |
+| `LocalDate` | Represents a property type in a type schema definition that stores a date value without a time-of-day or timezone component. |
+| `LocalTime` | Represents a property type in a type schema definition that stores a time value without a date or timezone context. |
+| `LocalDateTime` | Represents a property type in a type schema that defines a combination of local date and time without an associated time zone. |
+| `DateTimeZone` | Represents a property type in a type schema definition that specifies a date and time with associated timezone information. |
+| `Enum` | Represents an enumerated type, indicating that the property should store a predefined set of constant values. |
+| `List` | Represents a collection of values of a specified type in a type schema definition. |
+| `Array` | Represents a property type in a type schema definition that defines a collection of elements stored in an array structure. |
+| `Dictionary` | Represents a key-value pair collection where both keys and values conform to specified data types within a type schema definition. |
+
 ### `UserAddressType` (`Enum`)
 
 An enum that defines valid types of addresses.
@@ -579,6 +608,15 @@ An enum that defines valid types of addresses.
 | `Home` | Represents a home address. |
 | `Business` | Represents a business address. |
 | `Other` | Represents an address of another type. |
+
+### `UserDefinedPropertyStatus` (`Enum`)
+
+The lifecycle of a user-defined property definition, which exists because creating one is two operations
+
+| Member | Description |
+| ------ | ----------- |
+| `Pending` | Set at creation, inside the lock that claims the name. The property is invisible to clients — absent from the permission map, the join, conditions and orders — and cannot be written. |
+| `Active` | Set once the backfill has completed. The property is fully usable: visible to clients, readable, writable, and available to conditions and orders. |
 
 ### `UserEmailType` (`Enum`)
 
@@ -657,7 +695,7 @@ Represents a request entity in the system.
 | `requested_at` | `datetime.datetime` | — | When the request was requested. |
 | `status` | `RequestStatus` | `RequestStatus.Unknown` | The status of the request. |
 | `error_message` | `Optional[str]` | `None` | Error message if the request failed. |
-| `affected_entities` | `list[str]` | — | List of affected entity IDs. |
+| `affected_entities` | `list[str]` | — | List of affected entity types. |
 | `request_data` | `str` | `''` | The serialized request data associated with this entity. |
 
 ##### `ProcessingRunEntity`
@@ -761,6 +799,34 @@ Tracks entity protection relationships. When a downstream entity depends on an u
 | `protection_source_property` | `Optional[str]` | `None` | For property-based protections: the property name that created this protection (e.g., "UserId"). Null for connection-based protections. |
 | `protection_source_connection_type` | `Optional[str]` | `None` | For connection-based protections: the connection type name (e.g., "CastUserConnection"). Null for property-based protections. |
 | `protection_source_connection_id` | `Optional[UUID]` | `None` | For connection-based protections: the ID of the specific connection instance. Null for property-based protections. |
+
+##### `UserDefinedTableEntity`
+
+One row per sidecar table — a single row for each (organisation, entity type) pair that carries user-defined
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `entity_type_name` | `str` | `''` | The name of the entity or connection type the sidecar table sits on top of. |
+| `table_name` | `str` | `''` | What the sidecar table is actually called. |
+
+##### `UserDefinedPropertyEntity`
+
+One user-defined property definition — a single column on the sidecar table named by the
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `table_id` | `UUID` | — | The sidecar table this property is a column of. |
+| `entity_type_name` | `str` | `''` | The name of the entity or connection type this property is defined on. |
+| `name` | `str` | `''` | The property's identifier, carrying the reserved prefix that keeps user-defined names disjoint from schema property names. |
+| `name_key` | `str` | `''` | The snake_case normalisation of `Name`. |
+| `label` | `str` | `''` | The display text a client shows for this property. |
+| `description` | `Optional[str]` | `None` | Optional longer client-facing text describing what the property is for. |
+| `property_type` | `TypeSchemaPropertyType` | `TypeSchemaPropertyType.Invalid` | The property's declared type, reusing the existing wire enum rather than introducing a second type vocabulary. |
+| `sub_property_types` | `list[TypeSchemaPropertyType]` | — | The element, key and value types of a collection property. |
+| `nullable` | `bool` | `False` | Whether the property's value may be null. |
+| `default_value` | `Optional[str]` | `None` | The value every existing and newly created entity starts with, in wire format. |
+| `validation` | `Optional[str]` | `None` | The property's constraints, serialised as JSON. |
+| `status` | `UserDefinedPropertyStatus` | `UserDefinedPropertyStatus.Pending` | Where the definition is in its lifecycle. |
 
 ### Actual Service
 
@@ -1312,6 +1378,7 @@ Represents a permission entity.
 | `type_name` | `str` | `''` | The type name this permission applies to. |
 | `action` | `PermissionAction` | `PermissionAction.None_` | The permission actions allowed. |
 | `properties` | `Optional[list[str]]` | `None` | The list of properties this permission applies to. |
+| `user_defined_properties` | `Optional[list[str]]` | `None` | The list of user-defined properties this permission applies to. |
 | `condition_data` | `Optional[str]` | `None` | Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic. |
 | `super_admin` | `bool` | `False` | Whether this permission grants super admin access. |
 | `organization_admin` | `bool` | `False` | Whether this permission grants organization admin access. |

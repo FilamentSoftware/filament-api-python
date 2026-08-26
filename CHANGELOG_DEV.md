@@ -1,3 +1,10 @@
+## 0.6.1-dev.0.0.2 (2026-08-14 00:00)
+
+### Client
+
+#### FEATURE
+- Add user-defined property discovery, typed entity attributes, construction, conditions, cache maintenance, connected reads, and definition administration
+
 ## 0.6.1-dev.0.0.1 (2026-08-12 16:06)
 
 ### Codex
