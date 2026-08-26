@@ -15,6 +15,8 @@ from filament.types.generated.entities.task_service import TaskEntity
 from filament.types.generated.enums import DataRequestAction, TypeSchemaPropertyType
 from filament.types.generated.misc import (
     CreateUserDefinedPropertyRequest,
+    ServiceDataUpdate,
+    SubscriptionId,
     EntityPropertyPermission,
     EntityPropertyPermissions,
     ModifyDataRequest,
@@ -344,3 +346,115 @@ async def test_update_definition_clears_every_cached_type() -> None:
     assert result.success
     assert client._user_defined_properties == {}
     assert client._user_defined_subscription_id is None
+
+
+@pytest.mark.asyncio
+async def test_shared_backend_id_still_reaches_the_user_callback() -> None:
+    """A user subscription sharing the private UDP backend ID must still fire.
+
+    The backend returns the same subscription ID for duplicate type/permission
+    combinations, so a caller subscribing to ``UserDefinedPropertyEntity`` can
+    collide with the client's own private definition-maintenance subscription.
+    """
+    client = _client()
+    shared_id = uuid7()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {
+                "success": True, "message": "", "errorCode": 0,
+                "data": {"id": str(shared_id)},
+            }
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    await client.get_user_defined_properties("TaskEntity")
+    assert client._user_defined_subscription_id == shared_id
+
+    received: list[Any] = []
+    # Register a user callback against the very same backend ID.
+    client_id = uuid7()
+    client._backend_to_client[shared_id] = {client_id}
+    client._client_callbacks[client_id] = received.append
+    client._client_to_backend[client_id] = shared_id
+
+    update = ServiceDataUpdate(
+        subscription_id=SubscriptionId(id=shared_id),
+        scenario_id=UUID("00000000-0000-0000-0000-000000000000"),
+        modified_entities={},
+    )
+    await client._dispatch_data_update(shared_id, update)
+
+    assert len(received) == 1, "user callback was swallowed by the metadata handler"
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_does_not_cancel_the_shared_private_subscription() -> None:
+    """Unsubscribing a colliding user subscription must not kill the private one."""
+    client = _client()
+    shared_id = uuid7()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {
+                "success": True, "message": "", "errorCode": 0,
+                "data": {"id": str(shared_id)},
+            }
+        if method == "Unsubscribe":
+            return {"success": True, "message": "", "errorCode": 0}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    await client.get_user_defined_properties("TaskEntity")
+
+    client_id = uuid7()
+    client._backend_to_client[shared_id] = {client_id}
+    client._client_callbacks[client_id] = lambda _update: None
+    client._client_to_backend[client_id] = shared_id
+
+    result = await client.unsubscribe(SubscriptionId(id=client_id))
+
+    assert result.success
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert "Unsubscribe" not in methods, (
+        "Unsubscribe cancelled the still-needed private UDP subscription"
+    )
+    assert client._user_defined_subscription_id == shared_id
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_all_restores_a_subscription_covering_every_type() -> None:
+    """``unsubscribe_all`` must leave the private subscription covering all types.
+
+    The per-type reconcile that used to run inside the restoration gather could
+    early-return once ``desired`` already matched, so the batch relies on a
+    single explicit reconcile afterwards to guarantee the final subscription
+    covers everything that was restored.
+    """
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {
+                "success": True, "message": "", "errorCode": 0,
+                "data": {"id": str(uuid7())},
+            }
+        if method in ("Unsubscribe", "UnsubscribeAll"):
+            return {"success": True, "message": "", "errorCode": 0}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    type_names = ("TaskEntity", "UserEntity", "ScopeEntity")
+    for type_name in type_names:
+        await client.get_user_defined_properties(type_name)
+
+    await client.unsubscribe_all()
+
+    assert client._user_defined_subscription_types == frozenset(type_names)
+    assert client._user_defined_subscription_id is not None
