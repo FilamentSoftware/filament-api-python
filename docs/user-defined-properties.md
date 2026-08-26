@@ -51,8 +51,13 @@ declared type.
 
 ```python
 result = await client.read_data(request)
-task = result.data.data[0].entity
-print(task.udp_client_reference)
+if not result.success or result.data is None:
+    raise RuntimeError(result.message)
+
+entities = result.data.data
+if entities:
+    task = entities[0].entity
+    print(task.udp_client_reference)
 ```
 
 `read_connected_data` performs the same conversion independently for the

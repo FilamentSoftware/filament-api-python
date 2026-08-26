@@ -3,6 +3,9 @@
 This example expects ``UdpEmployeeNumber`` (String) and ``UdpHourlyRate``
 (Decimal) to be defined on ``UserEntity``. An administrator can create them by
 running ``create_user_defined_properties.py`` first.
+
+Both definitions must have reached ``Active`` status. A definition that is still
+``Pending`` is not writable, and the create below will be rejected.
 """
 from __future__ import annotations
 

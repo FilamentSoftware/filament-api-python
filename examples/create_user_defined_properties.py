@@ -4,6 +4,13 @@ This example requires an administrator API key. Run it once for an organisation
 before running the other user-defined property examples. If either definition
 already exists, the backend will return an error for that definition and the
 script will continue with the next one.
+
+A newly created definition starts out ``Pending`` and only becomes ``Active``
+once the backend has finished backfilling it. While it is pending it does not
+appear in the property-permission map and cannot be written to, so the other
+user-defined property examples will not see it yet. Wait for both definitions to
+reach ``Active`` -- poll ``get_user_defined_properties("UserEntity")`` until they
+appear -- before running them.
 """
 from __future__ import annotations
 

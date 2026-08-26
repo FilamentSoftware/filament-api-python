@@ -152,8 +152,10 @@ request. There are two shapes.
 
 ### `ValueOrErrorPublic_1[T]`
 
-Returned by calls that produce a value (`read_data`, `modify_data`, `subscribe`,
-`get_entity_permissions`, `get_entity_property_permissions`).
+Returned by every call that produces a value: `read_data`, `read_connected_data`,
+`modify_data`, `subscribe`, `get_entity_permissions`,
+`get_entity_property_permissions`, `get_user_defined_properties`,
+`create_user_defined_property` and `update_user_defined_property`.
 
 | Field | Type | Meaning |
 | ----- | ---- | ------- |
