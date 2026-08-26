@@ -40,7 +40,6 @@ from .types.generated.misc import (
     EntityPermissions,
     EntityPropertyPermissions,
     EntityServiceDataUpdate,
-    FileReference,
     FileUploadCompletion,
     FileUploadRequest,
     GetFileUrlsRequest,
@@ -70,6 +69,7 @@ from .types.generated.enums import (
     ReadMode,
     SubscriptionMode,
 )
+from .types.generated.shared import FileReference
 
 logger = logging.getLogger(__name__)
 

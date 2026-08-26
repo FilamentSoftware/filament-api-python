@@ -4,7 +4,8 @@ from typing import Protocol
 from uuid_utils import UUID, uuid7
 
 from .entities.core import FileEntity
-from .misc import ClientHelloRequest, CreateUserDefinedPropertyRequest, DataUpdateRejectedNotification, EntityPermissions, EntityPropertyPermissions, FileReference, FileUploadCompletion, FileUploadRequest, GetFileUrlsRequest, ModifyDataRequest, PreviewDataRequest, ProcessingStatus, ReadConnectedDataRequest, ReadDataRequest, RequestId, ServerCapabilities, ServiceDataPreview, ServiceDataRead, ServiceDataReadConnected, ServiceDataUpdate, StatusData, SubscriptionConfig, SubscriptionId, SuccessOrErrorPublic, UpdateUserDefinedPropertyRequest, UploadGrant, UserDefinedPropertyInfo, ValueOrErrorPublic_1
+from .misc import ClientHelloRequest, CreateUserDefinedPropertyRequest, DataUpdateRejectedNotification, EntityPermissions, EntityPropertyPermissions, FileUploadCompletion, FileUploadRequest, GetFileUrlsRequest, ModifyDataRequest, PreviewDataRequest, ProcessingStatus, ReadConnectedDataRequest, ReadDataRequest, RequestId, ServerCapabilities, ServiceDataPreview, ServiceDataRead, ServiceDataReadConnected, ServiceDataUpdate, StatusData, SubscriptionConfig, SubscriptionId, SuccessOrErrorPublic, UpdateUserDefinedPropertyRequest, UploadGrant, UserDefinedPropertyInfo, ValueOrErrorPublic_1
+from .shared import FileReference
 
 __all__ = [
     "ClientMethods",
@@ -26,8 +27,9 @@ class ClientMethods(Protocol):
         unlimited; pushed events to such a connection are bounded by entity count only.
         
         :param request: The capability handshake, including the negotiated maximum message size.
-        :returns: A <see cref="T:Filament.FSCore.Structs.SuccessOrErrorPublic" /> indicating whether the capabilities were accepted.
-                  Invalid values (zero, negative, or below the minimum floor) are rejected.
+        :returns: A <see cref="T:Filament.FSCore.Structs.ValueOrErrorPublic`1" /> carrying the <see cref="T:Filament.FilamentHub.Connections.ServerCapabilities" />
+                  this deployment advertises. Invalid values (zero, negative, or below the minimum floor) are
+                  rejected, and the capabilities are withheld rather than returned alongside the error.
         """
         ...
 

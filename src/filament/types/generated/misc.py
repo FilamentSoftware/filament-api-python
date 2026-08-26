@@ -13,7 +13,6 @@ from .base.base import EntityBase
 from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType
 
 __all__ = [
-    "FileMetadata",
     "TaskMilestoneWarning",
     "PriorityComponent",
     "MilestoneReason",
@@ -37,7 +36,6 @@ __all__ = [
     "GetFileUrlsRequest",
     "EntityServiceDataUpdate",
     "ServiceProcessingInfo",
-    "FileReference",
     "TaskPriorityReasons",
     "UserPriorityReasons",
     "ServerCapabilities",
@@ -54,8 +52,8 @@ __all__ = [
     "TaskReasons",
     "UserOptionReason",
     "ValueOrErrorPublic_1",
-    "EntityPropertyPermission",
     "SuccessOrErrorPublic",
+    "EntityPropertyPermission",
     "DataUpdateRejectedNotification",
     "WrappedEntity",
     "ModifyDataRequest",
@@ -75,22 +73,6 @@ __all__ = [
 T = TypeVar("T")
 T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
-
-
-@dataclass(kw_only=True)
-class FileMetadata:
-    """
-    Metadata a read grant may carry so a client can lay out before the bytes arrive.
-    
-    :param content_type: The content type of the stored object.
-    :param size: The size of the stored object in bytes.
-    :param width: Pixel width, for image objects whose dimensions are known.
-    :param height: Pixel height, for image objects whose dimensions are known.
-    """
-    content_type: str
-    size: int
-    width: Optional[int] = field(default=None)
-    height: Optional[int] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -503,34 +485,6 @@ class ServiceProcessingInfo:
     progress: float = field(default=0)
     start_instant: Optional[datetime.datetime] = field(default=None)
     end_instant: Optional[datetime.datetime] = field(default=None)
-
-
-@dataclass(kw_only=True)
-class FileReference:
-    """
-    The outcome of resolving one file for a client: either everything needed to display it, or why not.
-    
-    :param success: Whether the file was resolved.
-    :param message: Why the file could not be resolved. Empty on success.
-    :param error_code: The machine-readable reason. <see cref="F:Filament.FSCore.Structs.ErrorCodes.None" /> on success.
-    :param url: A signed, expiring URL the client can fetch directly. Null on failure.
-    :param cache_key: A key safe for an application-level cache, stable for the life of the verified bytes.
-    :param expires_at: When <see cref="P:Filament.FSCore.FileStore.FileReference.Url" /> stops being accepted. Null on failure.
-    :param refreshable: Whether the URL expires and can be re-minted.
-    :param metadata: Content type, size and, for images, dimensions — so a client can reserve space first.
-    :param name: The file's display name, as stored on the row. Null on failure.
-    :param description: Alternative text or a description, for accessibility and search. Null when the row has none.
-    """
-    success: bool = field(default=False)
-    message: str = field(default='')
-    error_code: ErrorCodes = field(default=ErrorCodes.None_)
-    url: Optional[str] = field(default=None)
-    cache_key: Optional[str] = field(default=None)
-    expires_at: Optional[datetime.datetime] = field(default=None)
-    refreshable: bool = field(default=False)
-    metadata: Optional[FileMetadata] = field(default=None)
-    name: Optional[str] = field(default=None)
-    description: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)

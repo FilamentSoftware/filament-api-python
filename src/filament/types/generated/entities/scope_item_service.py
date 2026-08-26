@@ -12,7 +12,7 @@ from ..entities.generic import GenericComplexityBase
 from ..entities.scope_category_service import ScopeCategoryEntity
 from ..entities.scope_service import ScopeStatusEntity
 from ..entities.user_service import UserEntity
-from ..misc import FileReference
+from ..shared import FileReference
 
 __all__ = [
     "ScopeItemNoteEntity",

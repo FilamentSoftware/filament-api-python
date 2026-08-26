@@ -13,7 +13,7 @@ from ..entities.generic import AddressEntityBase, EmailEntityBase, PhoneEntityBa
 from ..entities.organization_service import OfficeLocationEntity, TaxCreditLocationEntity
 from ..entities.specialty_service import SpecialtyEntity
 from ..enums import NameOrder, UserAddressType, UserEmailType, UserPhoneType, UserStatusEnum, UserTypeEnum
-from ..misc import FileReference
+from ..shared import FileReference
 
 __all__ = [
     "UserEntity",

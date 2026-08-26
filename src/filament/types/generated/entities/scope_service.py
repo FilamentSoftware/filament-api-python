@@ -8,7 +8,7 @@ from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
 from ..enums import ScopeType
-from ..misc import FileReference
+from ..shared import FileReference
 
 __all__ = [
     "ScopeEntity",

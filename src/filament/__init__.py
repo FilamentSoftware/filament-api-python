@@ -17,7 +17,7 @@ from ._serialization import from_dict
 from ._specified_properties import SpecifiedPropertiesBase
 from .user_defined_properties import UserDefinedProperty, UserDefinedValueAdapter
 from .types.generated.base.base import EntityBase
-from .types.generated.misc import FileReference
+from .types.generated.shared import FileReference
 
 _E = TypeVar("_E", bound=EntityBase)
 
