@@ -49,8 +49,10 @@ def test_constructor_mapping_installs_and_tracks_udp_attributes() -> None:
     assert task.udp_budget == Decimal("12.50")
     assert task.udp_note == "x"
     assert task.specified_properties == ["id", "udp_budget", "udp_note"]
-    with pytest.raises(AttributeError, match="constructor-only"):
-        _ = task._user_defined_properties
+    # Reads resolve to the residual InitVar default rather than raising: a
+    # raising read guard breaks dataclasses.replace(), which reads every
+    # defaulted InitVar with getattr() to rebuild the instance.
+    assert task._user_defined_properties is None
 
     task.udp_later = 3
     assert task.specified_properties == [
@@ -193,3 +195,80 @@ def test_specified_properties_base_initvar_annotation_is_not_stringified() -> No
     # The real guarantee: resolving hints on a UDP-capable entity must not raise.
     hints = typing.get_type_hints(TaskEntity)
     assert hints["id"] is not None
+
+
+def test_unknown_udp_name_is_rejected_when_definitions_are_supplied() -> None:
+    """A typo must fail with a property-specific error, not a raw wire value.
+
+    ``modify_data`` supplies an authoritative definition map, so an unmatched
+    ``udp_`` name is a caller typo. Guessing a wire name would send the raw
+    Python value and fail later inside the JSON encoder without naming the
+    property.
+    """
+    definition = _definition("UdpBudget", TypeSchemaPropertyType.Decimal)
+    permission = EntityPropertyPermission(
+        actions=PermissionAction.Read, user_defined_data=definition,
+    )
+    properties = build_user_defined_properties(
+        "TaskEntity", EntityPropertyPermissions(properties={"udpBudget": permission})
+    )
+
+    task = TaskEntity(id=uuid7(), _user_defined_properties={"udp_bugdet": Decimal("1")})
+
+    with pytest.raises(ValueError, match="udp_bugdet"):
+        to_dict(task, user_defined_properties=properties)
+
+    # Without a definition map the lenient fallback is preserved.
+    assert "udpBugdet" in to_dict(task)
+
+
+@pytest.mark.parametrize(
+    ("property_type", "comparable"),
+    [
+        # The backend's user-defined condition policy refuses ordering
+        # operators for Bool and Interval only, and restricts Enum to
+        # equality/In. Date and time types are ordered domains.
+        (TypeSchemaPropertyType.String, True),
+        (TypeSchemaPropertyType.LocalDate, True),
+        (TypeSchemaPropertyType.LocalTime, True),
+        (TypeSchemaPropertyType.LocalDateTime, True),
+        (TypeSchemaPropertyType.DateTimeZone, True),
+        (TypeSchemaPropertyType.Decimal, True),
+        (TypeSchemaPropertyType.Bool, False),
+        (TypeSchemaPropertyType.Interval, False),
+        (TypeSchemaPropertyType.Enum, False),
+    ],
+)
+def test_ordering_operators_match_backend_condition_policy(
+    property_type: TypeSchemaPropertyType, comparable: bool,
+) -> None:
+    from filament._condition_builder import DbConditionComparableProperty
+
+    definition = _definition("UdpValue", property_type)
+    permission = EntityPropertyPermission(
+        actions=PermissionAction.Read, user_defined_data=definition,
+    )
+    properties = build_user_defined_properties(
+        "TaskEntity", EntityPropertyPermissions(properties={"udpValue": permission})
+    )
+
+    condition = properties["udp_value"].condition()
+    assert isinstance(condition, DbConditionComparableProperty) is comparable
+
+
+def test_dataclasses_replace_works_on_entities() -> None:
+    """``dataclasses.replace()`` must work on every entity.
+
+    ``replace()`` reads each defaulted ``InitVar`` with ``getattr()`` to rebuild
+    the instance, so guarding reads of ``_user_defined_properties`` -- with a
+    ``__getattribute__`` hook or a data descriptor -- breaks it on all supported
+    Python versions. Writes stay guarded.
+    """
+    task = TaskEntity(id=uuid7())
+
+    replaced = dataclasses.replace(task)
+    assert isinstance(replaced, TaskEntity)
+    assert replaced.id == task.id
+
+    with pytest.raises(AttributeError, match="constructor-only"):
+        task._user_defined_properties = {"udp_x": 1}
