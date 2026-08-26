@@ -148,9 +148,12 @@ class ClientHelloRequest:
     <c>ClientHello</c> hub-method signature.
     
     :param max_message_size_bytes: The maximum number of bytes the client can accept in a single SignalR message (an invocation
-                                   response or a pushed event). <c>null</c> (or absent) means unlimited — the client opts out of
-                                   the cap, preserving the default behaviour. The server rejects values that are zero, negative,
-                                   or below a small floor.
+                                   response or a pushed event). <c>null</c> (or absent) means the client does not specify one, so
+                                   invocation responses are held to the server default (<c>--default-max-message-size</c>) — a
+                                   client cannot opt out of that cap. The server default does <em>not</em> extend to pushed
+                                   events: a connection that never negotiated has no byte ceiling on pushes, which remain bounded
+                                   only by the per-update entity count. A negotiated value applies to both. The server rejects
+                                   values that are zero, negative, or below a small floor.
     """
     max_message_size_bytes: Optional[int] = field(default=None)
 

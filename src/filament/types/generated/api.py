@@ -18,7 +18,9 @@ class ClientMethods(Protocol):
         enforces that limit on both invocation responses and pushed events, returning a structured
         <see cref="F:Filament.FSCore.Structs.ErrorCodes.ResponseTooLarge" /> error rather than sending a message the client
         would close the connection on. Intended to be called once, immediately after connecting.
-        Clients that never call this method are treated as unlimited (backwards compatible).
+        Clients that never call this method are held to the server default
+        (<c>--default-max-message-size</c>) on invocation responses rather than being treated as
+        unlimited; pushed events to such a connection are bounded by entity count only.
         
         :param request: The capability handshake, including the negotiated maximum message size.
         :returns: A <see cref="T:Filament.FSCore.Structs.SuccessOrErrorPublic" /> indicating whether the capabilities were accepted.

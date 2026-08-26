@@ -56,7 +56,7 @@ class RequestEntity(Entity):
     :param requested_at: When the request was requested.
     :param status: The status of the request.
     :param error_message: Error message if the request failed.
-    :param affected_entities: List of affected entity IDs.
+    :param affected_entities: List of affected entity types.
     :param request_data: The serialized request data associated with this entity.
     """
     sequence: int = field(default=0)

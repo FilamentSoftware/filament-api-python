@@ -345,6 +345,7 @@ The status of a request.
 | `Completed` | Request has been completed. |
 | `Failed` | Request has failed. |
 | `Cancelled` | Request has been cancelled. |
+| `Resubmitted` | Request has been resubmitted. A request that ended `Cancelled` or `Failed` can be moved to this status, which retires it and queues a fresh copy of it as a new `Pending` request. This is a terminal status for the original request - the copy carries the work from here, and nothing moves a request out of it. |
 
 ### `ScenarioEventAction` (`Enum`)
 
@@ -694,7 +695,7 @@ Represents a request entity in the system.
 | `requested_at` | `datetime.datetime` | — | When the request was requested. |
 | `status` | `RequestStatus` | `RequestStatus.Unknown` | The status of the request. |
 | `error_message` | `Optional[str]` | `None` | Error message if the request failed. |
-| `affected_entities` | `list[str]` | — | List of affected entity IDs. |
+| `affected_entities` | `list[str]` | — | List of affected entity types. |
 | `request_data` | `str` | `''` | The serialized request data associated with this entity. |
 
 ##### `ProcessingRunEntity`

@@ -535,6 +535,10 @@ class RequestStatus(Enum):
     :cvar Completed: Request has been completed.
     :cvar Failed: Request has failed.
     :cvar Cancelled: Request has been cancelled.
+    :cvar Resubmitted: Request has been resubmitted. A request that ended <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Cancelled" /> or
+                       <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Failed" /> can be moved to this status, which retires it and queues a fresh copy of
+                       it as a new <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Pending" /> request. This is a terminal status for the original request -
+                       the copy carries the work from here, and nothing moves a request out of it.
     """
     Unknown = 0
     Pending = 1
@@ -542,6 +546,7 @@ class RequestStatus(Enum):
     Completed = 3
     Failed = 4
     Cancelled = 5
+    Resubmitted = 6
 
 
 class ScenarioEventAction(Enum):
