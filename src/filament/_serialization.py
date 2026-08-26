@@ -498,6 +498,17 @@ def to_dict(
             udp_property = (
                 user_defined_properties.get(name) if user_defined_properties else None
             )
+            if udp_property is None and user_defined_properties is not None:
+                # The caller supplied an authoritative definition map (modify_data
+                # does for Create/Update), so an unmatched name is a typo rather
+                # than a property we simply have no metadata for.  Guessing a wire
+                # name here would send the raw Python value: Decimal, UUID,
+                # datetime and timedelta then fail in the JSON encoder with an
+                # error that never names the offending property.
+                raise ValueError(
+                    f"{name!r} is not a known user-defined property of "
+                    f"{data.__class__.__name__}"
+                )
             wire_name = (
                 udp_property.wire_name
                 if udp_property is not None
