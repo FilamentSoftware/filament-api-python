@@ -85,6 +85,11 @@ this documentation refers to:
 - `read_with_conditions.py` — read with the typed condition builder
 - `subscribe_users.py` — subscribe to real-time changes
 - `subscribe_with_conditions.py` — subscribe with a condition filter
+- `create_user_defined_properties.py` — create example UDP definitions (admin)
+- `discover_user_defined_properties.py` — discover, query, and read UDPs
+- `create_user_with_user_defined_properties.py` — set several UDPs on creation
+- `update_user_defined_property_values.py` — partially update several UDPs
+- `subscribe_users_with_user_defined_properties.py` — receive converted UDP values
 
 ## Conventions used in these docs
 
