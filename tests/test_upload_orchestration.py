@@ -26,11 +26,11 @@ from filament.types.generated.enums import (
 )
 from filament.types.generated.misc import (
     FileCapabilities,
-    FileReference,
     ServerCapabilities,
     UploadGrant,
     ValueOrErrorPublic_1,
 )
+from filament.types.generated.shared import FileReference
 
 
 def _make_client() -> FilamentClient:

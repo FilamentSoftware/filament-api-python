@@ -29,7 +29,6 @@ from filament.types.generated.misc import (
     DataUpdateRejectedNotification,
     DbOrderInstance,
     DbOrderLevel,
-    FileReference,
     ModifyDataRequest,
     ProcessingStatus,
     ReadConnectedDataTypeRequest,
@@ -42,6 +41,7 @@ from filament.types.generated.misc import (
     SuccessOrErrorPublic,
     ValueOrErrorPublic_1,
 )
+from filament.types.generated.shared import FileReference
 
 
 # ---------------------------------------------------------------------------

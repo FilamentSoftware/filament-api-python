@@ -33,7 +33,6 @@ from filament.types.generated.misc import (
     DataUpdateRejectedNotification,
     EntityPermissions,
     EntityServiceDataUpdate,
-    FileReference,
     FileUploadRequest,
     ProcessingStatus,
     ReadDataRequest,
@@ -45,6 +44,7 @@ from filament.types.generated.misc import (
     UploadGrant,
     ValueOrErrorPublic_1,
 )
+from filament.types.generated.shared import FileReference
 
 
 def _make_client(*, mock_invoke: bool = True, **kwargs: Any) -> FilamentClient:
