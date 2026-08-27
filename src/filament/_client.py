@@ -1655,11 +1655,17 @@ class FilamentClient:
                         exc_info=True,
                     )
                 return _value_error(message, error_code)
+
+            # 4. Confirm arrival; the server verifies size / type / checksum.
+            #    Inside the try so a cancellation delivered while completion is
+            #    in flight still releases the reservation below.
+            return await self.complete_file_upload(file_id)
         except asyncio.CancelledError:
             # The reservation outlives the cancelled task and keeps consuming
             # quota, so release it before unwinding.  Shielded so the in-flight
             # hub call is not itself cancelled; still best-effort, and the
-            # cancellation is always re-raised.
+            # cancellation is always re-raised.  Safe even if completion had
+            # already landed server-side: cancel_file_upload is idempotent.
             try:
                 await asyncio.shield(self.cancel_file_upload(file_id))
             except Exception:
@@ -1672,9 +1678,6 @@ class FilamentClient:
         finally:
             if owns_client:
                 await client.aclose()
-
-        # 4. Confirm arrival; the server verifies size / type / checksum.
-        return await self.complete_file_upload(file_id)
 
     async def _submit_upload(
         self,
