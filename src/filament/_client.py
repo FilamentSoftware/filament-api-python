@@ -353,6 +353,11 @@ class FilamentClient:
         we fail the connect with :class:`FilamentConnectionError` rather than
         hang ``__aenter__`` indefinitely.
         """
+        # Drop anything the previous connection advertised: every path out of
+        # this method below the invocation returns without setting them, so a
+        # reused client would otherwise carry stale capabilities (and a stale
+        # checksum algorithm) into a handshake that was rejected or unanswered.
+        self._server_capabilities = None
         request = ClientHelloRequest(max_message_size_bytes=self._max_size)
         try:
             result_dict: Any = await asyncio.wait_for(
@@ -1597,7 +1602,14 @@ class FilamentClient:
         caps = self._server_capabilities
         if caps is not None and caps.files is not None:
             algorithm = caps.files.checksum_algorithm
-        checksum = compute_checksum(data, algorithm)
+        try:
+            checksum = compute_checksum(data, algorithm)
+        except (RuntimeError, ValueError) as exc:
+            # Crc32cBase64 without the optional google-crc32c dependency, or an
+            # algorithm this client does not know.  Either way the upload cannot
+            # be attempted — surface it as a result, not an exception, since no
+            # reservation has been taken yet.
+            return _value_error(str(exc), ErrorCodes.NotSupported)
 
         # 2. Request the grant.
         grant_result = await self.request_file_upload(
@@ -1643,6 +1655,20 @@ class FilamentClient:
                         exc_info=True,
                     )
                 return _value_error(message, error_code)
+        except asyncio.CancelledError:
+            # The reservation outlives the cancelled task and keeps consuming
+            # quota, so release it before unwinding.  Shielded so the in-flight
+            # hub call is not itself cancelled; still best-effort, and the
+            # cancellation is always re-raised.
+            try:
+                await asyncio.shield(self.cancel_file_upload(file_id))
+            except Exception:
+                logger.warning(
+                    "Failed to cancel upload reservation for %s",
+                    file_id,
+                    exc_info=True,
+                )
+            raise
         finally:
             if owns_client:
                 await client.aclose()
