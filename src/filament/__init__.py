@@ -46,7 +46,15 @@ def file_reference_from_json(value: str) -> FileReference:
         raise ValueError(
             f"Expected a JSON object for FileReference, got {type(decoded).__name__}"
         )
-    result = from_dict(decoded, FileReference)
+    try:
+        result = from_dict(decoded, FileReference)
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        # A malformed object reaches into the deserializer in several ways — an
+        # unknown ``errorCode`` raises KeyError, a mistyped field TypeError, a
+        # nested scalar AttributeError.  The documented contract is ValueError.
+        raise ValueError(
+            "Could not deserialize FileReference from projection"
+        ) from exc
     if result is None:
         raise ValueError("Could not deserialize FileReference from projection")
     return result
