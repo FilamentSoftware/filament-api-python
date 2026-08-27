@@ -129,7 +129,7 @@ class TestUploadFile:
             return_value=_ok(FileEntity(id=file_id, name="f", state=FileState.Available))
         )
 
-        async with _mock_transport(lambda r: httpx.Response(204)) as http:
+        async with _mock_transport(lambda _request: httpx.Response(204)) as http:
             result = await client.upload_file(
                 name="f",
                 content_type="text/plain",
@@ -229,7 +229,7 @@ class TestUploadFile:
         client.complete_file_upload = AsyncMock()  # type: ignore[method-assign]
         client.cancel_file_upload = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
-        async with _mock_transport(lambda r: httpx.Response(403, text="denied")) as http:
+        async with _mock_transport(lambda _request: httpx.Response(403, text="denied")) as http:
             result = await client.upload_file(
                 name="f",
                 content_type="text/plain",
@@ -260,7 +260,7 @@ class TestUploadFile:
             side_effect=RuntimeError("cancel hub failed")
         )
 
-        async with _mock_transport(lambda r: httpx.Response(403, text="denied")) as http:
+        async with _mock_transport(lambda _request: httpx.Response(403, text="denied")) as http:
             result = await client.upload_file(
                 name="f",
                 content_type="text/plain",
@@ -336,7 +336,7 @@ class TestDownloadFile:
             return_value=_fail("boom", ErrorCodes.InternalError)
         )
 
-        async with _mock_transport(lambda r: httpx.Response(200)) as http:
+        async with _mock_transport(lambda _request: httpx.Response(200)) as http:
             result = await client.download_file(file_id, http_client=http)
 
         assert result.success is False
@@ -353,7 +353,7 @@ class TestDownloadFile:
             )
         )
 
-        async with _mock_transport(lambda r: httpx.Response(404)) as http:
+        async with _mock_transport(lambda _request: httpx.Response(404)) as http:
             result = await client.download_file(file_id, http_client=http)
 
         assert result.success is False

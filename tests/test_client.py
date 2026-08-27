@@ -1050,6 +1050,35 @@ class TestFileMethods:
         assert result.success is False
         assert result.error_code == ErrorCodes.InternalError
 
+    @pytest.mark.asyncio
+    async def test_file_wrappers_survive_a_scalar_hub_response(self) -> None:
+        # A hub that answers with a bare scalar instead of an envelope object
+        # reaches ``from_dict``'s ``data.get(...)`` and raises AttributeError.
+        # Every file wrapper must absorb that into a failed result.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value="success")
+        file_id = uuid7()
+
+        request = FileUploadRequest(
+            name="x",
+            content_type="text/plain",
+            size=1,
+            reference_type="UserEntity",
+            reference_id=uuid7(),
+            reference_property="Avatar",
+        )
+        results = [
+            await client.request_file_upload(request),
+            await client.refresh_file_upload_grant(file_id),
+            await client.complete_file_upload(file_id),
+            await client.cancel_file_upload(file_id),
+            await client.get_file_urls([file_id]),
+        ]
+
+        for result in results:
+            assert result.success is False
+            assert result.error_code == ErrorCodes.InternalError
+
 
 class TestDataUpdateRejected:
     """DataUpdateRejected event routing to subscription on_error callbacks."""

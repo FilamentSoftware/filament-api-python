@@ -222,6 +222,20 @@ class TestBuildUploadRequest:
         assert req.headers["x-custom"] == "1"
         assert req.headers["content-type"] == "application/octet-stream"
 
+    def test_plain_body_grant_content_type_wins_case_insensitively(self) -> None:
+        # httpx.Headers keeps "Content-Type" and "content-type" side by side, so
+        # a grant that pins the type in lowercase must not end up with two
+        # conflicting headers — its value is the only one sent.
+        req = build_upload_request(
+            url="https://storage.example.com/bucket",
+            method="PUT",
+            fields=None,
+            headers={"content-type": "application/octet-stream"},
+            data=b"raw",
+            content_type="text/plain",
+        )
+        assert req.headers.get_list("content-type") == ["application/octet-stream"]
+
     def test_content_type_field_matched_case_insensitively(self) -> None:
         # A lower-case "content-type" policy field should still drive the file
         # part's content type.
