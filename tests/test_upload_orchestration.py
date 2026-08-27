@@ -460,7 +460,8 @@ class TestUploadFile:
 
     @pytest.mark.asyncio
     async def test_failing_cleanup_does_not_mask_the_original_exception(self) -> None:
-        # The best-effort release must never replace the error that caused it.
+        # The best-effort release must run, and must never replace the error
+        # that caused it — even when the release call itself raises.
         client = _make_client()
         file_id = uuid7()
         client._server_capabilities = None
@@ -484,6 +485,10 @@ class TestUploadFile:
                     reference_property="Attachment",
                     http_client=http,
                 )
+
+        # Without this the test passes even with the release removed, since the
+        # completion error propagates on its own.
+        client.cancel_file_upload.assert_awaited_once_with(file_id)
 
 
 # ---------------------------------------------------------------------------
