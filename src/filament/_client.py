@@ -382,7 +382,7 @@ class FilamentClient:
 
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[ServerCapabilities])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.warning(
                 "Failed to deserialize ClientHello response — continuing.",
             )
@@ -499,7 +499,7 @@ class FilamentClient:
         """
         try:
             update = from_dict(data, ServiceDataUpdate)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize DataUpdated payload")
             return
         if update is None:
@@ -787,7 +787,7 @@ class FilamentClient:
         """
         try:
             notification = from_dict(data, DataUpdateRejectedNotification)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize DataUpdateRejected payload")
             return
         if notification is None:
@@ -835,7 +835,7 @@ class FilamentClient:
         """Deserialize a ``ProcessingStarted`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize %s payload", "ProcessingStarted")
             return
         if status is None:
@@ -850,7 +850,7 @@ class FilamentClient:
         """Deserialize a ``ProcessingCompleted`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize %s payload", "ProcessingCompleted")
             return
         if status is None:
@@ -865,7 +865,7 @@ class FilamentClient:
         """Deserialize a ``ProcessingFailed`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize %s payload", "ProcessingFailed")
             return
         if status is None:
@@ -907,7 +907,7 @@ class FilamentClient:
         )
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPropertyPermissions])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         return result if result is not None else _deserialization_error()
 
@@ -1101,7 +1101,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("GetEntityPermissions")
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPermissions])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1177,7 +1177,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("ReadData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1369,7 +1369,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("ModifyData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1394,7 +1394,7 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[ServiceDataReadConnected]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
@@ -1423,7 +1423,7 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[UserDefinedPropertyInfo]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
@@ -1447,7 +1447,7 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[UserDefinedPropertyInfo]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
@@ -1814,7 +1814,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("Subscribe", subscription_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[SubscriptionId])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
