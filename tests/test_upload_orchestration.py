@@ -19,6 +19,7 @@ import pytest
 from uuid_utils import UUID, uuid7
 
 from filament._client import FilamentClient
+from filament._exceptions import FilamentConnectionError
 from filament.types.generated.entities.core import FileEntity
 from filament.types.generated.enums import (
     ErrorCodes,
@@ -399,6 +400,90 @@ class TestUploadFile:
                 await task
 
         client.cancel_file_upload.assert_awaited_once_with(file_id)
+
+    @pytest.mark.asyncio
+    async def test_refresh_grant_raising_releases_the_reservation(self) -> None:
+        # refresh_file_upload_grant goes through _invoke, which raises when the
+        # hub connection drops rather than returning a failed result.  The
+        # reservation must still be released and the original error preserved.
+        client = _make_client()
+        file_id = uuid7()
+        client._server_capabilities = None
+        client.request_file_upload = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.refresh_file_upload_grant = AsyncMock(  # type: ignore[method-assign]
+            side_effect=FilamentConnectionError("hub connection lost")
+        )
+        client.complete_file_upload = AsyncMock()  # type: ignore[method-assign]
+        client.cancel_file_upload = AsyncMock()  # type: ignore[method-assign]
+
+        async with _mock_transport(lambda _request: httpx.Response(403)) as http:
+            with pytest.raises(FilamentConnectionError, match="hub connection lost"):
+                await client.upload_file(
+                    name="f",
+                    content_type="text/plain",
+                    data=b"x",
+                    reference_type="UserEntity",
+                    reference_id=uuid7(),
+                    reference_property="Attachment",
+                    http_client=http,
+                )
+
+        client.cancel_file_upload.assert_awaited_once_with(file_id)
+        client.complete_file_upload.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_completion_raising_releases_the_reservation(self) -> None:
+        # Same for a completion call that raises instead of returning a result.
+        client = _make_client()
+        file_id = uuid7()
+        client._server_capabilities = None
+        client.request_file_upload = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.refresh_file_upload_grant = AsyncMock()  # type: ignore[method-assign]
+        client.complete_file_upload = AsyncMock(  # type: ignore[method-assign]
+            side_effect=FilamentConnectionError("hub connection lost")
+        )
+        client.cancel_file_upload = AsyncMock()  # type: ignore[method-assign]
+
+        async with _mock_transport(lambda _request: httpx.Response(204)) as http:
+            with pytest.raises(FilamentConnectionError, match="hub connection lost"):
+                await client.upload_file(
+                    name="f",
+                    content_type="text/plain",
+                    data=b"x",
+                    reference_type="UserEntity",
+                    reference_id=uuid7(),
+                    reference_property="Attachment",
+                    http_client=http,
+                )
+
+        client.cancel_file_upload.assert_awaited_once_with(file_id)
+
+    @pytest.mark.asyncio
+    async def test_failing_cleanup_does_not_mask_the_original_exception(self) -> None:
+        # The best-effort release must never replace the error that caused it.
+        client = _make_client()
+        file_id = uuid7()
+        client._server_capabilities = None
+        client.request_file_upload = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.refresh_file_upload_grant = AsyncMock()  # type: ignore[method-assign]
+        client.complete_file_upload = AsyncMock(  # type: ignore[method-assign]
+            side_effect=FilamentConnectionError("hub connection lost")
+        )
+        client.cancel_file_upload = AsyncMock(  # type: ignore[method-assign]
+            side_effect=RuntimeError("cancel hub failed")
+        )
+
+        async with _mock_transport(lambda _request: httpx.Response(204)) as http:
+            with pytest.raises(FilamentConnectionError, match="hub connection lost"):
+                await client.upload_file(
+                    name="f",
+                    content_type="text/plain",
+                    data=b"x",
+                    reference_type="UserEntity",
+                    reference_id=uuid7(),
+                    reference_property="Attachment",
+                    http_client=http,
+                )
 
 
 # ---------------------------------------------------------------------------
