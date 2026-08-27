@@ -116,9 +116,13 @@ def build_upload_request(
         # Plain-body upload: send the raw bytes as the request body with the
         # content type.  ``UploadGrant.fields`` is null precisely for providers
         # that expect a plain body rather than a multipart policy form.
-        plain_headers = {"Content-Type": content_type}
-        if headers:
-            plain_headers.update(headers)
+        # The grant's own headers win: a provider that pins the content type in
+        # a signed header must receive that exact value.  Match case-insensitively
+        # — httpx keeps both spellings rather than collapsing them, so adding our
+        # own would send two conflicting ``Content-Type`` headers.
+        plain_headers = dict(headers) if headers else {}
+        if not any(key.lower() == _CONTENT_TYPE_FIELD.lower() for key in plain_headers):
+            plain_headers[_CONTENT_TYPE_FIELD] = content_type
         return httpx.Request(
             method or "POST",
             url,
