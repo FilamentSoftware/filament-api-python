@@ -843,6 +843,18 @@ class TestClientHello:
         assert client.server_capabilities is None
 
     @pytest.mark.asyncio
+    async def test_send_client_hello_survives_a_scalar_response(self) -> None:
+        # A bare scalar reaches from_dict's data.get(...) and raises
+        # AttributeError.  ClientHello is optional, so this must log and
+        # continue — if it escaped, __aenter__ would fail the whole connection.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value="success")
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
     async def test_send_client_hello_older_server_leaves_capabilities_none(self) -> None:
         client = _make_client()
         client._invoke = AsyncMock(
