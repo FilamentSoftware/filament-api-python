@@ -1476,7 +1476,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("RequestFileUpload", to_dict(request))
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[UploadGrant])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1495,7 +1495,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("RefreshFileUploadGrant", str(file_id))
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[UploadGrant])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1516,7 +1516,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("CompleteFileUpload", to_dict(request))
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[FileEntity])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1534,7 +1534,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("CancelFileUpload", str(file_id))
         try:
             result = from_dict(result_dict, SuccessOrErrorPublic)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _error_result_public(
                 "Failed to deserialize CancelFileUpload response"
             )
@@ -1559,7 +1559,7 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[dict[UUID, FileReference]]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
