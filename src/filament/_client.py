@@ -1644,40 +1644,54 @@ class FilamentClient:
                         client, grant, data, content_type, name
                     )
             if not ok:
-                # Best-effort release of the reservation (idempotent).  A failure
-                # here must not mask the transfer error we are about to return.
-                try:
-                    await self.cancel_file_upload(file_id)
-                except Exception:
-                    logger.warning(
-                        "Failed to cancel upload reservation for %s",
-                        file_id,
-                        exc_info=True,
-                    )
+                await self._release_upload_reservation(file_id)
                 return _value_error(message, error_code)
 
             # 4. Confirm arrival; the server verifies size / type / checksum.
-            #    Inside the try so a cancellation delivered while completion is
-            #    in flight still releases the reservation below.
+            #    Inside the try so a cancellation or hub failure while completion
+            #    is in flight still releases the reservation below.
             return await self.complete_file_upload(file_id)
         except asyncio.CancelledError:
             # The reservation outlives the cancelled task and keeps consuming
             # quota, so release it before unwinding.  Shielded so the in-flight
-            # hub call is not itself cancelled; still best-effort, and the
-            # cancellation is always re-raised.  Safe even if completion had
-            # already landed server-side: cancel_file_upload is idempotent.
-            try:
-                await asyncio.shield(self.cancel_file_upload(file_id))
-            except Exception:
-                logger.warning(
-                    "Failed to cancel upload reservation for %s",
-                    file_id,
-                    exc_info=True,
-                )
+            # hub call is not itself cancelled.
+            await self._release_upload_reservation(file_id, shielded=True)
+            raise
+        except Exception:
+            # The grant refresh or the completion call raised rather than
+            # returning a failed result — a dropped hub connection surfaces this
+            # way.  Same leak, but no shield needed: this task is not being
+            # cancelled, so the cleanup call can run normally.
+            await self._release_upload_reservation(file_id)
             raise
         finally:
             if owns_client:
                 await client.aclose()
+
+    async def _release_upload_reservation(
+        self,
+        file_id: UUID,
+        *,
+        shielded: bool = False,
+    ) -> None:
+        """Best-effort release of an upload reservation.
+
+        Never raises: a failure here must not mask the error that prompted the
+        release.  Safe to call even when the upload may already have completed
+        server-side, since :meth:`cancel_file_upload` is idempotent.
+
+        :param shielded: Protect the hub call from a cancellation already being
+            delivered to this task, so the reservation is still released.
+        """
+        call = self.cancel_file_upload(file_id)
+        try:
+            await (asyncio.shield(call) if shielded else call)
+        except Exception:
+            logger.warning(
+                "Failed to cancel upload reservation for %s",
+                file_id,
+                exc_info=True,
+            )
 
     async def _submit_upload(
         self,
