@@ -295,3 +295,18 @@ class TestFileReferenceFromJson:
         # json.loads accepts these, but they are not a FileReference object.
         with pytest.raises(ValueError):
             filament.file_reference_from_json(payload)
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            # Unknown enum member — from_dict raises KeyError.
+            '{"success": true, "errorCode": "NotAValidCode"}',
+            # Unusable nested object — from_dict raises out of FileMetadata.
+            '{"success": true, "errorCode": 0, "metadata": {"contentType": [], "size": {}}}',
+        ],
+    )
+    def test_malformed_object_raises_value_error(self, payload: str) -> None:
+        # The docstring promises ValueError; from_dict's own KeyError /
+        # AttributeError / TypeError must be normalised rather than leaking.
+        with pytest.raises(ValueError, match="Could not deserialize FileReference"):
+            filament.file_reference_from_json(payload)

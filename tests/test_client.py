@@ -853,6 +853,69 @@ class TestClientHello:
 
         assert client.server_capabilities is None
 
+    @pytest.mark.asyncio
+    async def test_reconnect_clears_stale_capabilities(self) -> None:
+        # A reused client must not carry the previous connection's capabilities
+        # into a handshake that was rejected — upload_file would otherwise
+        # checksum with an algorithm this server never advertised.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "files": {
+                    "checksumAlgorithm": 1,
+                    "serverSideChecksum": True,
+                },
+            },
+        })
+
+        await client._send_client_hello()
+        assert client.server_capabilities is not None
+
+        client._invoke = AsyncMock(return_value={
+            "success": False,
+            "message": "nope",
+            "errorCode": 0,
+            "errorId": None,
+            "data": None,
+        })
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
+    async def test_reconnect_to_older_server_clears_stale_capabilities(self) -> None:
+        # Same again for the swallowed "older server has no ClientHello" path,
+        # which returns before ever looking at a response.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "files": {
+                    "checksumAlgorithm": 1,
+                    "serverSideChecksum": True,
+                },
+            },
+        })
+
+        await client._send_client_hello()
+        assert client.server_capabilities is not None
+
+        client._invoke = AsyncMock(
+            side_effect=Exception("Method 'ClientHello' not found")
+        )
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
 
 class TestFileMethods:
     """Thin wrappers over the file-store hub methods."""

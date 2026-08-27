@@ -8,6 +8,7 @@ itself is covered separately in ``test_file_upload``.
 """
 from __future__ import annotations
 
+import asyncio
 import datetime
 import hashlib
 from typing import Any, Callable
@@ -274,6 +275,85 @@ class TestUploadFile:
         assert result.success is False
         assert result.error_code == ErrorCodes.RequestError
         assert "Storage rejected upload (403)" in result.message
+        client.cancel_file_upload.assert_awaited_once_with(file_id)
+        client.complete_file_upload.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unavailable_checksum_algorithm_is_a_typed_failure(self) -> None:
+        # Crc32cBase64 without the optional google-crc32c dependency raises
+        # RuntimeError out of compute_checksum.  upload_file declares a
+        # ValueOrErrorPublic_1 result, so that must not escape as an exception —
+        # and no reservation should be taken.
+        client = _make_client()
+        client._server_capabilities = ServerCapabilities(
+            files=FileCapabilities(
+                checksum_algorithm=FileChecksumAlgorithm.Crc32cBase64,
+                server_side_checksum=True,
+            )
+        )
+        client.request_file_upload = AsyncMock()  # type: ignore[method-assign]
+        client.cancel_file_upload = AsyncMock()  # type: ignore[method-assign]
+
+        with patch(
+            "filament._client.compute_checksum",
+            side_effect=RuntimeError(
+                "CRC32C checksums require the optional 'google-crc32c' dependency. "
+                "Install it with: pip install filament-api[crc32c]"
+            ),
+        ):
+            result = await client.upload_file(
+                name="f",
+                content_type="text/plain",
+                data=b"x",
+                reference_type="UserEntity",
+                reference_id=uuid7(),
+                reference_property="Attachment",
+            )
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.NotSupported
+        assert "google-crc32c" in result.message
+        # Nothing was reserved, so nothing needs releasing.
+        client.request_file_upload.assert_not_awaited()
+        client.cancel_file_upload.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_cancellation_releases_the_reservation(self) -> None:
+        # Cancelling the upload task after the grant is acquired must release the
+        # reservation rather than leaving it pending against the caller's quota,
+        # and the cancellation itself must still propagate.
+        client = _make_client()
+        file_id = uuid7()
+        client._server_capabilities = None
+        client.request_file_upload = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.refresh_file_upload_grant = AsyncMock()  # type: ignore[method-assign]
+        client.complete_file_upload = AsyncMock()  # type: ignore[method-assign]
+        client.cancel_file_upload = AsyncMock()  # type: ignore[method-assign]
+
+        transfer_started = asyncio.Event()
+
+        async def blocked(_request: httpx.Request) -> httpx.Response:
+            transfer_started.set()
+            await asyncio.Event().wait()  # never completes
+            raise AssertionError("unreachable")
+
+        async with _mock_transport(blocked) as http:
+            task = asyncio.ensure_future(
+                client.upload_file(
+                    name="f",
+                    content_type="text/plain",
+                    data=b"x",
+                    reference_type="UserEntity",
+                    reference_id=uuid7(),
+                    reference_property="Attachment",
+                    http_client=http,
+                )
+            )
+            await transfer_started.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
         client.cancel_file_upload.assert_awaited_once_with(file_id)
         client.complete_file_upload.assert_not_awaited()
 
