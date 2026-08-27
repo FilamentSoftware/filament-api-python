@@ -357,6 +357,49 @@ class TestUploadFile:
         client.cancel_file_upload.assert_awaited_once_with(file_id)
         client.complete_file_upload.assert_not_awaited()
 
+    @pytest.mark.asyncio
+    async def test_cancellation_during_completion_releases_the_reservation(self) -> None:
+        # The transfer has landed but CompleteFileUpload is still in flight.
+        # Cancelling there must still release the reservation — cancel is
+        # idempotent, so firing it against a completion that may already have
+        # succeeded server-side is safe.
+        client = _make_client()
+        file_id = uuid7()
+        client._server_capabilities = None
+        client.request_file_upload = AsyncMock(return_value=_ok(_grant(file_id)))  # type: ignore[method-assign]
+        client.refresh_file_upload_grant = AsyncMock()  # type: ignore[method-assign]
+        client.cancel_file_upload = AsyncMock()  # type: ignore[method-assign]
+
+        completing = asyncio.Event()
+
+        async def blocked_completion(_file_id: UUID) -> ValueOrErrorPublic_1[Any]:
+            completing.set()
+            await asyncio.Event().wait()  # never completes
+            raise AssertionError("unreachable")
+
+        client.complete_file_upload = AsyncMock(  # type: ignore[method-assign]
+            side_effect=blocked_completion
+        )
+
+        async with _mock_transport(lambda _request: httpx.Response(204)) as http:
+            task = asyncio.ensure_future(
+                client.upload_file(
+                    name="f",
+                    content_type="text/plain",
+                    data=b"x",
+                    reference_type="UserEntity",
+                    reference_id=uuid7(),
+                    reference_property="Attachment",
+                    http_client=http,
+                )
+            )
+            await completing.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        client.cancel_file_upload.assert_awaited_once_with(file_id)
+
 
 # ---------------------------------------------------------------------------
 # download_file
