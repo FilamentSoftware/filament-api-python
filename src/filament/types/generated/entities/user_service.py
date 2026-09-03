@@ -13,6 +13,7 @@ from ..entities.generic import AddressEntityBase, EmailEntityBase, PhoneEntityBa
 from ..entities.organization_service import OfficeLocationEntity, TaxCreditLocationEntity
 from ..entities.specialty_service import SpecialtyEntity
 from ..enums import NameOrder, UserAddressType, UserEmailType, UserPhoneType, UserStatusEnum, UserTypeEnum
+from ..shared import FileReference
 
 __all__ = [
     "UserEntity",
@@ -40,7 +41,9 @@ class UserEntity(UserBaseEntity):
     :param email_address: Represents the primary email address associated with the user.
                           Used as a primary means of electronic communication for the user.
     :param pronouns: The pronouns this user perfers to use.
-    :param image_link: Link path to the user profile image.
+    :param image_id: The user's profile image.
+    :param image_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.UserService.UserEntity.ImageId" />, carrying a <c>FileReference</c>.
+    :param image: The image as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>ImageData</c>.</b>
     :param name: Gets the full name of the user formatted based on the specified display order.
                  Includes the given name, optional middle names, and family name
                  displayed in either "Given Name First" or "Family Name First" order.
@@ -70,7 +73,9 @@ class UserEntity(UserBaseEntity):
     password: Optional[str] = field(default=None)
     email_address: str = field(default='')
     pronouns: Optional[str] = field(default=None)
-    image_link: Optional[str] = field(default=None)
+    image_id: Optional[UUID] = field(default=None)
+    image_data: Optional[str] = field(default=None)
+    image: Optional[FileReference] = field(default=None)
     name: str = field(default=' ')
     tax_credit_location_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     office_location_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

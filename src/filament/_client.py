@@ -8,11 +8,12 @@ import inspect
 import logging
 import math
 import re
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from types import TracebackType
 from typing import Any, Optional, Type, Union
 
+import httpx
 from pysignalr.client import SignalRClient
 from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
@@ -24,13 +25,14 @@ from ._exceptions import (
     ResponseTooLargeError,
 )
 from ._condition_builder import Condition
+from ._file_upload import build_upload_request, compute_checksum
 from ._serialization import from_dict, to_dict
 from .user_defined_properties import (
     UserDefinedProperty,
     build_user_defined_properties,
     hydrate_user_defined_properties,
 )
-from .types.generated.entities.core import UserDefinedPropertyEntity
+from .types.generated.entities.core import FileEntity, UserDefinedPropertyEntity
 from .types.generated.misc import (
     ClientHelloRequest,
     CreateUserDefinedPropertyRequest,
@@ -38,11 +40,15 @@ from .types.generated.misc import (
     EntityPermissions,
     EntityPropertyPermissions,
     EntityServiceDataUpdate,
+    FileUploadCompletion,
+    FileUploadRequest,
+    GetFileUrlsRequest,
     ModifyDataRequest,
     ProcessingStatus,
     ReadConnectedDataRequest,
     ReadDataRequest,
     RequestId,
+    ServerCapabilities,
     ServiceDataRead,
     ServiceDataReadConnected,
     ServiceDataUpdate,
@@ -50,6 +56,7 @@ from .types.generated.misc import (
     SubscriptionId,
     SuccessOrErrorPublic,
     UpdateUserDefinedPropertyRequest,
+    UploadGrant,
     UserDefinedPropertyInfo,
     ValueOrErrorPublic_1,
     WrappedEntity,
@@ -58,9 +65,11 @@ from .types.generated.enums import (
     DataProcessingStatus,
     DataRequestAction,
     ErrorCodes,
+    FileChecksumAlgorithm,
     ReadMode,
     SubscriptionMode,
 )
+from .types.generated.shared import FileReference
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +135,11 @@ class FilamentClient:
         self._auth_message: Optional[str] = None
         self._connection_timeout = connection_timeout
         self._max_size = max_size
+
+        # Capabilities the server advertises during ClientHello (e.g. the file
+        # store's checksum algorithm).  Populated on connect; stays None against
+        # older servers that don't return them.
+        self._server_capabilities: Optional[ServerCapabilities] = None
 
         # Subscription routing — supports multiple callbacks per backend
         # subscription.  The backend returns the same subscription ID when
@@ -339,6 +353,11 @@ class FilamentClient:
         we fail the connect with :class:`FilamentConnectionError` rather than
         hang ``__aenter__`` indefinitely.
         """
+        # Drop anything the previous connection advertised: every path out of
+        # this method below the invocation returns without setting them, so a
+        # reused client would otherwise carry stale capabilities (and a stale
+        # checksum algorithm) into a handshake that was rejected or unanswered.
+        self._server_capabilities = None
         request = ClientHelloRequest(max_message_size_bytes=self._max_size)
         try:
             result_dict: Any = await asyncio.wait_for(
@@ -362,8 +381,8 @@ class FilamentClient:
             return
 
         try:
-            result = from_dict(result_dict, SuccessOrErrorPublic)
-        except (TypeError, ValueError, KeyError):
+            result = from_dict(result_dict, ValueOrErrorPublic_1[ServerCapabilities])
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.warning(
                 "Failed to deserialize ClientHello response — continuing.",
             )
@@ -373,6 +392,13 @@ class FilamentClient:
                 "Server rejected ClientHello: %s",
                 result.message if result is not None else "no result",
             )
+            return
+
+        # Capture advertised capabilities (e.g. the file store's checksum
+        # algorithm) so upload_file and callers can consult them without another
+        # round trip.  ``data`` may be None on older servers that accept
+        # ClientHello but return no capabilities.
+        self._server_capabilities = result.data
 
     # ------------------------------------------------------------------
     # Internal event handlers
@@ -473,7 +499,7 @@ class FilamentClient:
         """
         try:
             update = from_dict(data, ServiceDataUpdate)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize DataUpdated payload")
             return
         if update is None:
@@ -761,7 +787,7 @@ class FilamentClient:
         """
         try:
             notification = from_dict(data, DataUpdateRejectedNotification)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize DataUpdateRejected payload")
             return
         if notification is None:
@@ -809,7 +835,7 @@ class FilamentClient:
         """Deserialize a ``ProcessingStarted`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize %s payload", "ProcessingStarted")
             return
         if status is None:
@@ -824,7 +850,7 @@ class FilamentClient:
         """Deserialize a ``ProcessingCompleted`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize %s payload", "ProcessingCompleted")
             return
         if status is None:
@@ -839,7 +865,7 @@ class FilamentClient:
         """Deserialize a ``ProcessingFailed`` event and invoke registered callbacks."""
         try:
             status = from_dict(data, ProcessingStatus)
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize %s payload", "ProcessingFailed")
             return
         if status is None:
@@ -881,7 +907,7 @@ class FilamentClient:
         )
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPropertyPermissions])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         return result if result is not None else _deserialization_error()
 
@@ -1049,6 +1075,21 @@ class FilamentClient:
             data=properties,
         )
 
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def server_capabilities(self) -> Optional[ServerCapabilities]:
+        """Capabilities the server advertised during the ``ClientHello`` handshake.
+
+        ``None`` until the connection is established, or when connected to an
+        older server that returns no capabilities.  ``server_capabilities.files``
+        (when present) carries the file store's checksum algorithm and
+        server-side-checksum flag, which :meth:`upload_file` consults to decide
+        whether and how to checksum before requesting an upload grant.
+        """
+        return self._server_capabilities
+
     # ------------------------------------------------------------------
     # API methods
     # ------------------------------------------------------------------
@@ -1060,7 +1101,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("GetEntityPermissions")
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[EntityPermissions])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1136,7 +1177,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("ReadData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1328,7 +1369,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("ModifyData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
             return result
@@ -1353,7 +1394,7 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[ServiceDataReadConnected]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
@@ -1382,7 +1423,7 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[UserDefinedPropertyInfo]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
@@ -1406,13 +1447,354 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[UserDefinedPropertyInfo]
             )
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
         if result.success:
             await self.invalidate_user_defined_property_cache()
         return result
+
+    # ------------------------------------------------------------------
+    # File methods
+    # ------------------------------------------------------------------
+    #
+    # These are thin wrappers over the file-store hub methods.  The bytes
+    # themselves never pass through the hub: ``request_file_upload`` returns an
+    # :class:`UploadGrant` locating a storage endpoint, the client POSTs the
+    # bytes there directly (see :mod:`filament._file_upload`), then
+    # ``complete_file_upload`` confirms arrival.  A future ``upload_file``
+    # helper will orchestrate the whole sequence.
+
+    async def request_file_upload(
+        self,
+        request: FileUploadRequest,
+    ) -> ValueOrErrorPublic_1[UploadGrant]:
+        """Request a grant to upload one file into one slot.
+
+        The returned :class:`UploadGrant` carries the storage URL, method, and
+        policy fields the client submits the bytes with; it does **not** move any
+        bytes itself.  If the store advertises a checksum algorithm (see
+        :attr:`server_capabilities`), set :attr:`FileUploadRequest.checksum`
+        before calling so the upload is verified at completion.
+        """
+        result_dict: Any = await self._invoke("RequestFileUpload", to_dict(request))
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[UploadGrant])
+        except (AttributeError, TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is not None:
+            return result
+        return _deserialization_error()
+
+    async def refresh_file_upload_grant(
+        self,
+        file_id: UUID,
+    ) -> ValueOrErrorPublic_1[UploadGrant]:
+        """Re-sign the grant for an in-progress upload.
+
+        Use when a grant expires mid-transfer.  Unlike
+        :meth:`request_file_upload` this does **not** take a second reservation,
+        so it is safe to call repeatedly for the same *file_id*.
+        """
+        result_dict: Any = await self._invoke("RefreshFileUploadGrant", str(file_id))
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[UploadGrant])
+        except (AttributeError, TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is not None:
+            return result
+        return _deserialization_error()
+
+    async def complete_file_upload(
+        self,
+        file_id: UUID,
+    ) -> ValueOrErrorPublic_1[FileEntity]:
+        """Confirm an upload's bytes arrived, returning the completed file.
+
+        The server verifies the stored object against what was declared (size,
+        content type, and checksum where both sides have one).  A checksum
+        mismatch returns :attr:`ErrorCodes.ChecksumMismatch`; the file is marked
+        failed and the caller should request a fresh upload rather than retry.
+        """
+        request = FileUploadCompletion(file_id=file_id)
+        result_dict: Any = await self._invoke("CompleteFileUpload", to_dict(request))
+        try:
+            result = from_dict(result_dict, ValueOrErrorPublic_1[FileEntity])
+        except (AttributeError, TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is not None:
+            return result
+        return _deserialization_error()
+
+    async def cancel_file_upload(
+        self,
+        file_id: UUID,
+    ) -> SuccessOrErrorPublic:
+        """Abandon an upload, releasing its reservation immediately.
+
+        Idempotent — safe to fire on abort without knowing whether the upload
+        already completed.
+        """
+        result_dict: Any = await self._invoke("CancelFileUpload", str(file_id))
+        try:
+            result = from_dict(result_dict, SuccessOrErrorPublic)
+        except (AttributeError, TypeError, ValueError, KeyError):
+            return _error_result_public(
+                "Failed to deserialize CancelFileUpload response"
+            )
+        if result is not None:
+            return result
+        return _error_result_public("Failed to deserialize CancelFileUpload response")
+
+    async def get_file_urls(
+        self,
+        file_ids: Sequence[UUID],
+    ) -> ValueOrErrorPublic_1[dict[UUID, FileReference]]:
+        """Mint read URLs for a batch of files.
+
+        Returns one :class:`FileReference` per requested id, keyed by file id.
+        Results are per-file: a stale or unreadable id yields a failed
+        :class:`FileReference` without failing the others.  A file the caller
+        cannot read and one that does not exist are indistinguishable, by design.
+        """
+        request = GetFileUrlsRequest(file_ids=list(file_ids))
+        result_dict: Any = await self._invoke("GetFileUrls", to_dict(request))
+        try:
+            result = from_dict(
+                result_dict, ValueOrErrorPublic_1[dict[UUID, FileReference]]
+            )
+        except (AttributeError, TypeError, ValueError, KeyError):
+            return _deserialization_error()
+        if result is not None:
+            return result
+        return _deserialization_error()
+
+    async def upload_file(
+        self,
+        *,
+        name: str,
+        content_type: str,
+        data: bytes,
+        reference_type: str,
+        reference_id: UUID,
+        reference_property: str,
+        description: Optional[str] = None,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> ValueOrErrorPublic_1[FileEntity]:
+        """Upload one file end-to-end and return the completed :class:`FileEntity`.
+
+        Orchestrates the full flow: compute whatever checksum the store requires
+        (from :attr:`server_capabilities`), request an upload grant, POST the
+        bytes directly to storage, then confirm completion.  If the transfer
+        fails the grant is refreshed once and retried (a likely cause is expiry,
+        and refresh takes no new reservation); if it still fails the reservation
+        is cancelled and a failed result is returned.
+
+        :param data: The file bytes.  ``size`` and any checksum are derived from
+            these, so the whole file must be in memory (streaming is a planned
+            follow-up).
+        :param http_client: Optional httpx client to reuse for the storage
+            transfer.  When omitted, a short-lived client is created and closed.
+        """
+        # 1. Checksum in the store's declared algorithm (None_ → no checksum).
+        algorithm = FileChecksumAlgorithm.None_
+        caps = self._server_capabilities
+        if caps is not None and caps.files is not None:
+            algorithm = caps.files.checksum_algorithm
+        try:
+            checksum = compute_checksum(data, algorithm)
+        except (RuntimeError, ValueError) as exc:
+            # Crc32cBase64 without the optional google-crc32c dependency, or an
+            # algorithm this client does not know.  Either way the upload cannot
+            # be attempted — surface it as a result, not an exception, since no
+            # reservation has been taken yet.
+            return _value_error(str(exc), ErrorCodes.NotSupported)
+
+        # 2. Request the grant.
+        grant_result = await self.request_file_upload(
+            FileUploadRequest(
+                name=name,
+                content_type=content_type,
+                size=len(data),
+                reference_type=reference_type,
+                reference_id=reference_id,
+                reference_property=reference_property,
+                description=description,
+                checksum=checksum,
+            )
+        )
+        if not grant_result.success or grant_result.data is None:
+            return _propagate_failure(grant_result)
+        grant = grant_result.data
+        file_id = grant.file_id
+
+        # 3. Transfer the bytes, refreshing the grant once on failure.
+        owns_client = http_client is None
+        client = http_client if http_client is not None else httpx.AsyncClient()
+        try:
+            ok, message, error_code = await self._submit_upload(
+                client, grant, data, content_type, name
+            )
+            if not ok:
+                refresh = await self.refresh_file_upload_grant(file_id)
+                if refresh.success and refresh.data is not None:
+                    grant = refresh.data
+                    ok, message, error_code = await self._submit_upload(
+                        client, grant, data, content_type, name
+                    )
+            if not ok:
+                await self._release_upload_reservation(file_id)
+                return _value_error(message, error_code)
+
+            # 4. Confirm arrival; the server verifies size / type / checksum.
+            #    Inside the try so a cancellation or hub failure while completion
+            #    is in flight still releases the reservation below.
+            return await self.complete_file_upload(file_id)
+        except asyncio.CancelledError:
+            # The reservation outlives the cancelled task and keeps consuming
+            # quota, so release it before unwinding.  Shielded so the in-flight
+            # hub call is not itself cancelled.
+            await self._release_upload_reservation(file_id, shielded=True)
+            raise
+        except Exception:
+            # The grant refresh or the completion call raised rather than
+            # returning a failed result — a dropped hub connection surfaces this
+            # way.  Same leak, but no shield needed: this task is not being
+            # cancelled, so the cleanup call can run normally.
+            await self._release_upload_reservation(file_id)
+            raise
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    async def _release_upload_reservation(
+        self,
+        file_id: UUID,
+        *,
+        shielded: bool = False,
+    ) -> None:
+        """Best-effort release of an upload reservation.
+
+        Never raises: a failure here must not mask the error that prompted the
+        release.  Safe to call even when the upload may already have completed
+        server-side, since :meth:`cancel_file_upload` is idempotent.
+
+        :param shielded: Protect the hub call from a cancellation already being
+            delivered to this task, so the reservation is still released.
+        """
+        call = self.cancel_file_upload(file_id)
+        try:
+            await (asyncio.shield(call) if shielded else call)
+        except Exception:
+            logger.warning(
+                "Failed to cancel upload reservation for %s",
+                file_id,
+                exc_info=True,
+            )
+
+    async def _submit_upload(
+        self,
+        http_client: httpx.AsyncClient,
+        grant: UploadGrant,
+        data: bytes,
+        content_type: str,
+        filename: str,
+    ) -> tuple[bool, str, ErrorCodes]:
+        """POST *data* to the storage endpoint described by *grant*.
+
+        Returns ``(ok, message, error_code)``; ``message`` and ``error_code``
+        are only meaningful when ``ok`` is False.
+        """
+        request = build_upload_request(
+            url=grant.url,
+            method=grant.method,
+            fields=grant.fields,
+            headers=grant.headers,
+            data=data,
+            content_type=content_type,
+            filename=filename,
+        )
+        try:
+            response = await http_client.send(request)
+        except httpx.HTTPError as exc:
+            return False, f"Upload transfer failed: {exc}", ErrorCodes.ConnectionError
+        if response.is_success:
+            return True, "", ErrorCodes.None_
+        body = response.text[:500]
+        return (
+            False,
+            f"Storage rejected upload ({response.status_code}): {body}",
+            ErrorCodes.RequestError,
+        )
+
+    async def download_file(
+        self,
+        file_id: UUID,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> ValueOrErrorPublic_1[bytes]:
+        """Fetch one file's bytes via a freshly minted read URL.
+
+        Resolves a signed URL with :meth:`get_file_urls`, then GETs the bytes
+        from storage.  Returns the bytes on success, or a failed result carrying
+        the reason the file could not be resolved or fetched.  A file the caller
+        cannot read and one that does not exist are indistinguishable, by design.
+        """
+        urls = await self.get_file_urls([file_id])
+        if not urls.success or urls.data is None:
+            return _propagate_failure(urls)
+        reference = urls.data.get(file_id)
+        if reference is None:
+            return _value_error(
+                f"No result returned for file {file_id}", ErrorCodes.NoData
+            )
+        return await self.download_file_reference(reference, http_client=http_client)
+
+    async def download_file_reference(
+        self,
+        reference: FileReference,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> ValueOrErrorPublic_1[bytes]:
+        """Fetch the bytes for an already-resolved :class:`FileReference`.
+
+        Use this when you already hold a reference — e.g. ``UserEntity.image``,
+        which is populated automatically from its ``[FileDataProperty]`` read
+        projection (a raw projection string can also be parsed with
+        :func:`filament.file_reference_from_json`) — to download directly,
+        skipping the extra :meth:`get_file_urls` round trip.  Returns the bytes,
+        or a failed result if the reference did not resolve or the transfer
+        failed.
+        """
+        if not reference.success or reference.url is None:
+            return _value_error(
+                reference.message or "File could not be resolved",
+                reference.error_code,
+            )
+
+        owns_client = http_client is None
+        client = http_client if http_client is not None else httpx.AsyncClient()
+        try:
+            response = await client.get(reference.url)
+        except httpx.HTTPError as exc:
+            return _value_error(
+                f"Download transfer failed: {exc}", ErrorCodes.ConnectionError
+            )
+        finally:
+            if owns_client:
+                await client.aclose()
+
+        if not response.is_success:
+            return _value_error(
+                f"Storage rejected download ({response.status_code})",
+                ErrorCodes.RequestError,
+            )
+        return ValueOrErrorPublic_1(
+            success=True,
+            message="",
+            error_code=ErrorCodes.None_,
+            error_id=None,
+            data=response.content,
+        )
 
     async def subscribe(
         self,
@@ -1446,7 +1828,7 @@ class FilamentClient:
         result_dict: Any = await self._invoke("Subscribe", subscription_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[SubscriptionId])
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
             return _deserialization_error()
@@ -1610,6 +1992,19 @@ def _value_error(
         message=message,
         error_code=error_code,
         error_id=None,
+        data=None,
+    )
+
+
+def _propagate_failure(
+    source: ValueOrErrorPublic_1[Any],
+) -> ValueOrErrorPublic_1[Any]:
+    """Re-wrap a failed result under a different data type, dropping its payload."""
+    return ValueOrErrorPublic_1(
+        success=False,
+        message=source.message,
+        error_code=source.error_code,
+        error_id=source.error_id,
         data=None,
     )
 

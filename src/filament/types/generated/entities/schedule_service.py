@@ -111,6 +111,26 @@ class ScheduleResultEntity(Entity):
                                                the most recent run.
     :param working_hours_axis_total_component_hours: Sum of <c>WorkingHoursAxis.TotalWorkingHours</c> across all components — a
                                                      rough health check for total envelope schedulable capacity.
+    :param event_history_backfill_version: The version of the one-shot event-history repair that has been applied to this
+                                           organisation's schedule. While this is below
+                                           <see cref="F:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultEntity.CurrentEventHistoryBackfillVersion" />, the next successful schedule pass
+                                           deep-walks every event's history (rather than the usual bounded window), back-fills
+                                           every elapsed occurrence that has no segments at all, and completes historical anchors
+                                           that carry no participant segments from the event's current invitee list; it then stamps
+                                           itself with the current version so the repair runs exactly once.
+                                           <para>
+                                           The stamp is what makes the zero-attendance carve-out a migration rather than a standing
+                                           rule. Before it, a pinned occurrence with zero participants means "the old code deleted
+                                           the participants", so completing it from the current invitee list restores what was lost.
+                                           After it, the only ways a bucket reaches zero participants are an upstream user deletion
+                                           or an upstream <c>EventUserConnection</c> deletion — both of which assert that nobody
+                                           should be there — so zero is the correct, final state and must not be repopulated.
+                                           </para>
+                                           <para>
+                                           Written in <c>PropagateData</c> after a pass succeeds, never inside the pass itself: a
+                                           stamp written on a failed run would mean the one-shot repair never happens. For the same
+                                           reason it must not be cleared when the rest of the result is reset per schedule attempt.
+                                           </para>
     """
     schedule_start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -129,6 +149,7 @@ class ScheduleResultEntity(Entity):
     spring_layout_convergence_delta: float = field(default=0)
     working_hours_axis_component_count: int = field(default=0)
     working_hours_axis_total_component_hours: float = field(default=0)
+    event_history_backfill_version: int = field(default=0)
 
 
 @dataclass(kw_only=True)

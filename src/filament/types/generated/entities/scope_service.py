@@ -8,6 +8,7 @@ from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
 from ..enums import ScopeType
+from ..shared import FileReference
 
 __all__ = [
     "ScopeEntity",
@@ -22,7 +23,9 @@ class ScopeEntity(Entity):
     :param name: The name of the scope/project.
     :param description: A description of the scope/project.
     :param scope_type: The type of project this is.  This will be used to auto set up some aspects of the project.
-    :param image_link: A link to an image to use when referencing this Scope
+    :param image_id: An image to use when referencing this Scope.
+    :param image_data: The hub-populated read projection of <see cref="P:Filament.FSCore.CoreEntities.ScopeEntity.ImageId" />, carrying a <c>FileReference</c>.
+    :param image: The image as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>ImageData</c>.</b>
     :param task_duration_multiplier: An overall multiplier that applies to all task durations. This allows a project to effectively
                                      adjust the duration of all tasks in one place.
     :param chargeable_multiplier: An overall multiplier on chargeable costs. This is used to set global discounts for an entire project.
@@ -38,7 +41,9 @@ class ScopeEntity(Entity):
     name: str = field(default='')
     description: str = field(default='')
     scope_type: ScopeType = field(default=ScopeType.Film)
-    image_link: Optional[str] = field(default=None)
+    image_id: Optional[UUID] = field(default=None)
+    image_data: Optional[str] = field(default=None)
+    image: Optional[FileReference] = field(default=None)
     task_duration_multiplier: float = field(default=1)
     chargeable_multiplier: float = field(default=1)
     priority: float = field(default=1)

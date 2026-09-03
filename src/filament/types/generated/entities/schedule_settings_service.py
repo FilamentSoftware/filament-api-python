@@ -66,6 +66,19 @@ class ScheduleSettingsEntity(Entity):
                                                         uses a lookahead pass to pick a single target time-within-period that the most of the
                                                         first N occurrences can land at simultaneously. From the (N+1)th anchor onward, the
                                                         mode-of-history calculation drives the target instead. Default: 4.
+    :param event_history_sample_size: Number of historical occurrences of a recurring event the planner looks back over. It bounds
+                                      two things at once:
+                                      <list type="bullet">
+                                      <item><description>the history sample fed to the mode-of-history offset calculation — the
+                                      newest N started anchors (plus any placements made earlier in the same pass) decide the
+                                      time-within-period that future occurrences are aligned to, so recent cadence outweighs
+                                      year-old placements;</description></item>
+                                      <item><description>the occurrence walk-back on an ordinary (non-repair) pass — enumeration
+                                      starts no earlier than the target of the Nth-newest started anchor, so retained history is
+                                      not re-walked every cycle. Holes older than that are back-filled only on an operator
+                                      <c>FullSchedule</c> pass.</description></item>
+                                      </list>
+                                      Both arms are additionally clamped by <c>MaxEventRepeat</c>. Default: 20.
     """
     full_schedule: bool = field(default=False)
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -83,6 +96,7 @@ class ScheduleSettingsEntity(Entity):
     task_priority_window_order_weight_multiplier: float = field(default=1)
     max_event_repeat: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     initial_repeating_event_alignment_lookahead: int = field(default=4)
+    event_history_sample_size: int = field(default=20)
 
 
 @dataclass(kw_only=True)

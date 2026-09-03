@@ -20,9 +20,12 @@ from filament._exceptions import (
     ResponseTooLargeError,
 )
 from filament._serialization import from_dict
+from filament.types.generated.entities.core import FileEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
     ErrorCodes,
+    FileChecksumAlgorithm,
+    FileState,
     ReadMode,
     SubscriptionMode,
 )
@@ -30,6 +33,7 @@ from filament.types.generated.misc import (
     DataUpdateRejectedNotification,
     EntityPermissions,
     EntityServiceDataUpdate,
+    FileUploadRequest,
     ProcessingStatus,
     ReadDataRequest,
     ReadDataTypeRequest,
@@ -37,8 +41,10 @@ from filament.types.generated.misc import (
     ServiceDataUpdate,
     SubscriptionConfig,
     SubscriptionId,
+    UploadGrant,
     ValueOrErrorPublic_1,
 )
+from filament.types.generated.shared import FileReference
 
 
 def _make_client(*, mock_invoke: bool = True, **kwargs: Any) -> FilamentClient:
@@ -774,6 +780,379 @@ class TestClientHello:
 
         with pytest.raises(FilamentConnectionError, match="ClientHello did not complete"):
             await client._send_client_hello()
+
+    @pytest.mark.asyncio
+    async def test_capabilities_default_none_before_connect(self) -> None:
+        client = _make_client()
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
+    async def test_send_client_hello_captures_server_capabilities(self) -> None:
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "files": {
+                    "checksumAlgorithm": 1,
+                    "serverSideChecksum": True,
+                },
+            },
+        })
+
+        await client._send_client_hello()
+
+        caps = client.server_capabilities
+        assert caps is not None
+        assert caps.files is not None
+        assert caps.files.checksum_algorithm == FileChecksumAlgorithm.Sha256Hex
+        assert caps.files.server_side_checksum is True
+
+    @pytest.mark.asyncio
+    async def test_send_client_hello_no_file_store_leaves_files_none(self) -> None:
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {"files": None},
+        })
+
+        await client._send_client_hello()
+
+        caps = client.server_capabilities
+        assert caps is not None
+        assert caps.files is None
+
+    @pytest.mark.asyncio
+    async def test_send_client_hello_rejected_leaves_capabilities_none(self) -> None:
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": False,
+            "message": "nope",
+            "errorCode": 0,
+            "errorId": None,
+            "data": None,
+        })
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
+    async def test_send_client_hello_survives_a_scalar_response(self) -> None:
+        # A bare scalar reaches from_dict's data.get(...) and raises
+        # AttributeError.  ClientHello is optional, so this must log and
+        # continue — if it escaped, __aenter__ would fail the whole connection.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value="success")
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
+    async def test_send_client_hello_older_server_leaves_capabilities_none(self) -> None:
+        client = _make_client()
+        client._invoke = AsyncMock(
+            side_effect=Exception("Method 'ClientHello' not found")
+        )
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
+    async def test_reconnect_clears_stale_capabilities(self) -> None:
+        # A reused client must not carry the previous connection's capabilities
+        # into a handshake that was rejected — upload_file would otherwise
+        # checksum with an algorithm this server never advertised.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "files": {
+                    "checksumAlgorithm": 1,
+                    "serverSideChecksum": True,
+                },
+            },
+        })
+
+        await client._send_client_hello()
+        assert client.server_capabilities is not None
+
+        client._invoke = AsyncMock(return_value={
+            "success": False,
+            "message": "nope",
+            "errorCode": 0,
+            "errorId": None,
+            "data": None,
+        })
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+    @pytest.mark.asyncio
+    async def test_reconnect_to_older_server_clears_stale_capabilities(self) -> None:
+        # Same again for the swallowed "older server has no ClientHello" path,
+        # which returns before ever looking at a response.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "files": {
+                    "checksumAlgorithm": 1,
+                    "serverSideChecksum": True,
+                },
+            },
+        })
+
+        await client._send_client_hello()
+        assert client.server_capabilities is not None
+
+        client._invoke = AsyncMock(
+            side_effect=Exception("Method 'ClientHello' not found")
+        )
+
+        await client._send_client_hello()
+
+        assert client.server_capabilities is None
+
+
+class TestFileMethods:
+    """Thin wrappers over the file-store hub methods."""
+
+    @pytest.mark.asyncio
+    async def test_request_file_upload_invokes_hub(self) -> None:
+        client = _make_client()
+        file_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "fileId": str(file_id),
+                "url": "https://storage.example.com/bucket",
+                "method": "POST",
+                "expiresAt": "2026-08-10T17:00:00.00000000Z",
+                "maxBytes": 1024,
+                "fields": {"key": "k", "Content-Type": "image/png"},
+                "checksumAlgorithm": 1,
+            },
+        })
+
+        request = FileUploadRequest(
+            name="photo.png",
+            content_type="image/png",
+            size=1024,
+            reference_type="UserEntity",
+            reference_id=uuid7(),
+            reference_property="Avatar",
+            checksum="abc",
+        )
+        result = await client.request_file_upload(request)
+
+        method, payload = client._invoke.call_args[0]
+        assert method == "RequestFileUpload"
+        assert payload["name"] == "photo.png"
+        assert payload["contentType"] == "image/png"
+        assert payload["referenceProperty"] == "Avatar"
+        assert result.success is True
+        assert result.data is not None
+        assert result.data.file_id == file_id
+        assert result.data.url == "https://storage.example.com/bucket"
+        assert result.data.checksum_algorithm == FileChecksumAlgorithm.Sha256Hex
+
+    @pytest.mark.asyncio
+    async def test_refresh_file_upload_grant_passes_uuid_string(self) -> None:
+        client = _make_client()
+        file_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                "fileId": str(file_id),
+                "url": "https://s/x",
+                "method": "POST",
+                "expiresAt": "2026-08-10T17:00:00.00000000Z",
+                "maxBytes": 10,
+            },
+        })
+
+        result = await client.refresh_file_upload_grant(file_id)
+
+        method, payload = client._invoke.call_args[0]
+        assert method == "RefreshFileUploadGrant"
+        assert payload == str(file_id)
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_complete_file_upload_sends_completion(self) -> None:
+        client = _make_client()
+        file_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {"id": str(file_id), "name": "photo.png", "state": 1},
+        })
+
+        result = await client.complete_file_upload(file_id)
+
+        method, payload = client._invoke.call_args[0]
+        assert method == "CompleteFileUpload"
+        assert payload == {"fileId": str(file_id)}
+        assert result.success is True
+        assert result.data is not None
+        assert isinstance(result.data, FileEntity)
+        assert result.data.id == file_id
+        assert result.data.state == FileState.Available
+
+    @pytest.mark.asyncio
+    async def test_cancel_file_upload_returns_success_or_error(self) -> None:
+        client = _make_client()
+        file_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+        })
+
+        result = await client.cancel_file_upload(file_id)
+
+        method, payload = client._invoke.call_args[0]
+        assert method == "CancelFileUpload"
+        assert payload == str(file_id)
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_cancel_file_upload_deserialization_error(self) -> None:
+        # A malformed hub response must be turned into a failed result rather
+        # than leaking a deserialization exception.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value={"errorCode": "NotAValidCode"})
+
+        result = await client.cancel_file_upload(uuid7())
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.InternalError
+
+    @pytest.mark.asyncio
+    async def test_get_file_urls_returns_uuid_keyed_dict(self) -> None:
+        client = _make_client()
+        id1, id2 = uuid7(), uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {
+                str(id1): {
+                    "success": True,
+                    "message": "",
+                    "errorCode": 0,
+                    "url": "https://s/1",
+                    "refreshable": True,
+                    "metadata": {
+                        "contentType": "image/png",
+                        "size": 10,
+                        "width": 4,
+                        "height": 4,
+                    },
+                },
+                str(id2): {
+                    "success": False,
+                    "message": "gone",
+                    "errorCode": 0,
+                },
+            },
+        })
+
+        result = await client.get_file_urls([id1, id2])
+
+        method, payload = client._invoke.call_args[0]
+        assert method == "GetFileUrls"
+        assert payload == {"fileIds": [str(id1), str(id2)]}
+        assert result.success is True
+        assert result.data is not None
+        # Wire string keys are converted back to UUID.
+        assert set(result.data.keys()) == {id1, id2}
+        assert isinstance(result.data[id1], FileReference)
+        assert result.data[id1].url == "https://s/1"
+        assert result.data[id1].metadata is not None
+        assert result.data[id1].metadata.content_type == "image/png"
+        assert result.data[id2].success is False
+
+    @pytest.mark.asyncio
+    async def test_request_file_upload_deserialization_error(self) -> None:
+        client = _make_client()
+        # An empty grant dict is missing UploadGrant's required fields, so
+        # deserialization raises and the wrapper returns a failed result.
+        client._invoke = AsyncMock(return_value={
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "errorId": None,
+            "data": {},
+        })
+
+        result = await client.request_file_upload(
+            FileUploadRequest(
+                name="x",
+                content_type="text/plain",
+                size=1,
+                reference_type="UserEntity",
+                reference_id=uuid7(),
+                reference_property="Avatar",
+            )
+        )
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.InternalError
+
+    @pytest.mark.asyncio
+    async def test_file_wrappers_survive_a_scalar_hub_response(self) -> None:
+        # A hub that answers with a bare scalar instead of an envelope object
+        # reaches ``from_dict``'s ``data.get(...)`` and raises AttributeError.
+        # Every file wrapper must absorb that into a failed result.
+        client = _make_client()
+        client._invoke = AsyncMock(return_value="success")
+        file_id = uuid7()
+
+        request = FileUploadRequest(
+            name="x",
+            content_type="text/plain",
+            size=1,
+            reference_type="UserEntity",
+            reference_id=uuid7(),
+            reference_property="Avatar",
+        )
+        results = [
+            await client.request_file_upload(request),
+            await client.refresh_file_upload_grant(file_id),
+            await client.complete_file_upload(file_id),
+            await client.cancel_file_upload(file_id),
+            await client.get_file_urls([file_id]),
+        ]
+
+        for result in results:
+            assert result.success is False
+            assert result.error_code == ErrorCodes.InternalError
 
 
 class TestDataUpdateRejected:

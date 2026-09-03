@@ -8,13 +8,15 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus, TypeSchemaPropertyType, UserDefinedPropertyStatus
+from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, FileState, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus, TypeSchemaPropertyType, UserDefinedPropertyStatus
 
 __all__ = [
     "ErrorEntity",
     "RequestEntity",
     "ProcessingRunEntity",
     "ProcessingSettingsEntity",
+    "FileEntity",
+    "FileStatsEntity",
     "EventLogEntity",
     "ScenarioEntity",
     "ScenarioServiceEntity",
@@ -118,6 +120,65 @@ class ProcessingSettingsEntity(Entity):
                               Defaults to false.
     """
     success_snapshots: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class FileEntity(Entity):
+    """
+    The record of one stored file. Hub-owned, with no providing service.
+    
+    :param name: The display name, as supplied by the client and validated server-side.
+    :param description: Alternative text or a description, for accessibility and search.
+    :param reference_type: The entity type that owns this file. Immutable after create.
+    :param reference_id: The row that owns this file. Immutable after create.
+    :param reference_property: The file-link property on <see cref="P:Filament.FSCore.CoreEntities.FileEntity.ReferenceType" /> that gates this file — the permission
+                               anchor. Required and immutable after create.
+    :param state: Where this file is in its lifecycle.
+    :param grant_expires_at: When the most recent upload grant stops being accepted.
+    :param content_type: The content type observed at completion, not the one the client declared.
+    :param size: The size observed at completion, in bytes.
+    :param checksum: The checksum observed at completion.
+    :param version_token: The provider's version identifier for the verified bytes, when the store advertises version
+                          pinning. Unused until versioning is enabled.
+    :param provider: Which store holds this file, for migration and multi-region.
+    :param location: The region or location the object lives in.
+    :param container: The bucket or container holding the object.
+    :param object_key: The server-derived object key. A client never supplies one, so this can never be used to
+                       address something the caller was not granted.
+    """
+    name: str = field(default='')
+    description: Optional[str] = field(default=None)
+    reference_type: str = field(default='')
+    reference_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    reference_property: str = field(default='')
+    state: FileState = field(default=FileState.Pending)
+    grant_expires_at: Optional[datetime.datetime] = field(default=None)
+    content_type: Optional[str] = field(default=None)
+    size: int = field(default=0)
+    checksum: Optional[str] = field(default=None)
+    version_token: Optional[str] = field(default=None)
+    provider: str = field(default='')
+    location: Optional[str] = field(default=None)
+    container: Optional[str] = field(default=None)
+    object_key: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class FileStatsEntity(Entity):
+    """
+    Per-tenant file usage. Hub-owned, and a singleton keyed on <see cref="P:Filament.FSCore.Entities.EntityBase.Id" /> of
+    <see cref="F:System.Guid.Empty" />.
+    
+    :param used_bytes: Bytes counted against the quota: <see cref="F:Filament.FSCore.CoreEntities.FileState.Available" /> plus
+                       <see cref="F:Filament.FSCore.CoreEntities.FileState.Pending" />.
+    :param pending_bytes: The part of <see cref="P:Filament.FSCore.CoreEntities.FileStatsEntity.UsedBytes" /> belonging to uploads that have not completed.
+    :param pending_count: How many uploads are currently incomplete, for the per-user concurrency ceiling.
+    :param file_count: How many files the tenant holds in total.
+    """
+    used_bytes: int = field(default=0)
+    pending_bytes: int = field(default=0)
+    pending_count: int = field(default=0)
+    file_count: int = field(default=0)
 
 
 @dataclass(kw_only=True)

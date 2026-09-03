@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import datetime
+import json
 
+import pytest
 from uuid_utils import UUID, uuid7
 
 from filament._serialization import (
@@ -12,6 +14,7 @@ from filament._serialization import (
     snake_case_from_camel_case,
     to_dict,
 )
+from filament._wire_formats import instant_from_wire, instant_to_wire
 from filament.types.generated.base.base import EntityBase
 from filament.types.generated.entities.permissions_service import PermissionEntity
 from filament.types.generated.entities.user_service import UserEntity
@@ -38,6 +41,7 @@ from filament.types.generated.misc import (
     SuccessOrErrorPublic,
     ValueOrErrorPublic_1,
 )
+from filament.types.generated.shared import FileReference
 
 
 # ---------------------------------------------------------------------------
@@ -517,3 +521,99 @@ class TestEntityBaseRoundTrip:
         )
         assert restored.given_name == "Alice"
         assert restored.family_name == "Smith"
+
+
+class TestJsonCompanionFields:
+    """`<name>` object fields auto-populated from their `<name>_data` JSON sibling.
+
+    The backend sends projections like ``UserEntity.imageData`` as a JSON string
+    with the object field ``image`` left unset; ``from_dict`` deserializes the
+    string into ``image``.
+    """
+
+    def test_image_populated_from_image_data(self) -> None:
+        image_json = json.dumps({
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "url": "https://storage/read/1",
+            "refreshable": True,
+            "metadata": {"contentType": "image/png", "size": 12, "width": 4, "height": 4},
+        })
+        user = from_dict({"id": str(uuid7()), "imageData": image_json}, UserEntity)
+
+        assert user is not None
+        # The raw projection is preserved...
+        assert user.image_data == image_json
+        # ...and the object field is deserialized from it.
+        assert isinstance(user.image, FileReference)
+        assert user.image.url == "https://storage/read/1"
+        assert user.image.metadata is not None
+        assert user.image.metadata.content_type == "image/png"
+
+    def test_absent_image_data_leaves_image_none(self) -> None:
+        user = from_dict({"id": str(uuid7())}, UserEntity)
+        assert user is not None
+        assert user.image_data is None
+        assert user.image is None
+
+    def test_empty_image_data_leaves_image_none(self) -> None:
+        user = from_dict({"id": str(uuid7()), "imageData": ""}, UserEntity)
+        assert user is not None
+        assert user.image is None
+
+    def test_malformed_image_data_leaves_image_none(self) -> None:
+        # A malformed projection must not fail the whole entity deserialization.
+        user = from_dict({"id": str(uuid7()), "imageData": "not json"}, UserEntity)
+        assert user is not None
+        assert user.image_data == "not json"
+        assert user.image is None
+
+    @pytest.mark.parametrize("payload", ["[]", "123", '"text"', "null", "true"])
+    def test_non_object_image_data_leaves_image_none(self, payload: str) -> None:
+        # Valid JSON that is not an object (array/scalar) must be ignored, not
+        # coerced into a bogus default FileReference or raised.
+        user = from_dict({"id": str(uuid7()), "imageData": payload}, UserEntity)
+        assert user is not None
+        assert user.image is None
+
+
+class TestInstantWireFormat:
+    """`instant_from_wire` parses the backend Instant format at any precision.
+
+    The canonical wire form carries up to 8 significant fractional digits (e.g.
+    ``...:57.23421050Z``); the parser must handle that, not only the special case
+    where the last two digits are ``00``.
+    """
+
+    def test_parses_eight_digit_fraction(self) -> None:
+        dt = instant_from_wire("2026-08-11T14:42:57.23421050Z")
+        assert dt == datetime.datetime(
+            2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
+        )
+
+    def test_parses_six_significant_digits_padded(self) -> None:
+        # The form to_wire emits: 6 microsecond digits + "00".
+        dt = instant_from_wire("2025-01-15T10:30:45.12345600Z")
+        assert dt.microsecond == 123456
+        assert dt.tzinfo == datetime.timezone.utc
+
+    def test_parses_without_fraction(self) -> None:
+        dt = instant_from_wire("2026-08-11T14:42:57Z")
+        assert dt.microsecond == 0
+        assert dt.tzinfo == datetime.timezone.utc
+
+    def test_truncates_sub_microsecond_digits(self) -> None:
+        # 9 fractional digits (nanoseconds) — truncate to microseconds.
+        dt = instant_from_wire("2026-08-11T14:42:57.123456789Z")
+        assert dt.microsecond == 123456
+
+    def test_requires_trailing_z(self) -> None:
+        with pytest.raises(ValueError):
+            instant_from_wire("2026-08-11T14:42:57.23421050")
+
+    def test_roundtrip_through_to_wire(self) -> None:
+        original = datetime.datetime(
+            2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
+        )
+        assert instant_from_wire(instant_to_wire(original)) == original

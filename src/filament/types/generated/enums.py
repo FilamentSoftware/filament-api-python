@@ -16,6 +16,8 @@ __all__ = [
     "DbOrderDirection",
     "ErrorCodes",
     "EventUserConnectionStatus",
+    "FileChecksumAlgorithm",
+    "FileState",
     "Industry",
     "NameOrder",
     "NoteUserConnectionType",
@@ -345,6 +347,7 @@ class ErrorCodes(Enum):
                             limit byte counts) so the caller can narrow the query or raise the client's limit.
     :cvar ProtectionError: The operation was blocked because downstream entities have protection records
                            preventing deletion of the upstream entity.
+    :cvar ChecksumMismatch: A completed upload's bytes did not match the checksum the client declared when it requested the grant.
     """
     None_ = 0
     NotSupported = 1
@@ -363,6 +366,7 @@ class ErrorCodes(Enum):
     RateLimitExceeded = 23
     ResponseTooLarge = 25
     ProtectionError = 26
+    ChecksumMismatch = 28
 
 
 class EventUserConnectionStatus(Enum):
@@ -376,6 +380,40 @@ class EventUserConnectionStatus(Enum):
     NotAccepted = 0
     Accepted = 1
     Declined = 2
+
+
+class FileChecksumAlgorithm(Enum):
+    """
+    The checksum a file store computes, and the encoding it reports it in.
+    
+    :cvar None_: The store computes no checksum, and advertises no <c>ServerSideChecksum</c>.
+    :cvar Sha256Hex: SHA-256, lower-case hexadecimal. The Filament storage service.
+    :cvar Md5Base64: MD5, canonical padded base64. GCS <c>md5Hash</c>.
+    :cvar Crc32cBase64: CRC32C, canonical padded base64. GCS <c>crc32c</c>.
+    """
+    None_ = 0
+    Sha256Hex = 1
+    Md5Base64 = 2
+    Crc32cBase64 = 3
+
+
+class FileState(Enum):
+    """
+    Where a file is in its upload lifecycle.
+    
+    :cvar Pending: A grant has been issued and the bytes have not been confirmed. Counts against the tenant's
+                   quota, so nobody can evade it by never completing.
+    :cvar Available: The bytes arrived and were verified against what was declared.
+    :cvar Failed: Verification failed and the object was deleted. Distinct from <see cref="F:Filament.FSCore.CoreEntities.FileState.Deleted" /> so the
+                  sweeper can tell a failed upload from a removed file, and so the quota can be released at the
+                  point of failure rather than at the next sweep.
+    :cvar Deleted: Marked for removal. The row survives until the sweeper has removed the object, so a failed
+                   object delete never leaves a dangling row or vice versa.
+    """
+    Pending = 0
+    Available = 1
+    Failed = 2
+    Deleted = 3
 
 
 class Industry(Enum):
