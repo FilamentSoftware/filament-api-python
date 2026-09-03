@@ -1,3 +1,20 @@
+## 0.7.0-dev.0.1.0 (2026-09-03 18:07)
+
+### Client
+
+#### FEATURE
+- Adds file upload and download, and auto-populates file read projections (e.g. UserEntity.image) into FileReference objects
+
+### Serialization
+
+#### FIX
+- Fixes parsing of backend timestamps that carry more than six fractional-second digits
+
+### Types
+
+#### OTHER
+- FileMetadata and FileReference now live in filament.types.generated.shared rather than .misc
+
 ## 0.7.0-dev.0.0.1 (2026-08-26 14:30)
 
 ### Client
