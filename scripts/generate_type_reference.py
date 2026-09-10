@@ -88,15 +88,27 @@ def _clean_doc(text: str) -> str:
 
 
 def _first_doc_line(doc: str) -> str:
+    """Return the docstring's summary paragraph, joined onto a single line.
+
+    The backend wraps summaries across several source lines, so stopping at the
+    first line truncates them mid-sentence. Collect every line up to the first
+    blank line or ``:directive:`` line instead.
+    """
     if not doc:
         return ""
+    summary: list[str] = []
     for line in doc.splitlines():
         line = line.strip()
-        if line:
-            if line.startswith(":"):  # docstring is directives-only (no summary)
-                return ""
-            return _clean_doc(line)
-    return ""
+        if not line:
+            if summary:  # blank line ends the summary paragraph
+                break
+            continue
+        if line.startswith(":"):  # directives begin; no summary left to read
+            break
+        summary.append(line)
+    if not summary:
+        return ""
+    return _clean_doc(" ".join(summary))
 
 
 def _parse_doc_directives(doc: str, directive: str) -> dict[str, str]:

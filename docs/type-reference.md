@@ -50,7 +50,7 @@ Defined in `enums.py`. `Flag` enums combine with the bitwise `|` operator; a mem
 
 ### `ActualStatusEnum` (`Enum`)
 
-Represents the status of an actual, reflecting the task's progress through hands-on work
+Represents the status of an actual, reflecting the task's progress through hands-on work and the post-work pipeline (automated processing, then human review).
 
 | Member | Description |
 | ------ | ----------- |
@@ -203,7 +203,7 @@ The direction for database ordering.
 
 ### `ErrorCodes` (`Enum`)
 
-Represents a set of predefined error codes that can be used to indicate
+Represents a set of predefined error codes that can be used to indicate specific error conditions in the application.
 
 | Member | Description |
 | ------ | ----------- |
@@ -343,7 +343,7 @@ Specifies the mode for reading data from the database.
 
 ### `RepeatDaysEnum` (`Flag`)
 
-An enum to reference the days of the week that a weekly recurring entity repeats on.
+An enum to reference the days of the week that a weekly recurring entity repeats on. This enum supports flags, so multiple values can be stored at the same time.
 
 | Member | Description |
 | ------ | ----------- |
@@ -453,7 +453,7 @@ Represents the different types of child elements that a scope group can contain.
 
 ### `ScopeGroupLevelModeEnum` (`Enum`)
 
-The role of a scope group level. `Arbitrary` levels are ordinary user-defined
+The role of a scope group level. `Arbitrary` levels are ordinary user-defined levels that populate their own derived task group level; the other modes mark the level as the template for the corresponding built-in task group level, which copies the template's Name, Description, and rollup configuration during population (and produces no derived level of its own). Persisted as ints: never renumber existing members.
 
 | Member | Description |
 | ------ | ----------- |
@@ -507,7 +507,7 @@ Represents the type or category of a scope within the system.
 
 ### `ServiceProcessingMode` (`Enum`)
 
-The role a service is playing in a processing run — what work it is performing. Fixed at
+The role a service is playing in a processing run — what work it is performing. Fixed at run setup, does not change as the run progresses.
 
 | Member | Description |
 | ------ | ----------- |
@@ -535,7 +535,7 @@ The status of an individual service within a processing run.
 
 ### `SubscriptionMode` (`Flag`)
 
-Represents the mode of a subscription, defining the types of updates
+Represents the mode of a subscription, defining the types of updates that the subscription should receive. Each mode can be combined using bitwise operations by leveraging the `FlagsAttribute`.
 
 | Member | Description |
 | ------ | ----------- |
@@ -564,7 +564,7 @@ Specifies the possible states for the overlap proportion in a task dependency ov
 
 ### `TaskMilestoneDirectionEnum` (`Enum`)
 
-Defines the direction of a task milestone, specifying whether the milestone is
+Defines the direction of a task milestone, specifying whether the milestone is to start after or end before a designated point in time or task scheduling.
 
 | Member | Description |
 | ------ | ----------- |
@@ -659,7 +659,7 @@ An enum that defines valid types of addresses.
 
 ### `UserDefinedPropertyStatus` (`Enum`)
 
-The lifecycle of a user-defined property definition, which exists because creating one is two operations
+The lifecycle of a user-defined property definition, which exists because creating one is two operations with very different durations: claiming the name and adding the column take milliseconds, while seeding every existing entity is a table-sized write.
 
 | Member | Description |
 | ------ | ----------- |
@@ -679,7 +679,7 @@ Enum that defines valid email address types.
 
 ### `UserLicenseType` (`Enum`)
 
-The set of license types tracked by UserLicenseService. Rules for each type are currently
+The set of license types tracked by UserLicenseService. Rules for each type are currently hard-coded in the UserLicenseProcessor.
 
 | Member | Description |
 | ------ | ----------- |
@@ -749,7 +749,7 @@ Represents a request entity in the system.
 
 ##### `ProcessingRunEntity`
 
-Represents a single processing run for an organization. Created when a batch of requests
+Represents a single processing run for an organization. Created when a batch of requests begins processing, and updated as the run moves through its lifecycle.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -764,7 +764,7 @@ Represents a single processing run for an organization. Created when a batch of 
 
 ##### `ProcessingSettingsEntity`
 
-Per-organisation processing configuration. This is a singleton per tenant: the single
+Per-organisation processing configuration. This is a singleton per tenant: the single instance has both `Id` and `ScenarioId` set to `Empty` (it lives outside any scenario). When no row exists for a tenant, the processing run falls back to the property defaults defined here.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -794,7 +794,7 @@ The record of one stored file. Hub-owned, with no providing service.
 
 ##### `FileStatsEntity`
 
-Per-tenant file usage. Hub-owned, and a singleton keyed on `Id` of
+Per-tenant file usage. Hub-owned, and a singleton keyed on `Id` of `Empty`.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -831,7 +831,7 @@ Represents a scenario entity.
 
 ##### `ScenarioServiceEntity`
 
-Represents a specialized entity that encompasses the properties and behavior
+Represents a specialized entity that encompasses the properties and behavior specific to a scenario service within the application context.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -840,7 +840,7 @@ Represents a specialized entity that encompasses the properties and behavior
 
 ##### `ScenarioEventEntity`
 
-Represents an event that is part of a scenario, providing contextual information
+Represents an event that is part of a scenario, providing contextual information for processing and applying actions to entities within a scenario.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -870,7 +870,7 @@ Represents a changed entity in the system.
 
 ##### `EntityProtectionEntity`
 
-Tracks entity protection relationships. When a downstream entity depends on an upstream entity
+Tracks entity protection relationships. When a downstream entity depends on an upstream entity (via a property link or connection), a protection record prevents deletion of the upstream entity unless all downstream dependents are also deleted in the same request, or (for connection-based protections) the protecting connection itself is deleted in the same request.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -884,7 +884,7 @@ Tracks entity protection relationships. When a downstream entity depends on an u
 
 ##### `UserDefinedTableEntity`
 
-One row per sidecar table — a single row for each (organisation, entity type) pair that carries user-defined
+One row per sidecar table — a single row for each (organisation, entity type) pair that carries user-defined properties. The row names the sidecar table that holds those properties' values.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -893,7 +893,7 @@ One row per sidecar table — a single row for each (organisation, entity type) 
 
 ##### `UserDefinedPropertyEntity`
 
-One user-defined property definition — a single column on the sidecar table named by the
+One user-defined property definition — a single column on the sidecar table named by the `UserDefinedTableEntity` this row points at.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -947,7 +947,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `ApiKeyEntity`
 
-Represents an API key entity with business configuration for programmatic access.
+Represents an API key entity with business configuration for programmatic access. The plaintext key is write-only; it is hashed and stored on the corresponding `AuthApiKeyEntity` during processing.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -977,7 +977,7 @@ _Extends:_ `PermissionsRoleConnectionBase_1`
 
 ##### `AvailabilityEntity`
 
-For storing availability information for a user. Multiple Availability entities can be stacked, using the
+For storing availability information for a user. Multiple Availability entities can be stacked, using the `Priority` property to determine the relative priorities.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -1005,7 +1005,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `CastEntity`
 
-An entity that is used to link together all tasks with the same skill requirements, and allows
+An entity that is used to link together all tasks with the same skill requirements, and allows all users who can work on these tasks to be linked to a single place. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1017,7 +1017,7 @@ An entity that is used to link together all tasks with the same skill requiremen
 
 ##### `CastUserConnection`
 
-Represents a connection between a cast and a user with additional properties
+Represents a connection between a cast and a user with additional properties to define the nature and characteristics of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1028,13 +1028,13 @@ Represents a connection between a cast and a user with additional properties
 
 ##### `CastTaskConnection`
 
-Represents a connection between a `CastEntity` and a `TaskEntity`
+Represents a connection between a `CastEntity` and a `TaskEntity` in the context of casting service operations and task management. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _No type-specific fields beyond the common base fields._
 
 ##### `CastSkillConnection`
 
-Represents a specific connection between a cast entity and a skill entity with task-related functionality.
+Represents a specific connection between a cast entity and a skill entity with task-related functionality. Inherits from `GenericTaskSkillConnection`. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _Extends:_ `GenericTaskSkillConnection_1`
 
@@ -1048,7 +1048,7 @@ _Extends:_ `GenericTaskSkillConnection_1`
 
 ##### `CastOfficeLocationConnection`
 
-Represents the relationship between a cast entity and an office location entity.
+Represents the relationship between a cast entity and an office location entity. This connection may include additional metadata such as priority to determine the importance or ranking of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1107,7 +1107,7 @@ Represents settings for the Current Instant service.
 
 ##### `EventEntity`
 
-Represents an event entity, including details such as name, description, duration, owner,
+Represents an event entity, including details such as name, description, duration, owner, start time constraints, time zone, and related review task configurations.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1180,7 +1180,7 @@ Represents a connection between an event calendar and a user.
 
 ##### `EventReviewTaskConnection`
 
-Represents a link from an event to a task that is reviewed in that event. The task's downstream
+Represents a link from an event to a task that is reviewed in that event. The task's downstream tasks are scheduled to start only after the review event's scheduled end (see ScheduleProcessor). FROM = the reviewing `EventEntity`; TO = the reviewed `TaskEntity`.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1192,7 +1192,7 @@ Represents a link from an event to a task that is reviewed in that event. The ta
 
 ##### `FileSettingsEntity`
 
-Per-tenant file settings. A singleton keyed on `Id` of
+Per-tenant file settings. A singleton keyed on `Id` of `Empty`, following the convention ScheduleResultEntity and ScheduleScopeSettingsEntity already use.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1221,7 +1221,7 @@ An address entity linked to a specific user.
 
 ##### `ReferenceEntityBase` *(abstract base)*
 
-Represents the base class for entities that maintain references
+Represents the base class for entities that maintain references to other entities through a combination of reference type and reference ID.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1231,7 +1231,7 @@ Represents the base class for entities that maintain references
 
 ##### `UserBaseEntity`
 
-Represents the base entity for a user, effectively inheriting from the generic entity structure
+Represents the base entity for a user, effectively inheriting from the generic entity structure and providing foundational equality comparison logic specific to user entities.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1408,7 +1408,7 @@ An entity that represents an organization.
 
 ##### `TaxCreditLocationEntity`
 
-A geographic or political location defined by its inclusion in a tax credit policy.
+A geographic or political location defined by its inclusion in a tax credit policy. This could be for Visual Effects tax rebates, research tax credits or any other form of tax credit that might apply to work produced.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1421,7 +1421,7 @@ A geographic or political location defined by its inclusion in a tax credit poli
 
 ##### `OfficeLocationEntity`
 
-An entity that describes any office locations this company has. This is distinct
+An entity that describes any office locations this company has. This is distinct from their tax credit locations as it is possible to have multiple offices in a single tax credit area.
 
 _Extends:_ `AddressEntityBase`
 
@@ -1495,7 +1495,7 @@ Represents a permission entity.
 
 ##### `ReviewGroupEntity`
 
-Represents a named set of task groups used to route review work. Events reference a review
+Represents a named set of task groups used to route review work. Events reference a review group (or a task group directly) to declare which tasks they review, and task statuses can override the review routing for an individual task by pointing at specific review groups.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1510,7 +1510,7 @@ Represents a named set of task groups used to route review work. Events referenc
 
 ##### `PlaceholderUserEntity`
 
-Represents a placeholder user entity with associated properties and behaviors,
+Represents a placeholder user entity with associated properties and behaviors, including office location linkage and a specified time interval. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1596,7 +1596,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `PlaceholderUserSkillConnection`
 
-Represents a connection between a PlaceholderUserEntity and a skill,
+Represents a connection between a PlaceholderUserEntity and a skill, inheriting functionality from the GenericUserSkillConnection class. This class is used to associate a PlaceholderUserEntity with a specific skill and manage the relationship. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _Extends:_ `GenericUserSkillConnection_1`
 
@@ -1608,7 +1608,7 @@ _Extends:_ `GenericUserSkillConnection_1`
 
 ##### `ScheduledEventReviewTaskConnection`
 
-Represents a scheduler-computed automatic link from an event occurrence to a task it reviews.
+Represents a scheduler-computed automatic link from an event occurrence to a task it reviews. Owned by ScheduleService and fully re-diffed against the desired links at the end of every schedule pass — never data-entered by clients (manually authored links use `EventReviewTaskConnection` instead). FROM = the reviewing `EventEntity`; TO = the reviewed `TaskEntity`. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1694,7 +1694,7 @@ Represents a category of items in the system.
 
 ##### `ScopeCostEntity`
 
-Represents a scope cost entity that includes chargeable and estimated costs,
+Represents a scope cost entity that includes chargeable and estimated costs, as well as contextual references to related entities. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -1720,7 +1720,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `ScopeGroupLevelEntity`
 
-Represents an entity defining a level within a scope group hierarchy.
+Represents an entity defining a level within a scope group hierarchy. The class provides properties to name and describe the hierarchy level, identify its parent level, and manage comparisons and equality checks between entities.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1733,7 +1733,7 @@ Represents an entity defining a level within a scope group hierarchy.
 
 ##### `ScopeGroupEntity`
 
-Represents a scope group entity in the system, which contains information about
+Represents a scope group entity in the system, which contains information about the scope's name, description, parent group, and group level.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1755,7 +1755,7 @@ Represents a scope group entity in the system, which contains information about
 
 ##### `ScopeItemNoteEntity`
 
-Represents a note entity linked to a specific scope item, containing details such as the note's title,
+Represents a note entity linked to a specific scope item, containing details such as the note's title, content, and information about the associated user.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1838,7 +1838,7 @@ _No type-specific fields beyond the common base fields._
 
 ##### `ScopeItemOfficeLocationConnection`
 
-Represents a connection between a `ScopeItemEntity` and an `OfficeLocationEntity`.
+Represents a connection between a `ScopeItemEntity` and an `OfficeLocationEntity`. This class models the relationship and contextual data needed for managing these entities.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -1969,7 +1969,7 @@ An entity that gives information about a task type that can be used within a sco
 
 ##### `ScopeTaskTypeStepEntity`
 
-Represents a step in a scope task type, defining specific attributes and behaviors such as name, description, sort order,
+Represents a step in a scope task type, defining specific attributes and behaviors such as name, description, sort order, time weight, deliverables, review requirements, and default processing duration. This class provides a structured way to organize and manage task type steps as part of a broader scope task management system.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -2152,7 +2152,7 @@ Represents a specific level of proficiency for a skill.
 
 ##### `SkillTypeEntity`
 
-The SkillTypeEntity defines any potential type that the organization decides to use. These
+The SkillTypeEntity defines any potential type that the organization decides to use. These can be either/or a context and/or taskable. A context type generally refers to the software a skill requires knowledge of. Taskable skill types can have tasks created by the TaskService and scheduled by the ScheduleService. Skill types will generally be either taskable or context but not both, however there may be cases where both are required.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -2229,7 +2229,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `TaskGroupEntity`
 
-Represents a task group entity that provides a structured grouping of tasks within a defined scope.
+Represents a task group entity that provides a structured grouping of tasks within a defined scope. This class extends the functionality of ReferenceEntityBase and incorporates additional properties for contextual identification and operational details.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -2291,7 +2291,7 @@ _No type-specific fields beyond the common base fields._
 
 ##### `TaskGroupConnection`
 
-Represents a connection between a task entity and a task group entity.
+Represents a connection between a task entity and a task group entity. This class is a specialization of `EntityConnection` to handle connections specifically between `TaskEntity` and `TaskGroupEntity`. Implements the `IEquatable` interface for equality checks.
 
 _No type-specific fields beyond the common base fields._
 
@@ -2303,13 +2303,13 @@ _No type-specific fields beyond the common base fields._
 
 ##### `TaskMilestoneConnection`
 
-Represents a connection between a TaskEntity and a TaskMilestoneEntity.
+Represents a connection between a TaskEntity and a TaskMilestoneEntity. Used to define and manage the association between tasks and their respective milestones. This class extends from the EntityConnection generic base class and implements equality checks.
 
 _No type-specific fields beyond the common base fields._
 
 ##### `TaskSkillConnection`
 
-Represents a specific connection between a task and a skill,
+Represents a specific connection between a task and a skill, extending functionality of a generic task-skill connection. This class provides equality checks suited for TaskSkillConnection objects.
 
 _Extends:_ `GenericTaskSkillConnection_1`
 
@@ -2335,7 +2335,7 @@ Represents a connection between a task and an office location within the system,
 
 ##### `TaskStatusEntity`
 
-Represents the status entity for a task, defined as a sidecar entity
+Represents the status entity for a task, defined as a sidecar entity associated with `TaskEntity`.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
@@ -2352,7 +2352,7 @@ Represents the status entity for a task, defined as a sidecar entity
 
 ##### `TimeLogEntity`
 
-Represents a time log entry entity that records a time-related event for a user.
+Represents a time log entry entity that records a time-related event for a user. A time log entry will always have `Reference` pointing to a `TaskEntity`.
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -2376,7 +2376,7 @@ _Extends:_ `ReferenceEntityBase`
 
 ##### `UserLicenseEntity`
 
-An hourly record of which users have held a given license type during the hour. One row
+An hourly record of which users have held a given license type during the hour. One row exists per (`LicenseType`, `Instant`) pair; subsequent propagations within the same hour merge the newly-computed holders into `UserIds` (union semantics), so a user that qualified at any point in the hour stays in the row even if they no longer qualify by a later propagation in the same bucket. A new hour starts fresh. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
