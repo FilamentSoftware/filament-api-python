@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import datetime
 import json
+from dataclasses import dataclass, field
+from typing import Union
 
 import pytest
 from uuid_utils import UUID, uuid7
@@ -626,6 +628,15 @@ class TestInstantWireFormat:
 # Polymorphic union fields
 # ---------------------------------------------------------------------------
 
+@dataclass
+class _BareUnionHolder:
+    """A union with no ``None`` arm — a shape codegen does not emit yet."""
+
+    ref: Union[ScopeItemEntity, NoteEntity] = field(
+        default_factory=lambda: NoteEntity()
+    )
+
+
 class TestUnionFieldDispatch:
     """Backend navigation properties such as ``reference`` are generated as a
     union of the concrete entities they may point at (e.g.
@@ -686,6 +697,18 @@ class TestUnionFieldDispatch:
         assert note is not None
         assert isinstance(note.on, TaskEntity)
         assert note.on.name == "T"
+
+    def test_bare_union_field_serializes(self) -> None:
+        """A union with no ``None`` arm must still be unwrapped by ``to_dict``.
+
+        Codegen only emits ``Optional[Union[...]]`` today, so this guards the
+        shape rather than a current type: an un-unwrapped union matches no
+        branch in ``_convert_to_dict_value`` and would leak the raw entity.
+        """
+        wire = to_dict(_BareUnionHolder(ref=NoteEntity(title="N")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["title"] == "N"
 
     def test_union_field_round_trips(self) -> None:
         original = TaskEntity(name="T", reference=NoteEntity(title="N"))
