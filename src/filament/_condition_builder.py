@@ -130,8 +130,20 @@ def _is_optional(tp: Any) -> bool:
 
 
 def _unwrap_optional(tp: Any) -> Any:
-    """Extract the inner type from ``Optional[X]``."""
-    return next((a for a in get_args(tp) if a is not type(None)), tp)
+    """Strip ``None`` from an optional type, keeping every remaining arm.
+
+    ``Optional[X]`` collapses to ``X``, but ``Optional[Union[X, Y]]`` keeps
+    ``Union[X, Y]`` rather than silently becoming ``X``. Keeping the whole
+    union lets :func:`_classify_field` fall through to ``"base"`` instead of
+    classifying a multi-arm union by whatever its first member happens to be.
+    Mirrors ``_unwrap_optional`` in ``filament_mypy_plugin.py``.
+    """
+    args = tuple(a for a in get_args(tp) if a is not type(None))
+    if not args:
+        return tp
+    if len(args) == 1:
+        return args[0]
+    return Union[args]
 
 
 def _classify_field(
