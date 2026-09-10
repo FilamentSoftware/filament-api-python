@@ -148,6 +148,28 @@ def _union_members(tp: Any) -> Optional[list[Any]]:
     return None
 
 
+def _matching_union_member(data: Any, members: list[Any]) -> Any:
+    """Pick the arm *data* is an instance of, falling back to the first arm.
+
+    A union of entities can use any arm, because ``to_dict`` re-dispatches on
+    the value's runtime type. A mixed union cannot: sending a ``str`` down the
+    dataclass arm of ``Union[SomeEntity, str]`` serializes it to ``None`` and
+    loses the value.
+    """
+    for member in members:
+        # A parameterized generic (``list[str]``) is not a valid isinstance
+        # target, and is still an instance of ``type`` before Python 3.11, so
+        # screen it out rather than relying on the isinstance check alone.
+        if not isinstance(member, type) or get_origin(member) is not None:
+            continue
+        try:
+            if isinstance(data, member):
+                return member
+        except TypeError:
+            continue
+    return members[0]
+
+
 def _select_union_member(data: Any, members: list[Any]) -> Any:
     """Pick the union member matching *data*'s ``$type`` tag.
 
@@ -321,16 +343,17 @@ def _convert_to_dict_value(
     """
     # Optional[X] / Union[X, Y] -> unwrap
     #
-    # Unlike the from_dict direction, no ``$type`` dispatch is needed here: the
-    # dataclass branch below calls ``to_dict(data, ...)``, which serializes by
-    # the value's runtime type and ignores ``field_type``. Any member arm will
-    # do, so long as a union is unwrapped at all -- a union left intact matches
-    # no branch below and would fall through, leaking the raw object.
+    # No ``$type`` dispatch is needed in this direction: the dataclass branch
+    # below calls ``to_dict(data, ...)``, which serializes by the value's
+    # runtime type. But the arm still has to be the right *kind* -- routing a
+    # non-dataclass value down a dataclass arm would serialize it to ``None``
+    # -- so match on the runtime type. A union left intact matches no branch
+    # below and would fall through, leaking the raw object.
     members = _union_members(field_type)
     if members:
         if data is None:
             return None
-        inner = members[0]
+        inner = _matching_union_member(data, members)
         if isinstance(inner, TypeVar):
             inner = generic_type_arg
         return _convert_to_dict_value(data, inner, None, convert_uuid)
