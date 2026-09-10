@@ -149,13 +149,20 @@ def _union_members(tp: Any) -> Optional[list[Any]]:
 
 
 def _matching_union_member(data: Any, members: list[Any]) -> Any:
-    """Pick the arm *data* is an instance of, falling back to the first arm.
+    """Pick the most specific arm *data* is an instance of, else the first arm.
 
     A union of entities can use any arm, because ``to_dict`` re-dispatches on
     the value's runtime type. A mixed union cannot: sending a ``str`` down the
     dataclass arm of ``Union[SomeEntity, str]`` serializes it to ``None`` and
     loses the value.
+
+    Specificity matters when arms overlap. Every value is an instance of
+    ``object``, so taking the first match would pick the broad arm of
+    ``Union[object, SomeEntity]``, leave the entity unserialized, and hand a
+    raw dataclass to the JSON encoder. Rank matches by their position in the
+    value's MRO so the nearest class wins.
     """
+    matches: list[type] = []
     for member in members:
         # A parameterized generic (``list[str]``) is not a valid isinstance
         # target, and is still an instance of ``type`` before Python 3.11, so
@@ -164,9 +171,17 @@ def _matching_union_member(data: Any, members: list[Any]) -> Any:
             continue
         try:
             if isinstance(data, member):
-                return member
+                matches.append(member)
         except TypeError:
             continue
+    if matches:
+        # Arms outside the MRO (an ABC matched by registration, say) sort last
+        # but stay ahead of the no-match fallback.
+        mro = type(data).__mro__
+        return min(
+            matches,
+            key=lambda member: mro.index(member) if member in mro else len(mro),
+        )
     return members[0]
 
 
