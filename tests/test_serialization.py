@@ -16,7 +16,10 @@ from filament._serialization import (
 )
 from filament._wire_formats import instant_from_wire, instant_to_wire
 from filament.types.generated.base.base import EntityBase
+from filament.types.generated.entities.note_service import NoteEntity
 from filament.types.generated.entities.permissions_service import PermissionEntity
+from filament.types.generated.entities.scope_item_service import ScopeItemEntity
+from filament.types.generated.entities.task_service import TaskEntity
 from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
@@ -617,3 +620,60 @@ class TestInstantWireFormat:
             2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
         )
         assert instant_from_wire(instant_to_wire(original)) == original
+
+
+# ---------------------------------------------------------------------------
+# Polymorphic union fields
+# ---------------------------------------------------------------------------
+
+class TestUnionFieldDispatch:
+    """Backend navigation properties such as ``reference`` are generated as a
+    union of the concrete entities they may point at (e.g.
+    ``TaskEntity.reference: Optional[Union[ScopeItemEntity, NoteEntity]]``).
+    Deserialization must pick the arm named by the payload's ``$type`` tag
+    rather than defaulting to the first one.
+    """
+
+    def test_picks_first_union_arm_by_type_tag(self) -> None:
+        task = from_dict(
+            {"name": "T", "reference": {"$type": "ScopeItemEntity", "name": "SI"}},
+            TaskEntity,
+        )
+        assert task is not None
+        assert isinstance(task.reference, ScopeItemEntity)
+        assert task.reference.name == "SI"
+
+    def test_picks_later_union_arm_by_type_tag(self) -> None:
+        task = from_dict(
+            {"name": "T", "reference": {"$type": "NoteEntity", "title": "N"}},
+            TaskEntity,
+        )
+        assert task is not None
+        assert isinstance(task.reference, NoteEntity)
+        assert task.reference.title == "N"
+
+    def test_untagged_payload_falls_back_to_first_arm(self) -> None:
+        task = from_dict({"name": "T", "reference": {"name": "SI"}}, TaskEntity)
+        assert task is not None
+        assert isinstance(task.reference, ScopeItemEntity)
+
+    def test_null_union_field_stays_none(self) -> None:
+        task = from_dict({"name": "T", "reference": None}, TaskEntity)
+        assert task is not None
+        assert task.reference is None
+
+    def test_single_arm_optional_entity_still_dispatches(self) -> None:
+        """``Optional[X]`` keeps the existing ``$type`` behaviour."""
+        note = from_dict(
+            {"title": "N", "on": {"$type": "TaskEntity", "name": "T"}}, NoteEntity
+        )
+        assert note is not None
+        assert isinstance(note.on, TaskEntity)
+        assert note.on.name == "T"
+
+    def test_union_field_round_trips(self) -> None:
+        original = TaskEntity(name="T", reference=NoteEntity(title="N"))
+        restored = from_dict(to_dict(original) or {}, TaskEntity)
+        assert restored is not None
+        assert isinstance(restored.reference, NoteEntity)
+        assert restored.reference.title == "N"
