@@ -638,6 +638,13 @@ class _BareUnionHolder:
 
 
 @dataclass
+class _BroadUnionHolder:
+    """A union whose broad arm precedes the specific one."""
+
+    ref: Union[object, ScopeItemEntity] = ""
+
+
+@dataclass
 class _MixedUnionHolder:
     """A union mixing a dataclass arm with a plain scalar arm."""
 
@@ -732,6 +739,18 @@ class TestUnionFieldDispatch:
 
     def test_mixed_union_still_serializes_entity_arm(self) -> None:
         wire = to_dict(_MixedUnionHolder(ref=ScopeItemEntity(name="SI")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["name"] == "SI"
+
+    def test_broad_union_arm_does_not_shadow_the_specific_one(self) -> None:
+        """A superclass arm must not win over the arm that actually matches.
+
+        Every value is an instance of ``object``, so returning the first
+        isinstance match would pick ``object`` here, leave the entity
+        unserialized, and hand a raw dataclass to the JSON encoder.
+        """
+        wire = to_dict(_BroadUnionHolder(ref=ScopeItemEntity(name="SI")))
         assert wire is not None
         assert isinstance(wire["ref"], dict)
         assert wire["ref"]["name"] == "SI"
