@@ -8,6 +8,7 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..entities.generic import ReferenceEntityBase
+from ..entities.task_service import TaskEntity
 from ..entities.user_service import UserEntity
 from ..enums import TimeLogModeEnum, TimeLogStatusEnum
 
@@ -21,6 +22,7 @@ class TimeLogEntity(ReferenceEntityBase):
     Represents a time log entry entity that records a time-related event for a user.
     A time log entry will always have <see cref="P:Filament.FSCore.Entities.ReferenceEntityBase.Reference" /> pointing to a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
     
+    :param reference: Represents a linked entity instance.
     :param start_instant: The start instant of the time log entry.
     :param end_instant: The end instant of the time log entry.
                         A null value indicates the time log is still in progress and should be treated as Pending.
@@ -34,6 +36,7 @@ class TimeLogEntity(ReferenceEntityBase):
     :param mode: The mode of the time log entry, indicating whether this is work time or a break.
                  Work mode creates schedule segments, while Break mode only marks time as unavailable.
     """
+    reference: Optional[TaskEntity] = field(default=None)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: Optional[datetime.datetime] = field(default=None)
     user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

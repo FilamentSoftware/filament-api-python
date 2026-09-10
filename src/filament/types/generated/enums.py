@@ -20,6 +20,7 @@ __all__ = [
     "FileState",
     "Industry",
     "NameOrder",
+    "NoteStatusEnum",
     "NoteUserConnectionType",
     "PermissionAction",
     "PermissionType",
@@ -34,6 +35,7 @@ __all__ = [
     "ScheduleMode",
     "ScheduleSegmentModeEnum",
     "ScopeGroupChildType",
+    "ScopeGroupLevelModeEnum",
     "ScopeMilestoneDirectionEnum",
     "ScopeMilestoneModeEnum",
     "ScopeTaskTypeComplexitySource",
@@ -61,20 +63,34 @@ __all__ = [
 
 class ActualStatusEnum(Enum):
     """
-    Represents the status of an actual, reflecting the task's progress and readiness to proceed.
+    Represents the status of an actual, reflecting the task's progress through hands-on work
+    and the post-work pipeline (automated processing, then human review).
     
-    :cvar Waiting: The task cannot yet start because its planned start date is in the future (tomorrow or later).
-    :cvar NotReady: The task cannot yet start because at least one first-level upstream dependency is not complete.
-    :cvar ReadyToStart: All first-level upstream dependencies are complete (or the task has no dependencies),
-                        but no work has started on the task yet.
+    :cvar NotReady: The task cannot yet start because at least one first-level upstream dependency has not
+                    reached <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" />.
+    :cvar Waiting: The task cannot yet start because its planned start date is in the future (tomorrow or
+                   later, UTC date comparison). Upstream dependencies are all <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" /> —
+                   otherwise the task is <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.NotReady" />.
+    :cvar ReadyToStart: All first-level upstream dependencies are <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" /> (or the task has no
+                        dependencies) and the planned start date has arrived, but no work has started on the
+                        task yet.
     :cvar InProgress: The task has started work, indicated by either an open time log or a qualifying submitted work time log.
-    :cvar Complete: The task's billing proportion has reached 1.0.
+    :cvar RequiresProcessing: The hands-on work is done and the task is waiting for automated processing to run.
+    :cvar Processing: Automated processing is currently running for this task. Reserved for upcoming scheduler
+                      work; the status calculation does not yet produce this value.
+    :cvar RequiresReview: The hands-on work (and any processing) is done and the task is waiting for human review.
+    :cvar Finished: The task is fully done: hands-on work, processing, and review (where required) are all
+                    complete. Only this status counts as complete for upstream-dependency gating and group
+                    rollups.
     """
-    Waiting = 0
-    NotReady = 1
+    NotReady = 0
+    Waiting = 1
     ReadyToStart = 2
     InProgress = 3
-    Complete = 4
+    RequiresProcessing = 4
+    Processing = 5
+    RequiresReview = 6
+    Finished = 7
 
 
 class AvailabilityModeEnum(Enum):
@@ -440,6 +456,17 @@ class NameOrder(Enum):
     FamilyNameFirst = 1
 
 
+class NoteStatusEnum(Enum):
+    """
+    Whether a note is still being composed or has been submitted to its recipients.
+    
+    :cvar Draft: The note is still being composed and is not visible to its recipients.
+    :cvar Submitted: The note has been submitted and is visible to its recipients.
+    """
+    Draft = 0
+    Submitted = 1
+
+
 class NoteUserConnectionType(Enum):
     """
     Represents the type of connection a user has to a note.
@@ -696,6 +723,25 @@ class ScopeGroupChildType(Enum):
     Item = 1
 
 
+class ScopeGroupLevelModeEnum(Enum):
+    """
+    The role of a scope group level. <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> levels are ordinary user-defined
+    levels that populate their own derived task group level; the other modes mark the level as
+    the template for the corresponding built-in task group level, which copies the template's
+    Name, Description, and rollup configuration during population (and produces no derived
+    level of its own). Persisted as ints: never renumber existing members.
+    
+    :cvar Arbitrary: An ordinary user-defined level — the default, behaving exactly as levels always have.
+    :cvar Scope: Template for the built-in Scope task group level.
+    :cvar Item: Template for the built-in Item task group level.
+    :cvar Task: Template for the built-in Task task group level.
+    """
+    Arbitrary = 0
+    Scope = 1
+    Item = 2
+    Task = 3
+
+
 class ScopeMilestoneDirectionEnum(Enum):
     """
     Defines the direction of a scope milestone.
@@ -893,25 +939,20 @@ class TaskMilestoneModeEnum(Enum):
 
 class TaskStatusEnum(Enum):
     """
-    Represents the status of a task within the workflow or process lifecycle.
+    Represents the state of one post-work stage (processing or review) of a task.
     
-    :cvar InProgress: Indicates that a task is currently in progress and actively being worked on.
-                      This status reflects that the task is not yet completed but has transitioned
-                      from an initial or awaiting state to active execution.
-    :cvar Processing: Represents a status where the task is undergoing processing. This indicates that
-                      the task is actively being handled by the system or a workflow stage, but is not
-                      yet in a completed or finalized state.
-    :cvar RequiresReview: Indicates that a task requires review before proceeding further in the workflow.
-                          This status reflects that the task has reached a completion or checkpoint
-                          where evaluation, validation, or approval is necessary.
-    :cvar Finished: Represents a task that has been completed successfully. This status indicates
-                    that all necessary work associated with the task has been finalized and no further
-                    actions are required.
+    :cvar Undefined: The stage has not been specified. Whether the stage is required is derived from the
+                     task's own configuration (<see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.DefaultProcessingDuration" /> for
+                     processing, <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.RequiresReview" /> for review).
+    :cvar NotRequired: The stage is explicitly not required for this task, regardless of the task's own
+                       configuration.
+    :cvar Pending: The stage is required and has not been completed yet.
+    :cvar Complete: The stage has been completed.
     """
-    InProgress = 0
-    Processing = 1
-    RequiresReview = 2
-    Finished = 3
+    Undefined = 0
+    NotRequired = 1
+    Pending = 2
+    Complete = 3
 
 
 class TimeLogModeEnum(Enum):
@@ -1031,9 +1072,16 @@ class UserDefinedPropertyStatus(Enum):
                    from the permission map, the join, conditions and orders — and cannot be written.
     :cvar Active: Set once the backfill has completed. The property is fully usable: visible to clients, readable,
                   writable, and available to conditions and orders.
+    :cvar Hidden: Set by an administrator to retire the property without deleting it — the soft delete, in the same
+                  sense that a currency is disabled rather than removed. Everywhere a value could be seen or written the
+                  property behaves exactly as <see cref="F:Filament.FSCore.CoreEntities.UserDefinedPropertyStatus.Pending" /> does: absent from the permission map, the join,
+                  conditions and orders, and refused as unknown by any request that names it. The definition row itself
+                  stays readable to callers who may read it, carrying this status, so an administrator can list what is
+                  hidden and bring it back.
     """
     Pending = 0
     Active = 1
+    Hidden = 2
 
 
 class UserEmailType(Enum):

@@ -115,6 +115,12 @@ class ScheduleScopeSettingsEntity(Entity):
     :param far_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the far distance.
     :param far_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the far distance.
     :param far_buffer_max_proportion: The maximum proportion of a task's duration that should be used as buffer at the far distance.
+    :param max_review_event_search_distance: How far ahead the scheduler searches for a review-event occurrence when automatically
+                                             linking a task that needs review. The search window is
+                                             <c>[searchStart, searchStart + MaxReviewEventSearchDistance]</c>, where <c>searchStart</c>
+                                             is the later of the task's processing end and the current instant. Tasks with no matching
+                                             occurrence inside the window are not linked (threshold-miss behaviour is decided by the
+                                             scheduler).
     :param user_priority_reference_cost_weight_multiplier: Multiplier applied to the user-selection ReferenceCost priority weight from
                                                            <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
                                                            unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
@@ -159,6 +165,7 @@ class ScheduleScopeSettingsEntity(Entity):
     far_buffer_min_proportion: float = field(default=0.05)
     far_buffer_initial_proportion: float = field(default=0.1)
     far_buffer_max_proportion: float = field(default=0.15)
+    max_review_event_search_distance: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     user_priority_reference_cost_weight_multiplier: float = field(default=1)
     user_priority_actual_user_weight_multiplier: float = field(default=1)
     user_priority_user_last_worked_on_task_weight_multiplier: float = field(default=1)

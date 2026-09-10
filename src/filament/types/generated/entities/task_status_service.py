@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
+from typing import Optional
 
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
+from ..entities.review_group_service import ReviewGroupEntity
 from ..enums import BlockUserReasonEnum, TaskStatusEnum
 
 __all__ = [
@@ -19,19 +21,29 @@ class TaskStatusEntity(Entity):
     Represents the status entity for a task, defined as a sidecar entity
     associated with <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
     
-    :param status: The status of the task as defined by the <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEnum" /> enumeration.
-                   This property represents the current phase or state of a task within its lifecycle, such as
-                   InProgress, Processing, RequiresReview, or Finished.
+    :param processing_status: The state of the automated processing stage that follows the task's hands-on work.
+                              When <see cref="F:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEnum.Undefined" />, whether processing is required is derived
+                              from the effective processing duration (see <see cref="P:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity.ProcessingDuration" />).
+    :param review_status: The state of the human review stage that follows the task's hands-on work (and its
+                          processing stage, when one exists). When <see cref="F:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEnum.Undefined" />, whether
+                          review is required is derived from <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.RequiresReview" />.
     :param block_user_ids: The collection of user identifiers associated with their corresponding
                            blocking reasons, as specified in the <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.BlockUserReasonEnum" /> enumeration.
                            This property is used to track which users have been blocked and the reasons for their block status
                            in the context of a task's lifecycle.
-    :param override_review_tags: A collection of tags used to override the default review process for a task.
-                                 If a task has override review tags, it won't be placed into the standard review
-                                 slot, but will instead find the first review slot that matches one of these tags.
     :param processing_duration: Represents the estimated processing duration required until the task is finished.
+                                When null, the task's <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.DefaultProcessingDuration" /> applies; an
+                                explicit <see cref="P:NodaTime.Duration.Zero" /> means the task needs no processing.
+    :param override_review_group_ids: The ids of review groups that override the default review routing for this task. When
+                                      non-empty, review events are matched against these review groups only, instead of the
+                                      task's ancestor task groups.
+    :param override_review_groups: Represents the review groups that override the default review routing for this task.
+                                   Assigning values to this property populates the associated
+                                   <c>OverrideReviewGroupIds</c> property with the corresponding identifiers.
     """
-    status: TaskStatusEnum = field(default=TaskStatusEnum.InProgress)
+    processing_status: TaskStatusEnum = field(default=TaskStatusEnum.Undefined)
+    review_status: TaskStatusEnum = field(default=TaskStatusEnum.Undefined)
     block_user_ids: dict[UUID, BlockUserReasonEnum] = field(default_factory=dict)
-    override_review_tags: list[str] = field(default_factory=list)
-    processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    processing_duration: Optional[datetime.timedelta] = field(default=None)
+    override_review_group_ids: list[UUID] = field(default_factory=list)
+    override_review_groups: Optional[list[ReviewGroupEntity]] = field(default=None)
