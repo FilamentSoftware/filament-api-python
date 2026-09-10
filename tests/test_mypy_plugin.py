@@ -145,6 +145,29 @@ def test_prop_narrows_field_type(
     assert _revealed_types(output) == [expected], output
 
 
+def test_prop_narrows_multi_arm_entity_union(tmp_path: Path) -> None:
+    """A 3+-arm ``Optional[Union[...]]`` keeps every arm, not just the first.
+
+    ``AvailabilityEntity.reference`` covers the 2-arm case; this exercises
+    ``_unwrap_optional``'s ``make_union`` path with more arms than that.
+    """
+    source = (
+        "from filament._condition_builder import Condition\n"
+        "from filament.types.generated.entities.schedule_service import "
+        "ScheduleSegmentEntity\n"
+        'reveal_type(Condition(ScheduleSegmentEntity).prop("reference"))\n'
+    )
+    output = _run_mypy(source, tmp_path)
+    assert _errors(output) == [], output
+    assert _revealed_types(output) == [
+        f"{_CB}.DbConditionProperty["
+        "filament.types.generated.entities.event_service.EventEntity"
+        " | filament.types.generated.entities.scope_service.ScopeEntity"
+        " | filament.types.generated.entities.task_service.TaskEntity"
+        " | filament.types.generated.entities.task_service.TaskGroupEntity]"
+    ], output
+
+
 def test_prop_narrows_list_field(tmp_path: Path) -> None:
     # address_parts: list[str] (inherited from AddressEntityBase -> Entity).
     source = (
