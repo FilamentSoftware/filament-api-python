@@ -18,6 +18,7 @@ import types
 from collections.abc import Sequence as ABCSequence
 from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, get_origin, get_args
 
 import uuid_utils
@@ -230,8 +231,14 @@ def _is_data_option_type(tp: Any) -> bool:
         return False
 
 
+@lru_cache(maxsize=None)
 def _resolve_entity_type(type_name: str) -> Optional[type]:
-    """Look up a concrete EntityBase subclass by name from $type tag."""
+    """Look up a concrete EntityBase subclass by name from $type tag.
+
+    Cached: this runs per union-typed field while deserializing every
+    ``DataUpdated`` push, on the event loop. The entity hierarchy is fixed once
+    ``types.generated.entities`` is imported, so the walk cannot go stale.
+    """
     from .types.generated.base.base import EntityBase
 
     def _walk(cls: type) -> Optional[type]:
@@ -312,13 +319,20 @@ def _convert_to_dict_value(
     Handles ``Optional``, ``TypeVar``, dataclasses, lists, dicts, enums,
     UUIDs, and datetimes.
     """
-    # Optional[X] -> unwrap
-    if _is_optional(field_type):
-        inner = _unwrap_optional(field_type)
-        if isinstance(inner, TypeVar):
-            inner = generic_type_arg
+    # Optional[X] / Union[X, Y] -> unwrap
+    #
+    # Unlike the from_dict direction, no ``$type`` dispatch is needed here: the
+    # dataclass branch below calls ``to_dict(data, ...)``, which serializes by
+    # the value's runtime type and ignores ``field_type``. Any member arm will
+    # do, so long as a union is unwrapped at all -- a union left intact matches
+    # no branch below and would fall through, leaking the raw object.
+    members = _union_members(field_type)
+    if members:
         if data is None:
             return None
+        inner = members[0]
+        if isinstance(inner, TypeVar):
+            inner = generic_type_arg
         return _convert_to_dict_value(data, inner, None, convert_uuid)
 
     # TypeVar -> use the resolved generic arg, or infer from runtime value
