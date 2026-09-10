@@ -637,6 +637,13 @@ class _BareUnionHolder:
     )
 
 
+@dataclass
+class _MixedUnionHolder:
+    """A union mixing a dataclass arm with a plain scalar arm."""
+
+    ref: Union[ScopeItemEntity, str] = ""
+
+
 class TestUnionFieldDispatch:
     """Backend navigation properties such as ``reference`` are generated as a
     union of the concrete entities they may point at (e.g.
@@ -678,7 +685,9 @@ class TestUnionFieldDispatch:
 
     def test_type_tag_outside_union_raises(self) -> None:
         """A known entity that is not a declared arm must not be coerced."""
-        with pytest.raises(ValueError, match="UserEntity"):
+        with pytest.raises(
+            ValueError, match="not one of the declared union members"
+        ):
             from_dict(
                 {"name": "T", "reference": {"$type": "UserEntity", "name": "U"}},
                 TaskEntity,
@@ -709,6 +718,23 @@ class TestUnionFieldDispatch:
         assert wire is not None
         assert isinstance(wire["ref"], dict)
         assert wire["ref"]["title"] == "N"
+
+    def test_mixed_union_keeps_non_dataclass_value(self) -> None:
+        """A non-dataclass value must not be routed down a dataclass arm.
+
+        With the dataclass arm declared first, taking ``members[0]`` would send
+        the ``str`` through ``to_dict``, which returns ``None`` for a
+        non-dataclass and would drop the value silently.
+        """
+        wire = to_dict(_MixedUnionHolder(ref="plain string"))
+        assert wire is not None
+        assert wire["ref"] == "plain string"
+
+    def test_mixed_union_still_serializes_entity_arm(self) -> None:
+        wire = to_dict(_MixedUnionHolder(ref=ScopeItemEntity(name="SI")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["name"] == "SI"
 
     def test_union_field_round_trips(self) -> None:
         original = TaskEntity(name="T", reference=NoteEntity(title="N"))
