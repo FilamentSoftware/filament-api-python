@@ -101,11 +101,14 @@ _AVAILABILITY_CASES = [
         f"{_CB}.DbConditionComparableProperty[str]",
         id="inherited-parent-str",
     ),
-    # Inherited Optional[EntityBase] -> Optional unwrapped, not a known scalar.
+    # Optional[Union[...]] override of ReferenceEntityBase.reference -> None
+    # stripped, union preserved, not a known scalar.
     pytest.param(
         "reference",
-        f"{_CB}.DbConditionProperty[filament.types.generated.base.base.EntityBase]",
-        id="inherited-parent-optional-entity",
+        f"{_CB}.DbConditionProperty["
+        "filament.types.generated.entities.organization_service.OfficeLocationEntity"
+        " | filament.types.generated.entities.user_service.UserEntity]",
+        id="own-optional-entity-union",
     ),
     # Inherited from a grandparent base, EntityBase (two levels up).
     pytest.param(
