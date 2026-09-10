@@ -1,3 +1,26 @@
+## 0.7.0-dev.0.1.1 (2026-09-10 15:57)
+
+### Docs
+
+#### FIX
+- The generated type reference no longer cuts entity and enum descriptions off mid-sentence
+
+### Mypy Plugin
+
+#### FIX
+- Condition.prop() on a reference property now types as every entity it can point at, rather than only the first
+
+### Serialization
+
+#### FIX
+- Deserializing a polymorphic reference whose $type names an unexpected type now fails cleanly instead of silently returning a different entity
+- Polymorphic entity references now deserialize as the type the payload names, instead of always the first candidate type
+
+### Types
+
+#### OTHER
+- Task review state is now tracked per stage, review routing moves from tags to review groups, and entity reference properties expose their concrete target types
+
 ## 0.7.0-dev.0.1.0 (2026-09-03 18:07)
 
 ### Client
