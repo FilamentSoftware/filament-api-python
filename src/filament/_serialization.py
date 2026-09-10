@@ -162,26 +162,29 @@ def _matching_union_member(data: Any, members: list[Any]) -> Any:
     raw dataclass to the JSON encoder. Rank matches by their position in the
     value's MRO so the nearest class wins.
     """
-    matches: list[type] = []
+    # Each entry pairs the arm to return with the plain class to test against:
+    # a parameterized generic (``dict[str, str]``) is not a valid isinstance
+    # target, but its origin (``dict``) is, and the arm itself is what the
+    # caller needs in order to convert the contents.
+    matches: list[tuple[Any, type]] = []
     for member in members:
-        # A parameterized generic (``list[str]``) is not a valid isinstance
-        # target, and is still an instance of ``type`` before Python 3.11, so
-        # screen it out rather than relying on the isinstance check alone.
-        if not isinstance(member, type) or get_origin(member) is not None:
+        runtime_type = get_origin(member) or member
+        if not isinstance(runtime_type, type):
             continue
         try:
-            if isinstance(data, member):
-                matches.append(member)
+            if isinstance(data, runtime_type):
+                matches.append((member, runtime_type))
         except TypeError:
             continue
     if matches:
         # Arms outside the MRO (an ABC matched by registration, say) sort last
         # but stay ahead of the no-match fallback.
         mro = type(data).__mro__
-        return min(
+        member, _ = min(
             matches,
-            key=lambda member: mro.index(member) if member in mro else len(mro),
+            key=lambda pair: mro.index(pair[1]) if pair[1] in mro else len(mro),
         )
+        return member
     return members[0]
 
 
