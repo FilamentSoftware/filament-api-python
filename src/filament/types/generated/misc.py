@@ -10,7 +10,7 @@ from uuid_utils import UUID, uuid7
 from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
-from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType
+from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType, UserDefinedPropertyStatus
 
 __all__ = [
     "TaskMilestoneWarning",
@@ -610,12 +610,14 @@ class UpdateUserDefinedPropertyRequest(StructBase):
     :param description: Gets or sets the new description, or null to leave it unchanged.
     :param default_value: Gets or sets the new default value in wire format, or null to leave it unchanged.
     :param validation: Gets or sets the new constraints, or null to leave them unchanged.
+    :param status: Gets or sets the new status, or null to leave it unchanged.
     """
     id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     label: Optional[str] = field(default=None)
     description: Optional[str] = field(default=None)
     default_value: Optional[str] = field(default=None)
     validation: Optional[UserDefinedValidation] = field(default=None)
+    status: Optional[UserDefinedPropertyStatus] = field(default=None)
 
 
 @dataclass(kw_only=True)

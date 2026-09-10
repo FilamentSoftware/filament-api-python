@@ -11,7 +11,6 @@ __all__ = [
     "TaskDependencyConnection",
     "TaskGroupConnection",
     "TaskGroupParentConnection",
-    "TaskGroupLevelParentConnection",
     "TaskMilestoneConnection",
     "TaskSkillConnection",
     "TaskOfficeLocationConnection",
@@ -35,11 +34,6 @@ class TaskGroupConnection(EntityConnection):
 @dataclass(kw_only=True)
 class TaskGroupParentConnection(EntityConnection):
     """Represents a connection between a task group entity and its parent task group entity."""
-
-
-@dataclass(kw_only=True)
-class TaskGroupLevelParentConnection(EntityConnection):
-    """Represents a connection between two instances of TaskGroupLevelEntity, establishing a parent-child relationship at the task group level."""
 
 
 @dataclass(kw_only=True)

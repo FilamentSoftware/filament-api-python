@@ -10,6 +10,8 @@ from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
 from ..entities.scope_group_service import ScopeGroupEntity
 from ..entities.scope_item_service import ScopeItemEntity
+from ..entities.scope_service import ScopeEntity
+from ..entities.scope_task_type_service import ScopeTaskTypeEntity
 from ..entities.scope_template_item_service import ScopeTemplateItemEntity
 
 __all__ = [
@@ -22,6 +24,7 @@ class ScopeCostEntity(ReferenceEntityBase):
     Represents a scope cost entity that includes chargeable and estimated costs,
     as well as contextual references to related entities. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
+    :param reference: Represents a linked entity instance.
     :param context_type: Represents the type of the context associated with the scope cost.
                          Typically stores the name of the entity type that the context refers to.
     :param context_id: Represents the unique identifier for the associated context entity linked to the scope cost.
@@ -39,6 +42,7 @@ class ScopeCostEntity(ReferenceEntityBase):
                         Determined from the currency of the item the cost is for.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     """
+    reference: Optional[Union[ScopeEntity, ScopeGroupEntity, ScopeItemEntity, ScopeTaskTypeEntity, ScopeTemplateItemEntity]] = field(default=None)
     context_type: str = field(default='')
     context_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     instance: bool = field(default=False)

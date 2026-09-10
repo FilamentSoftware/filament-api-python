@@ -63,11 +63,19 @@ def _extract_str_literal(tp: ProperType) -> Optional[str]:
 
 
 def _unwrap_optional(tp: ProperType) -> ProperType:
-    """If *tp* is ``Optional[X]`` (i.e. ``Union[X, None]``), return ``X``."""
+    """Strip ``None`` from *tp* if it is a union containing it.
+
+    ``Optional[X]`` becomes ``X``; ``Optional[Union[X, Y]]`` becomes
+    ``Union[X, Y]`` (backend entities with several possible reference targets
+    generate the latter).
+    """
     if isinstance(tp, UnionType):
         non_none = [t for t in tp.items if not isinstance(get_proper_type(t), NoneType)]
+        if not non_none or len(non_none) == len(tp.items):
+            return tp
         if len(non_none) == 1:
             return get_proper_type(non_none[0])
+        return get_proper_type(UnionType.make_union(non_none, tp.line, tp.column))
     return tp
 
 

@@ -12,10 +12,10 @@ from ..enums import UserStatusEnum
 
 __all__ = [
     "AddressEntityBase",
+    "ReferenceEntityBase",
     "UserBaseEntity",
     "PhoneEntityBase",
     "EmailEntityBase",
-    "ReferenceEntityBase",
     "GenericComplexityBase",
 ]
 
@@ -37,6 +37,21 @@ class AddressEntityBase(Entity):
     region: str = field(default='')
     post_code: str = field(default='')
     country: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class ReferenceEntityBase(Entity):
+    """
+    Represents the base class for entities that maintain references
+    to other entities through a combination of reference type and reference ID.
+    
+    :param reference_type: The entity type this references
+    :param reference_id: The id of the referenced entity
+    :param reference: Represents a linked entity instance.
+    """
+    reference_type: str = field(default='')
+    reference_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    reference: Optional[EntityBase] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -70,21 +85,6 @@ class EmailEntityBase(Entity):
     :param email_address: The email address.
     """
     email_address: str = field(default='')
-
-
-@dataclass(kw_only=True)
-class ReferenceEntityBase(Entity):
-    """
-    Represents the base class for entities that maintain references
-    to other entities through a combination of reference type and reference ID.
-    
-    :param reference_type: The entity type this references
-    :param reference_id: The id of the referenced entity
-    :param reference: Represents a linked entity instance.
-    """
-    reference_type: str = field(default='')
-    reference_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
-    reference: Optional[EntityBase] = field(default=None)
 
 
 @dataclass(kw_only=True)

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import datetime
 import json
+from dataclasses import dataclass, field
+from typing import Union
 
 import pytest
 from uuid_utils import UUID, uuid7
@@ -16,7 +18,10 @@ from filament._serialization import (
 )
 from filament._wire_formats import instant_from_wire, instant_to_wire
 from filament.types.generated.base.base import EntityBase
+from filament.types.generated.entities.note_service import NoteEntity
 from filament.types.generated.entities.permissions_service import PermissionEntity
+from filament.types.generated.entities.scope_item_service import ScopeItemEntity
+from filament.types.generated.entities.task_service import TaskEntity
 from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
@@ -617,3 +622,182 @@ class TestInstantWireFormat:
             2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
         )
         assert instant_from_wire(instant_to_wire(original)) == original
+
+
+# ---------------------------------------------------------------------------
+# Polymorphic union fields
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _BareUnionHolder:
+    """A union with no ``None`` arm — a shape codegen does not emit yet."""
+
+    ref: Union[ScopeItemEntity, NoteEntity] = field(
+        default_factory=lambda: NoteEntity()
+    )
+
+
+@dataclass
+class _CollectionUnionHolder:
+    """A union of two parameterised collection arms."""
+
+    ref: Union[list[str], dict[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class _BroadCollectionUnionHolder:
+    """A broad arm ahead of a parameterised collection arm."""
+
+    ref: Union[object, dict[str, datetime.datetime]] = ""
+
+
+@dataclass
+class _BroadUnionHolder:
+    """A union whose broad arm precedes the specific one."""
+
+    ref: Union[object, ScopeItemEntity] = ""
+
+
+@dataclass
+class _MixedUnionHolder:
+    """A union mixing a dataclass arm with a plain scalar arm."""
+
+    ref: Union[ScopeItemEntity, str] = ""
+
+
+class TestUnionFieldDispatch:
+    """Backend navigation properties such as ``reference`` are generated as a
+    union of the concrete entities they may point at (e.g.
+    ``TaskEntity.reference: Optional[Union[ScopeItemEntity, NoteEntity]]``).
+    Deserialization must pick the arm named by the payload's ``$type`` tag
+    rather than defaulting to the first one.
+    """
+
+    def test_picks_first_union_arm_by_type_tag(self) -> None:
+        task = from_dict(
+            {"name": "T", "reference": {"$type": "ScopeItemEntity", "name": "SI"}},
+            TaskEntity,
+        )
+        assert task is not None
+        assert isinstance(task.reference, ScopeItemEntity)
+        assert task.reference.name == "SI"
+
+    def test_picks_later_union_arm_by_type_tag(self) -> None:
+        task = from_dict(
+            {"name": "T", "reference": {"$type": "NoteEntity", "title": "N"}},
+            TaskEntity,
+        )
+        assert task is not None
+        assert isinstance(task.reference, NoteEntity)
+        assert task.reference.title == "N"
+
+    def test_untagged_payload_falls_back_to_first_arm(self) -> None:
+        task = from_dict({"name": "T", "reference": {"name": "SI"}}, TaskEntity)
+        assert task is not None
+        assert isinstance(task.reference, ScopeItemEntity)
+
+    def test_unknown_type_tag_raises(self) -> None:
+        """An unrecognised ``$type`` must not silently build the first arm."""
+        with pytest.raises(ValueError, match="NotAnEntity"):
+            from_dict(
+                {"name": "T", "reference": {"$type": "NotAnEntity", "name": "X"}},
+                TaskEntity,
+            )
+
+    def test_type_tag_outside_union_raises(self) -> None:
+        """A known entity that is not a declared arm must not be coerced."""
+        with pytest.raises(
+            ValueError, match="not one of the declared union members"
+        ):
+            from_dict(
+                {"name": "T", "reference": {"$type": "UserEntity", "name": "U"}},
+                TaskEntity,
+            )
+
+    def test_null_union_field_stays_none(self) -> None:
+        task = from_dict({"name": "T", "reference": None}, TaskEntity)
+        assert task is not None
+        assert task.reference is None
+
+    def test_single_arm_optional_entity_still_dispatches(self) -> None:
+        """``Optional[X]`` keeps the existing ``$type`` behaviour."""
+        note = from_dict(
+            {"title": "N", "on": {"$type": "TaskEntity", "name": "T"}}, NoteEntity
+        )
+        assert note is not None
+        assert isinstance(note.on, TaskEntity)
+        assert note.on.name == "T"
+
+    def test_bare_union_field_serializes(self) -> None:
+        """A union with no ``None`` arm must still be unwrapped by ``to_dict``.
+
+        Codegen only emits ``Optional[Union[...]]`` today, so this guards the
+        shape rather than a current type: an un-unwrapped union matches no
+        branch in ``_convert_to_dict_value`` and would leak the raw entity.
+        """
+        wire = to_dict(_BareUnionHolder(ref=NoteEntity(title="N")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["title"] == "N"
+
+    def test_mixed_union_keeps_non_dataclass_value(self) -> None:
+        """A non-dataclass value must not be routed down a dataclass arm.
+
+        With the dataclass arm declared first, taking ``members[0]`` would send
+        the ``str`` through ``to_dict``, which returns ``None`` for a
+        non-dataclass and would drop the value silently.
+        """
+        wire = to_dict(_MixedUnionHolder(ref="plain string"))
+        assert wire is not None
+        assert wire["ref"] == "plain string"
+
+    def test_mixed_union_still_serializes_entity_arm(self) -> None:
+        wire = to_dict(_MixedUnionHolder(ref=ScopeItemEntity(name="SI")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["name"] == "SI"
+
+    def test_broad_union_arm_does_not_shadow_the_specific_one(self) -> None:
+        """A superclass arm must not win over the arm that actually matches.
+
+        Every value is an instance of ``object``, so returning the first
+        isinstance match would pick ``object`` here, leave the entity
+        unserialized, and hand a raw dataclass to the JSON encoder.
+        """
+        wire = to_dict(_BroadUnionHolder(ref=ScopeItemEntity(name="SI")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["name"] == "SI"
+
+    def test_collection_union_picks_the_dict_arm(self) -> None:
+        """A dict value must not be serialized through the list arm."""
+        wire = to_dict(_CollectionUnionHolder(ref={"k": "v"}))
+        assert wire is not None
+        assert wire["ref"] == {"k": "v"}
+
+    def test_collection_union_picks_the_list_arm(self) -> None:
+        wire = to_dict(_CollectionUnionHolder(ref=["a", "b"]))
+        assert wire is not None
+        assert wire["ref"] == ["a", "b"]
+
+    def test_broad_arm_does_not_shadow_a_collection_arm(self) -> None:
+        """Specificity ranking must see through a parameterised arm's origin.
+
+        The value is a dict of datetimes, so routing it through the ``object``
+        arm leaves the datetimes unconverted rather than in wire format --
+        a passthrough that a dict of plain strings would not expose.
+        """
+        wire = to_dict(
+            _BroadCollectionUnionHolder(
+                ref={"k": datetime.datetime(2025, 1, 15, 10, 30, 45, 123456)}
+            )
+        )
+        assert wire is not None
+        assert wire["ref"] == {"k": "2025-01-15T10:30:45.12345600Z"}
+
+    def test_union_field_round_trips(self) -> None:
+        original = TaskEntity(name="T", reference=NoteEntity(title="N"))
+        restored = from_dict(to_dict(original) or {}, TaskEntity)
+        assert restored is not None
+        assert isinstance(restored.reference, NoteEntity)
+        assert restored.reference.title == "N"

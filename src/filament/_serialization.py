@@ -18,6 +18,7 @@ import types
 from collections.abc import Sequence as ABCSequence
 from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, get_origin, get_args
 
 import uuid_utils
@@ -140,6 +141,94 @@ def _unwrap_optional(tp: Any) -> Any:
     return next((a for a in get_args(tp) if a is not type(None)), tp)
 
 
+def _union_members(tp: Any) -> Optional[list[Any]]:
+    """Return the non-``None`` members of a union, or ``None`` if *tp* isn't one."""
+    if get_origin(tp) is Union or isinstance(tp, types.UnionType):
+        return [a for a in get_args(tp) if a is not type(None)]
+    return None
+
+
+def _matching_union_member(data: Any, members: list[Any]) -> Any:
+    """Pick the most specific arm *data* is an instance of, else the first arm.
+
+    A union of entities can use any arm, because ``to_dict`` re-dispatches on
+    the value's runtime type. A mixed union cannot: sending a ``str`` down the
+    dataclass arm of ``Union[SomeEntity, str]`` serializes it to ``None`` and
+    loses the value.
+
+    Specificity matters when arms overlap. Every value is an instance of
+    ``object``, so taking the first match would pick the broad arm of
+    ``Union[object, SomeEntity]``, leave the entity unserialized, and hand a
+    raw dataclass to the JSON encoder. Rank matches by their position in the
+    value's MRO so the nearest class wins.
+    """
+    # Each entry pairs the arm to return with the plain class to test against:
+    # a parameterized generic (``dict[str, str]``) is not a valid isinstance
+    # target, but its origin (``dict``) is, and the arm itself is what the
+    # caller needs in order to convert the contents.
+    matches: list[tuple[Any, type]] = []
+    for member in members:
+        runtime_type = get_origin(member) or member
+        if not isinstance(runtime_type, type):
+            continue
+        try:
+            if isinstance(data, runtime_type):
+                matches.append((member, runtime_type))
+        except TypeError:
+            continue
+    if matches:
+        # Arms outside the MRO (an ABC matched by registration, say) sort last
+        # but stay ahead of the no-match fallback.
+        mro = type(data).__mro__
+        member, _ = min(
+            matches,
+            key=lambda pair: mro.index(pair[1]) if pair[1] in mro else len(mro),
+        )
+        return member
+    return members[0]
+
+
+def _select_union_member(data: Any, members: list[Any]) -> Any:
+    """Pick the union member matching *data*'s ``$type`` tag.
+
+    Backend navigation properties such as ``reference`` are typed as a union of
+    the concrete entities they may point at. The payload names its own type, so
+    use that to choose the arm; fall back to the first arm when there is no
+    usable tag.
+
+    Raise ``ValueError`` when the payload does name a type but it cannot be
+    placed among the declared arms. Guessing an arm there would build one
+    entity out of another entity's data and hand the caller a plausible-looking
+    object whose fields silently defaulted to ``None``.
+    """
+    if not isinstance(data, dict):
+        return members[0]
+
+    type_name = data.get("$type")
+    if not isinstance(type_name, str):
+        return members[0]
+
+    # ``$type`` dispatch only applies to unions of entities.
+    entity_members = [
+        m for m in members if isinstance(m, type) and issubclass(m, EntityBase)
+    ]
+    if not entity_members:
+        return members[0]
+
+    resolved = _resolve_entity_type(type_name)
+    if resolved is None:
+        raise ValueError(f"Unknown entity type in $type tag: {type_name!r}")
+
+    for member in entity_members:
+        if issubclass(resolved, member):
+            return member
+
+    raise ValueError(
+        f"$type {type_name!r} is not one of the declared union members: "
+        f"{[m.__name__ for m in entity_members]}"
+    )
+
+
 def _is_uuid_type(tp: Any) -> bool:
     """Return ``True`` if *tp* is ``uuid_utils.UUID``."""
     try:
@@ -182,8 +271,14 @@ def _is_data_option_type(tp: Any) -> bool:
         return False
 
 
+@lru_cache(maxsize=None)
 def _resolve_entity_type(type_name: str) -> Optional[type]:
-    """Look up a concrete EntityBase subclass by name from $type tag."""
+    """Look up a concrete EntityBase subclass by name from $type tag.
+
+    Cached: this runs per union-typed field while deserializing every
+    ``DataUpdated`` push, on the event loop. The entity hierarchy is fixed once
+    ``types.generated.entities`` is imported, so the walk cannot go stale.
+    """
     from .types.generated.base.base import EntityBase
 
     def _walk(cls: type) -> Optional[type]:
@@ -264,13 +359,21 @@ def _convert_to_dict_value(
     Handles ``Optional``, ``TypeVar``, dataclasses, lists, dicts, enums,
     UUIDs, and datetimes.
     """
-    # Optional[X] -> unwrap
-    if _is_optional(field_type):
-        inner = _unwrap_optional(field_type)
-        if isinstance(inner, TypeVar):
-            inner = generic_type_arg
+    # Optional[X] / Union[X, Y] -> unwrap
+    #
+    # No ``$type`` dispatch is needed in this direction: the dataclass branch
+    # below calls ``to_dict(data, ...)``, which serializes by the value's
+    # runtime type. But the arm still has to be the right *kind* -- routing a
+    # non-dataclass value down a dataclass arm would serialize it to ``None``
+    # -- so match on the runtime type. A union left intact matches no branch
+    # below and would fall through, leaking the raw object.
+    members = _union_members(field_type)
+    if members:
         if data is None:
             return None
+        inner = _matching_union_member(data, members)
+        if isinstance(inner, TypeVar):
+            inner = generic_type_arg
         return _convert_to_dict_value(data, inner, None, convert_uuid)
 
     # TypeVar -> use the resolved generic arg, or infer from runtime value
@@ -350,13 +453,14 @@ def _convert_from_dict_value(
     Handles ``Optional``, ``TypeVar``, dataclasses (with ``$type`` dispatch),
     lists, dicts, enums, UUIDs, datetimes, and primitive coercion.
     """
-    # Optional[X] -> unwrap
-    if _is_optional(field_type):
-        inner = _unwrap_optional(field_type)
-        if isinstance(inner, TypeVar):
-            inner = generic_type_arg
+    # Optional[X] / Union[X, Y] -> unwrap, choosing the arm the payload names
+    members = _union_members(field_type)
+    if members:
         if data is None:
             return None
+        inner = members[0] if len(members) == 1 else _select_union_member(data, members)
+        if isinstance(inner, TypeVar):
+            inner = generic_type_arg
         return _convert_from_dict_value(data, inner, None)
 
     # TypeVar -> use the resolved generic arg
