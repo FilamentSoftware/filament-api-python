@@ -638,6 +638,20 @@ class _BareUnionHolder:
 
 
 @dataclass
+class _CollectionUnionHolder:
+    """A union of two parameterised collection arms."""
+
+    ref: Union[list[str], dict[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class _BroadCollectionUnionHolder:
+    """A broad arm ahead of a parameterised collection arm."""
+
+    ref: Union[object, dict[str, datetime.datetime]] = ""
+
+
+@dataclass
 class _BroadUnionHolder:
     """A union whose broad arm precedes the specific one."""
 
@@ -754,6 +768,32 @@ class TestUnionFieldDispatch:
         assert wire is not None
         assert isinstance(wire["ref"], dict)
         assert wire["ref"]["name"] == "SI"
+
+    def test_collection_union_picks_the_dict_arm(self) -> None:
+        """A dict value must not be serialized through the list arm."""
+        wire = to_dict(_CollectionUnionHolder(ref={"k": "v"}))
+        assert wire is not None
+        assert wire["ref"] == {"k": "v"}
+
+    def test_collection_union_picks_the_list_arm(self) -> None:
+        wire = to_dict(_CollectionUnionHolder(ref=["a", "b"]))
+        assert wire is not None
+        assert wire["ref"] == ["a", "b"]
+
+    def test_broad_arm_does_not_shadow_a_collection_arm(self) -> None:
+        """Specificity ranking must see through a parameterised arm's origin.
+
+        The value is a dict of datetimes, so routing it through the ``object``
+        arm leaves the datetimes unconverted rather than in wire format --
+        a passthrough that a dict of plain strings would not expose.
+        """
+        wire = to_dict(
+            _BroadCollectionUnionHolder(
+                ref={"k": datetime.datetime(2025, 1, 15, 10, 30, 45, 123456)}
+            )
+        )
+        assert wire is not None
+        assert wire["ref"] == {"k": "2025-01-15T10:30:45.12345600Z"}
 
     def test_union_field_round_trips(self) -> None:
         original = TaskEntity(name="T", reference=NoteEntity(title="N"))
