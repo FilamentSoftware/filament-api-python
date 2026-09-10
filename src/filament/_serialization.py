@@ -140,6 +140,30 @@ def _unwrap_optional(tp: Any) -> Any:
     return next((a for a in get_args(tp) if a is not type(None)), tp)
 
 
+def _union_members(tp: Any) -> Optional[list[Any]]:
+    """Return the non-``None`` members of a union, or ``None`` if *tp* isn't one."""
+    if get_origin(tp) is Union or isinstance(tp, types.UnionType):
+        return [a for a in get_args(tp) if a is not type(None)]
+    return None
+
+
+def _select_union_member(data: Any, members: list[Any]) -> Any:
+    """Pick the union member matching *data*'s ``$type`` tag.
+
+    Backend navigation properties such as ``reference`` are typed as a union of
+    the concrete entities they may point at. The payload names its own type, so
+    use that to choose the arm; fall back to the first arm when there is no
+    usable tag.
+    """
+    if isinstance(data, dict) and isinstance(data.get("$type"), str):
+        resolved = _resolve_entity_type(data["$type"])
+        if resolved is not None:
+            for member in members:
+                if isinstance(member, type) and issubclass(resolved, member):
+                    return member
+    return members[0]
+
+
 def _is_uuid_type(tp: Any) -> bool:
     """Return ``True`` if *tp* is ``uuid_utils.UUID``."""
     try:
@@ -350,13 +374,14 @@ def _convert_from_dict_value(
     Handles ``Optional``, ``TypeVar``, dataclasses (with ``$type`` dispatch),
     lists, dicts, enums, UUIDs, datetimes, and primitive coercion.
     """
-    # Optional[X] -> unwrap
-    if _is_optional(field_type):
-        inner = _unwrap_optional(field_type)
-        if isinstance(inner, TypeVar):
-            inner = generic_type_arg
+    # Optional[X] / Union[X, Y] -> unwrap, choosing the arm the payload names
+    members = _union_members(field_type)
+    if members:
         if data is None:
             return None
+        inner = members[0] if len(members) == 1 else _select_union_member(data, members)
+        if isinstance(inner, TypeVar):
+            inner = generic_type_arg
         return _convert_from_dict_value(data, inner, None)
 
     # TypeVar -> use the resolved generic arg
