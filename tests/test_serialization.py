@@ -657,6 +657,22 @@ class TestUnionFieldDispatch:
         assert task is not None
         assert isinstance(task.reference, ScopeItemEntity)
 
+    def test_unknown_type_tag_raises(self) -> None:
+        """An unrecognised ``$type`` must not silently build the first arm."""
+        with pytest.raises(ValueError, match="NotAnEntity"):
+            from_dict(
+                {"name": "T", "reference": {"$type": "NotAnEntity", "name": "X"}},
+                TaskEntity,
+            )
+
+    def test_type_tag_outside_union_raises(self) -> None:
+        """A known entity that is not a declared arm must not be coerced."""
+        with pytest.raises(ValueError, match="UserEntity"):
+            from_dict(
+                {"name": "T", "reference": {"$type": "UserEntity", "name": "U"}},
+                TaskEntity,
+            )
+
     def test_null_union_field_stays_none(self) -> None:
         task = from_dict({"name": "T", "reference": None}, TaskEntity)
         assert task is not None
