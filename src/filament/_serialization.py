@@ -154,14 +154,38 @@ def _select_union_member(data: Any, members: list[Any]) -> Any:
     the concrete entities they may point at. The payload names its own type, so
     use that to choose the arm; fall back to the first arm when there is no
     usable tag.
+
+    Raise ``ValueError`` when the payload does name a type but it cannot be
+    placed among the declared arms. Guessing an arm there would build one
+    entity out of another entity's data and hand the caller a plausible-looking
+    object whose fields silently defaulted to ``None``.
     """
-    if isinstance(data, dict) and isinstance(data.get("$type"), str):
-        resolved = _resolve_entity_type(data["$type"])
-        if resolved is not None:
-            for member in members:
-                if isinstance(member, type) and issubclass(resolved, member):
-                    return member
-    return members[0]
+    if not isinstance(data, dict):
+        return members[0]
+
+    type_name = data.get("$type")
+    if not isinstance(type_name, str):
+        return members[0]
+
+    # ``$type`` dispatch only applies to unions of entities.
+    entity_members = [
+        m for m in members if isinstance(m, type) and issubclass(m, EntityBase)
+    ]
+    if not entity_members:
+        return members[0]
+
+    resolved = _resolve_entity_type(type_name)
+    if resolved is None:
+        raise ValueError(f"Unknown entity type in $type tag: {type_name!r}")
+
+    for member in entity_members:
+        if issubclass(resolved, member):
+            return member
+
+    raise ValueError(
+        f"$type {type_name!r} is not one of the declared union members: "
+        f"{[m.__name__ for m in entity_members]}"
+    )
 
 
 def _is_uuid_type(tp: Any) -> bool:
