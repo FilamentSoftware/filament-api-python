@@ -1100,6 +1100,7 @@ Represents settings for the Current Instant service.
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `update_period` | `datetime.timedelta` | — | The period at which the current instant should be updated. |
+| `enable_update` | `bool` | `True` | Whether the current instant is updated automatically. When false, the service makes no automatic updates regardless of `UpdatePeriod`. Defaults to true. |
 
 ### Event Service
 
@@ -2383,6 +2384,7 @@ An hourly record of which users have held a given license type during the hour. 
 | `license_type` | `UserLicenseType` | `UserLicenseType.User` | The license type this snapshot is for. |
 | `instant` | `datetime.datetime` | — | The hour bucket this snapshot represents, expressed as an `Instant` floored to the start of the UTC hour. |
 | `user_ids` | `list[UUID]` | — | The set of user ids that have held this license type at any propagation during the hour represented by `Instant`. Updated by union — entries are never removed within the bucket. |
+| `user_count` | `int` | `0` | The number of entries in `UserIds`, i.e. how many distinct users held this license type at any propagation during the hour represented by `Instant`. Maintained by the processor alongside `UserIds` so the count can be read (and queried) without materialising the id list; it is never written independently of it. |
 | `month_license_count` | `int` | `0` | A moment-in-time snapshot of license usage for this `LicenseType`, sealed at the last propagation of this hour bucket. Computed as max(dayMin, priorValue) where: dayMin is the minimum of UserIds.Count across every entity on the same UTC day for the same license type (including this one), as observed at the moment of this hour's last propagation. priorValue is the `MonthLicenseCount` of the latest-Instant entity in the same UTC calendar month strictly before today, for the same license type. Gap days (calendar days with no entities) are walked over — the chain runs back through prior days in the month until one with entities is found, stopping at the start of the month. priorValue is 0 only when today is the 1st of the month or no prior day in the current month has any entities. What this value is and is not: It resets at the start of each UTC calendar month — values do not carry across month boundaries. It is not strictly monotonic within a month: later hours of a day typically see a smaller dayMin as more rows accumulate, so an entity's MonthLicenseCount can be lower than another entity earlier on the same day. Two entities on the same day can therefore hold different values. Within an hour bucket it is sealed by that hour's last propagation; later hours never overwrite it. To read "the current month's value as of right now", look at the latest-Instant entity in the current calendar month for the license type — not "the maximum value seen in the month so far". They are not the same. |
 
 ### User Service

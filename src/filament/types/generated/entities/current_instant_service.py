@@ -29,5 +29,8 @@ class CurrentInstantSettingsEntity(Entity):
     Represents settings for the Current Instant service.
     
     :param update_period: The period at which the current instant should be updated.
+    :param enable_update: Whether the current instant is updated automatically. When false, the service makes no automatic
+                          updates regardless of <see cref="P:Filament.Services.CoreServices.Entities.CurrentInstantService.CurrentInstantSettingsEntity.UpdatePeriod" />. Defaults to true.
     """
     update_period: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
+    enable_update: bool = field(default=True)
