@@ -1,3 +1,10 @@
+## 0.7.0-dev.0.1.2 (2026-09-16 12:17)
+
+### Types
+
+#### OTHER
+- New entity fields from the backend — CurrentInstantSettingsEntity.enable_update to disable automatic instant advancement, and UserLicenseEntity.user_count for hourly license usage without the id list
+
 ## 0.7.0-dev.0.1.1 (2026-09-10 15:57)
 
 ### Docs
