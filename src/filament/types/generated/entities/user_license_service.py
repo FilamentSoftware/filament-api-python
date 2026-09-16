@@ -28,6 +28,10 @@ class UserLicenseEntity(Entity):
     :param user_ids: The set of user ids that have held this license type at any propagation during the hour
                      represented by <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.Instant" />. Updated by union — entries are never removed
                      within the bucket.
+    :param user_count: The number of entries in <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.UserIds" />, i.e. how many distinct users held this
+                       license type at any propagation during the hour represented by <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.Instant" />.
+                       Maintained by the processor alongside <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.UserIds" /> so the count can be read (and
+                       queried) without materialising the id list; it is never written independently of it.
     :param month_license_count: A moment-in-time snapshot of license usage for this <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.LicenseType" />, sealed
                                 at the last propagation of this hour bucket. Computed as
                                 <c>max(dayMin, priorValue)</c> where:
@@ -60,4 +64,5 @@ class UserLicenseEntity(Entity):
     license_type: UserLicenseType = field(default=UserLicenseType.User)
     instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     user_ids: list[UUID] = field(default_factory=list)
+    user_count: int = field(default=0)
     month_license_count: int = field(default=0)
