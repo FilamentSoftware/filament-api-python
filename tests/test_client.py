@@ -10,6 +10,7 @@ from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pysignalr.exceptions import HubError
 from pysignalr.messages import CompletionMessage
 from uuid_utils import UUID, uuid7
 
@@ -700,6 +701,186 @@ class TestConnectionClose:
             mock_cls.return_value = mock_client
             FilamentClient(organization_id="org", api_key_name="k", api_key="s")
             mock_client.on_close.assert_called_once()
+
+    @staticmethod
+    async def _start_pending_invoke(client: FilamentClient) -> asyncio.Task[Any]:
+        """Start an ``_invoke`` whose completion never arrives, and wait until it is pending."""
+        client._signalr_client.send = AsyncMock(return_value=None)
+        invoke_task = asyncio.create_task(client._invoke("SomeMethod"))
+        for _ in range(10):
+            if client._pending_invocations:
+                break
+            await asyncio.sleep(0)
+        assert len(client._pending_invocations) == 1
+        return invoke_task
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("Connection is closed"),
+            HubError(),
+            ConnectionResetError("reset by peer"),
+        ],
+    )
+    async def test_send_transport_failure_raises_connection_error(
+        self, error: BaseException,
+    ) -> None:
+        """Transport errors from send() surface as FilamentConnectionError, not pysignalr's own."""
+        client = _make_client(mock_invoke=False)
+        client._signalr_client.send = AsyncMock(side_effect=error)
+
+        with pytest.raises(FilamentConnectionError, match="SignalR send failed") as exc_info:
+            await client._invoke("SomeMethod")
+
+        assert exc_info.value.__cause__ is error
+        # The cancelled future's done-callback runs on the next loop iteration.
+        await asyncio.sleep(0)
+        assert client._pending_invocations == set()
+
+    @pytest.mark.asyncio
+    async def test_server_error_names_method(self) -> None:
+        """A completion error is a bare Exception prefixed with the hub method name."""
+        client = _make_client(mock_invoke=False)
+
+        async def fake_send(method: str, args: list[Any], on_invocation: Any) -> None:
+            await on_invocation(
+                CompletionMessage(invocation_id="x", error="Sequence contains no elements"),
+            )
+
+        client._signalr_client.send = AsyncMock(side_effect=fake_send)
+
+        with pytest.raises(Exception) as exc_info:
+            await client._invoke("ReadData")
+
+        assert type(exc_info.value) is Exception
+        assert str(exc_info.value) == "ReadData: Sequence contains no elements"
+
+    @pytest.mark.asyncio
+    async def test_close_error_includes_close_code(self) -> None:
+        """The close code and reason from the last connection travel in the failure message."""
+        client = _make_client(mock_invoke=False)
+        client._last_connection = MagicMock(close_code=1009, close_reason="message too big")
+        invoke_task = await self._start_pending_invoke(client)
+
+        await client._handle_close()
+
+        with pytest.raises(FilamentConnectionError, match=r"close 1009 \(message too big\)"):
+            await invoke_task
+
+    def test_close_detail_without_connection(self) -> None:
+        """With no recorded connection (or no close code), the detail degrades to a fixed string."""
+        client = _make_client()
+        assert client._close_detail() == "close code unavailable"
+        client._last_connection = MagicMock(close_code=None)
+        assert client._close_detail() == "close code unavailable"
+        client._last_connection = MagicMock(close_code=1000, close_reason="")
+        assert client._close_detail() == "close 1000"
+
+    @pytest.mark.asyncio
+    async def test_reconnect_fails_pending_invocations(self) -> None:
+        """_on_open fails invocations orphaned by a reconnect and records the new websocket."""
+        client = _make_client(mock_invoke=False)
+        websocket = MagicMock()
+        client._signalr_client._transport._ws = websocket
+        invoke_task = await self._start_pending_invoke(client)
+
+        await client._on_open()
+
+        with pytest.raises(FilamentConnectionError, match="re-established"):
+            await invoke_task
+        assert client._last_connection is websocket
+
+    @pytest.mark.asyncio
+    async def test_send_waiting_for_connection_survives_reconnect(self) -> None:
+        """An invocation queued in send() while disconnected is not failed by the reconnect.
+
+        pysignalr's send() blocks until a connection is available; on reconnect it
+        resumes after on_open fires and writes to the new socket, so failing it
+        there would report an error for a request the server actually received.
+        """
+        client = _make_client(mock_invoke=False)
+        connected = asyncio.Event()
+        captured: dict[str, Any] = {}
+
+        async def send_after_reconnect(method: str, args: list[Any], on_invocation: Any) -> None:
+            await connected.wait()
+            captured["on_invocation"] = on_invocation
+
+        client._signalr_client.send = AsyncMock(side_effect=send_after_reconnect)
+        await client._handle_close()
+        invoke_task = asyncio.create_task(client._invoke("SomeMethod"))
+        await asyncio.sleep(0)
+
+        connected.set()
+        await client._on_open()
+        assert not invoke_task.done()
+
+        for _ in range(10):
+            if client._pending_invocations:
+                break
+            await asyncio.sleep(0)
+        await captured["on_invocation"](CompletionMessage(invocation_id="x", result={"ok": True}))
+        assert await invoke_task == {"ok": True}
+
+    @pytest.mark.asyncio
+    async def test_close_during_send_fails_invocation(self) -> None:
+        """A close that lands while send() is still running fails the invocation.
+
+        send() can return normally after the socket it wrote to has closed (e.g. it
+        was waiting on flow control); the close handler has then already run, so
+        registering the future afterwards would leave the caller hanging forever.
+        """
+        client = _make_client(mock_invoke=False)
+        client._last_connection = MagicMock(close_code=1000, close_reason="")
+
+        async def send_then_close(method: str, args: list[Any], on_invocation: Any) -> None:
+            await client._handle_close()
+
+        client._signalr_client.send = AsyncMock(side_effect=send_then_close)
+
+        with pytest.raises(FilamentConnectionError, match=r"closed before .*\(close 1000\)"):
+            await asyncio.wait_for(client._invoke("SomeMethod"), timeout=1)
+        assert client._pending_invocations == set()
+
+    @pytest.mark.asyncio
+    async def test_send_failure_includes_close_detail(self) -> None:
+        """A send failure after a drop names the close code of the last connection."""
+        client = _make_client(mock_invoke=False)
+        client._last_connection = MagicMock(close_code=1009, close_reason="message too big")
+        client._signalr_client.send = AsyncMock(side_effect=RuntimeError("Connection is closed"))
+
+        with pytest.raises(FilamentConnectionError, match=r"close 1009 \(message too big\)"):
+            await client._invoke("SomeMethod")
+
+    @pytest.mark.asyncio
+    async def test_run_task_ending_fails_pending_invocations(self) -> None:
+        """A run loop that dies without firing on_close still fails in-flight invocations."""
+        client = _make_client(mock_invoke=False)
+        invoke_task = await self._start_pending_invoke(client)
+
+        async def failing_run() -> None:
+            raise RuntimeError("transport exploded")
+
+        run_task: asyncio.Task[None] = asyncio.create_task(failing_run())
+        run_task.add_done_callback(client._handle_run_task_done)
+
+        with pytest.raises(FilamentConnectionError, match="transport exploded"):
+            await invoke_task
+
+    @pytest.mark.asyncio
+    async def test_aexit_swallows_run_loop_error(self) -> None:
+        """Closing never re-raises an error from an already-broken transport."""
+        client = _make_client()
+
+        async def failing_run() -> None:
+            raise HubError()
+
+        client._run_task = asyncio.create_task(failing_run())
+        await asyncio.sleep(0)
+
+        # Should not raise.
+        await client.__aexit__(None, None, None)
 
 
 class TestClientHello:
