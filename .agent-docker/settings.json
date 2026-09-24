@@ -1,6 +1,7 @@
 {
     "read_only": [
-        "D:\\dev\\FilamentSoftware\\MVP\\Filament"
+        "D:\\dev\\FilamentSoftware\\MVP\\Filament",
+        "D:\\dev\\FilamentSoftware\\MVP\\Filament.worktrees\\add-support-for-uploading-files"
     ],
     "host_commands": [
         "poetry run mypy",

@@ -8,7 +8,7 @@ from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
 from ..entities.scope_category_service import ScopeCategoryEntity
-from ..enums import ScopeGroupChildType
+from ..enums import ScopeGroupChildType, ScopeGroupLevelModeEnum
 
 __all__ = [
     "ScopeGroupLevelEntity",
@@ -24,12 +24,22 @@ class ScopeGroupLevelEntity(Entity):
     
     :param name: The name of the scope group level.
     :param description: A brief description of the scope group level
+    :param mode: The role of this level: <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> (default) for an
+                 ordinary user-defined level, or a template mode marking this level as the source of the
+                 corresponding built-in task group level's Name/Description/rollup config. Intended to be
+                 immutable after create (converting a level means creating a new one); this is currently
+                 unenforced, and population self-heals flips in either direction.
+    :param actual_status_rollup_rules_data: JSON-serialized <see cref="P:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelEntity.ActualStatusRollupRules" /> for this level. Null means the
+                                            level inherits the nearest ancestor level's config (walking the parent chain), or the
+                                            built-in default (no rules, hard-coded priority order) when no ancestor defines one.
     :param parent_id: The parent scope group level of this group. This should be of the type ScopeGroupLevelEntity.
                       Using the helper property will ensure this is the case.
     :param parent: Represents the parent entity of the current scope group level entity.
     """
     name: str = field(default='')
     description: str = field(default='')
+    mode: ScopeGroupLevelModeEnum = field(default=ScopeGroupLevelModeEnum.Arbitrary)
+    actual_status_rollup_rules_data: Optional[str] = field(default=None)
     parent_id: Optional[UUID] = field(default=None)
     parent: Optional[ScopeGroupLevelEntity] = field(default=None)
 

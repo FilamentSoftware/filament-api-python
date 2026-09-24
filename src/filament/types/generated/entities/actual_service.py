@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 from uuid_utils import UUID, uuid7
 
 from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
+from ..entities.task_service import TaskEntity, TaskGroupEntity
 from ..enums import ActualStatusEnum
 
 __all__ = [
@@ -20,6 +21,7 @@ class ActualEntity(ReferenceEntityBase):
     """
     Defines actual time and cost spent on a task and details of when it was started and finished. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
+    :param reference: Represents a linked entity instance.
     :param duration_to_date: The total time duration worked on the task to date, derived from TimeLog schedule segments.
     :param duration_forecast_total: The total forecast duration for the task, derived from all qualifying schedule segments (Work and TimeLog).
                                     Represents the predicted total duration at task completion — the sum of planned remaining work and time already logged.
@@ -42,20 +44,26 @@ class ActualEntity(ReferenceEntityBase):
     :param currency: A helper property for setting the CurrencyId property. Pass in a CurrencyEntity type.
     :param start_instant: The instant (UTC) when work on the task started.
     :param end_instant: The instant (UTC) when work on the task finished.
-    :param status: The computed status of this actual, derived from task progress and dependency state.
-                   For task actuals: Complete if logged work remains with no planned Work segments left,
-                   InProgress if work has started, NotReady if any first-level upstream dependency is incomplete,
-                   Waiting if the planned start date is tomorrow or later, otherwise ReadyToStart.
-                   For group actuals: rolled up from child statuses. Any child InProgress makes the group
-                   InProgress; all children Complete makes the group Complete; any partially complete child
-                   also makes the group InProgress; otherwise any ReadyToStart child makes the group ReadyToStart;
-                   otherwise any Waiting child makes the group Waiting, and empty or fully blocked groups remain Waiting/NotReady.
+    :param status: The computed status of this actual, derived from task progress, the post-work pipeline,
+                   and dependency state.
+                   For task actuals: once logged work exists with no planned Work segments left, the post-work
+                   pipeline decides between RequiresProcessing, RequiresReview, and Finished (see
+                   <see cref="M:Filament.Services.CoreServices.Services.ActualStatusCalculation.GetPostWorkStatus(Filament.Services.CoreServices.Entities.TaskService.TaskEntity,Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity)" />); InProgress if work has
+                   started; NotReady if any first-level upstream dependency is not Finished; otherwise
+                   ReadyToStart.
+                   For group actuals: rolled up from the immediate children's statuses by
+                   <see cref="M:Filament.Services.CoreServices.Services.ActualStatusCalculation.GetGroupStatus(System.Collections.Generic.IReadOnlyCollection{Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum},Filament.Services.CoreServices.Services.ActualStatusRollupRules)" /> using the owning level's
+                   rollup configuration: uniform children pass their shared status through, then the first
+                   configured rule containing every distinct child status wins, then the highest-priority
+                   status present among the children applies (the level's configured priorities, with the
+                   built-in default order beneath). Empty groups are Waiting.
     :param office_location_ids: The deduplicated office location IDs associated with this actual.
                                 For tasks this comes from <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskOfficeLocationConnection" /> rows.
                                 For groups this is the union of child office location IDs.
     :param warnings_data: JSON-serialized warnings for this actual, keyed by warning type with sets of affected user IDs as values.
                           Null when there are no warnings.
     """
+    reference: Optional[Union[TaskEntity, TaskGroupEntity]] = field(default=None)
     duration_to_date: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     duration_forecast_total: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -68,6 +76,6 @@ class ActualEntity(ReferenceEntityBase):
     currency: Optional[CurrencyEntity] = field(default=None)
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
-    status: ActualStatusEnum = field(default=ActualStatusEnum.Waiting)
+    status: ActualStatusEnum = field(default=ActualStatusEnum.NotReady)
     office_location_ids: list[UUID] = field(default_factory=list)
     warnings_data: Optional[str] = field(default=None)

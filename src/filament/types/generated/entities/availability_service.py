@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 from ..entities.generic import ReferenceEntityBase
+from ..entities.organization_service import OfficeLocationEntity
+from ..entities.user_service import UserEntity
 from ..enums import AvailabilityModeEnum, RepeatDaysEnum, RepeatModeEnum
 
 __all__ = [
@@ -18,6 +20,7 @@ class AvailabilityEntity(ReferenceEntityBase):
     For storing availability information for a user. Multiple Availability entities can be stacked, using the
     <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.Priority" /> property to determine the relative priorities.
     
+    :param reference: Represents a linked entity instance.
     :param name: A human-readable name for this Availability entity.
     :param description: An optional description providing additional detail about this Availability entity.
     :param priority: The priority of this Availability entity. The higher the priority, the more this entity takes precedence.
@@ -33,6 +36,7 @@ class AvailabilityEntity(ReferenceEntityBase):
                        <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.RepeatCount" /> property, so if the number of repeats has not finished when this time is reached,
                        repeating will finish anyway.
     """
+    reference: Optional[Union[OfficeLocationEntity, UserEntity]] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
     priority: int = field(default=0)

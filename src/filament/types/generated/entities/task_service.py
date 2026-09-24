@@ -9,9 +9,13 @@ from uuid_utils import UUID, uuid7
 
 from ..entities.currency_service import CurrencyEntity
 from ..entities.generic import ReferenceEntityBase
+from ..entities.scope_group_service import ScopeGroupEntity, ScopeGroupLevelEntity
 from ..entities.scope_item_service import ScopeItemEntity
+from ..entities.scope_milestone_service import ScopeMilestoneEntity
 from ..entities.scope_service import ScopeEntity
-from ..enums import TaskMilestoneDirectionEnum, TaskMilestoneModeEnum
+from ..entities.scope_task_type_service import ScopeTaskTypeEntity
+from ..entities.specialty_service import SpecialtyEntity
+from ..enums import ScopeGroupLevelModeEnum, TaskMilestoneDirectionEnum, TaskMilestoneModeEnum
 
 __all__ = [
     "TaskGroupLevelEntity",
@@ -25,11 +29,39 @@ class TaskGroupLevelEntity(ReferenceEntityBase):
     """
     Represents an entity for a task group level that defines the hierarchical structure and metadata for task groupings.
     
+    :param reference: Represents a linked entity instance.
     :param name: The name of the task group level entity.
     :param description: The description of the task group level entity.
+    :param mode: The role of this level. Set only on the three built-in levels (Scope/Item/Task), which
+                 are resolved by mode rather than by name — a mode-matched template can rename them.
+                 Levels derived from <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> scope group levels
+                 keep the default <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" />; the mode is never
+                 copied from a scope group level during population.
+    :param parent_ids: The ids of this level's parent levels, in order. The order is semantic: rollup-config
+                       inheritance walks the <em>first</em> parent at each step; the remaining entries are
+                       topology only.
+    :param parents: Represents the parent levels of this level. Assigning values to this property populates
+                    the associated <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskGroupLevelEntity.ParentIds" /> property with the corresponding identifiers, in
+                    the given order.
+    :param actual_status_rollup_rules_data: JSON-serialized <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskGroupLevelEntity.ActualStatusRollupRules" /> for this level, copied from the
+                                            backing <see cref="T:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelEntity" /> (or its mode-matched template for built-in
+                                            levels) during population. Null means the level inherits the nearest ancestor level's
+                                            config (walking <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskGroupLevelEntity.ParentIds" />[0]), or the built-in default when no ancestor
+                                            defines one.
+    :param auto_generated_by: The name of the task module that generated this task group level during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    reference: Optional[ScopeGroupLevelEntity] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
+    mode: ScopeGroupLevelModeEnum = field(default=ScopeGroupLevelModeEnum.Arbitrary)
+    parent_ids: list[UUID] = field(default_factory=list)
+    parents: Optional[list[TaskGroupLevelEntity]] = field(default=None)
+    actual_status_rollup_rules_data: Optional[str] = field(default=None)
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -37,6 +69,7 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     """
     A TaskMilestoneEntity is created from a ScopeMilestoneEntity.
     
+    :param reference: Represents a linked entity instance.
     :param name: The given name for this milestone.
     :param description: The description of this milestone
     :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Fixed" /> anchors
@@ -48,13 +81,20 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     :param warnings_data: JSON-serialized list of warnings raised while processing this milestone - each is a
                           <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneWarning" /> describing an issue, such as an assignment that
                           attached to no tasks. Null when there are no warnings.
+    :param auto_generated_by: The name of the task module that generated this task milestone during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    reference: Optional[ScopeMilestoneEntity] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
     mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Fixed)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
     warnings_data: Optional[str] = field(default=None)
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -64,6 +104,7 @@ class TaskGroupEntity(ReferenceEntityBase):
     This class extends the functionality of ReferenceEntityBase and incorporates additional properties
     for contextual identification and operational details.
     
+    :param reference: Represents a linked entity instance.
     :param name: The given name for this task.
     :param description: The description of this task
     :param context_type: Represents the type of the context associated with the TaskGroupEntity.
@@ -89,7 +130,13 @@ class TaskGroupEntity(ReferenceEntityBase):
     :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task group.
                             This property is used to establish relationships between task groups in a hierarchical structure,
                             identifying all ancestor groups for the current entity.
+    :param auto_generated_by: The name of the task module that generated this task group during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    reference: Optional[Union[ScopeEntity, ScopeGroupEntity, ScopeItemEntity, ScopeTaskTypeEntity, SpecialtyEntity]] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
     context_type: str = field(default='')
@@ -104,6 +151,7 @@ class TaskGroupEntity(ReferenceEntityBase):
     child_group_levels: Optional[list[TaskGroupLevelEntity]] = field(default=None)
     ancestor_group_ids: list[UUID] = field(default_factory=list)
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -111,9 +159,12 @@ class TaskEntity(ReferenceEntityBase):
     """
     A TaskEntity is created from scope entities and is then used by the scheduler.
     
-    :param contexts: A dictionary of context key-value pairs associated with the task. This property is used to store and retrieve
-                     contextual information relevant to the task. The keys represent the context identifiers, and the values
-                     contain their corresponding details as strings.
+    :param reference: Represents a linked entity instance.
+    :param contexts: Context key-value pairs. On a task a module generated they are the module's: the scope module writes
+                     the originating step, combine key and instance number; the note module writes the note lineage and its
+                     <c>NoteChargeableTicks</c> marker. A task created by hand may carry any contexts a client chooses - the
+                     property is client-writable - which is why neither module trusts contexts alone: a task is a module's
+                     only when <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.AutoGeneratedBy" /> is set as well.
     :param name: The given name for this task.
     :param description: The description of this task
     :param duration: This task's duration.
@@ -133,7 +184,18 @@ class TaskEntity(ReferenceEntityBase):
                        the task duration, and the scope/item chargeable multipliers, with currency conversion applied.
     :param currency_id: The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
+    :param specialty_id: The specialty this task falls under. Populated by TaskScopeModule from the owning
+                         <see cref="T:Filament.Services.CoreServices.Entities.ScopeTaskTypeService.ScopeTaskTypeEntity" /> for a generated task, or supplied directly for a manually
+                         created task — deliberately not a calculated property, for the same reason as
+                         <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.Deliverables" />.
+    :param specialty: A helper method for setting the SpecialtyId property. Pass in a SpecialtyEntity type.
+    :param auto_generated_by: The name of the task module that generated this task during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    reference: Optional[Union[ScopeItemEntity, TaskEntity]] = field(default=None)
     contexts: dict[str, str] = field(default_factory=dict)
     name: str = field(default='')
     description: str = field(default='')
@@ -148,3 +210,6 @@ class TaskEntity(ReferenceEntityBase):
     chargeable: float = field(default=0)
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
+    specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    specialty: Optional[SpecialtyEntity] = field(default=None)
+    auto_generated_by: Optional[str] = field(default=None)

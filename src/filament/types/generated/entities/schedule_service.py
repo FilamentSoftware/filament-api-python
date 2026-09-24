@@ -8,9 +8,12 @@ from typing import Optional, Union
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
+from ..entities.event_service import EventEntity
 from ..entities.generic import ReferenceEntityBase
 from ..entities.organization_service import OfficeLocationEntity
+from ..entities.scope_service import ScopeEntity
 from ..entities.specialty_service import SpecialtyEntity
+from ..entities.task_service import TaskEntity, TaskGroupEntity, TaskMilestoneEntity
 from ..entities.time_log_service import TimeLogEntity
 from ..entities.user_service import UserEntity
 from ..enums import ScheduleSegmentModeEnum, TaskMilestoneDirectionEnum
@@ -71,15 +74,10 @@ class ScheduleResultEntity(Entity):
                                             required users excluded because they could not be made available at the chosen slot.
                                             Keys are composite <c>"{eventId:N}:{ISO8601 target instant or empty}"</c>. Cleared and
                                             repopulated on each run.
-    :param degraded_review_gates: A mapping of per-link diagnostic keys (see
-                                  <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.ReviewGateKey(System.Guid,System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; reason string for review links whose gate
-                                  could not be applied on the most recent run, because the linked review event/occurrence could
-                                  not be placed or the connection's <c>OccurrenceTargetInstant</c> resolved to no placed
-                                  occurrence (a stale recurrence target). For these links the scheduler fell back to gating
-                                  downstream tasks on the reviewed task's own end only — the review link silently did not
-                                  constrain scheduling. Keys are composite <c>"{taskId:N}:{eventId:N}:{ISO8601 target instant
-                                  or empty}"</c>, so a task reviewed in more than one event/occurrence carries one entry per
-                                  degraded link without collision. Cleared and repopulated on each run.
+    :param degraded_review_gates: A mapping of diagnostic keys (see <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.ReviewGateKey(System.Guid,System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; reason
+                                  string for review gates that could not be applied on the most recent run. Keys are composite
+                                  <c>"{taskId:N}:{eventId:N}:{ISO8601 target instant or empty}"</c>, so a task with more than one
+                                  degraded gate carries one entry each without collision. Cleared and repopulated on each run.
     :param milestones_missed: A dictionary representing the milestones that were not achieved during the scheduling process,
                               keyed by their unique identifiers, with the associated missed duration for each milestone.
     :param early_placeholder_users: A dictionary containing placeholder user ids that were required to start earlier than the expected
@@ -111,6 +109,26 @@ class ScheduleResultEntity(Entity):
                                                the most recent run.
     :param working_hours_axis_total_component_hours: Sum of <c>WorkingHoursAxis.TotalWorkingHours</c> across all components — a
                                                      rough health check for total envelope schedulable capacity.
+    :param event_history_backfill_version: The version of the one-shot event-history repair that has been applied to this
+                                           organisation's schedule. While this is below
+                                           <see cref="F:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultEntity.CurrentEventHistoryBackfillVersion" />, the next successful schedule pass
+                                           deep-walks every event's history (rather than the usual bounded window), back-fills
+                                           every elapsed occurrence that has no segments at all, and completes historical anchors
+                                           that carry no participant segments from the event's current invitee list; it then stamps
+                                           itself with the current version so the repair runs exactly once.
+                                           <para>
+                                           The stamp is what makes the zero-attendance carve-out a migration rather than a standing
+                                           rule. Before it, a pinned occurrence with zero participants means "the old code deleted
+                                           the participants", so completing it from the current invitee list restores what was lost.
+                                           After it, the only ways a bucket reaches zero participants are an upstream user deletion
+                                           or an upstream <c>EventUserConnection</c> deletion — both of which assert that nobody
+                                           should be there — so zero is the correct, final state and must not be repopulated.
+                                           </para>
+                                           <para>
+                                           Written in <c>PropagateData</c> after a pass succeeds, never inside the pass itself: a
+                                           stamp written on a failed run would mean the one-shot repair never happens. For the same
+                                           reason it must not be cleared when the rest of the result is reset per schedule attempt.
+                                           </para>
     """
     schedule_start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -129,6 +147,7 @@ class ScheduleResultEntity(Entity):
     spring_layout_convergence_delta: float = field(default=0)
     working_hours_axis_component_count: int = field(default=0)
     working_hours_axis_total_component_hours: float = field(default=0)
+    event_history_backfill_version: int = field(default=0)
 
 
 @dataclass(kw_only=True)
@@ -136,6 +155,7 @@ class ScheduleMilestoneEntity(ReferenceEntityBase):
     """
     Represents a scheduled milestone within the system, including details such as its name, description, timing, delay, and direction relative to tasks. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
+    :param reference: Represents a linked entity instance.
     :param name: The given name for this milestone.
     :param description: The description of this milestone
     :param instant: The moment in time this milestone is due. If this is null, then the milestone does not have a fixed instant,
@@ -144,6 +164,7 @@ class ScheduleMilestoneEntity(ReferenceEntityBase):
                        or this milestone does not have a specific instant.
     :param direction: Should tasks start after this milestone or end before it?
     """
+    reference: Optional[TaskMilestoneEntity] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
     instant: Optional[datetime.datetime] = field(default=None)
@@ -156,6 +177,7 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     """
     Represents a segment in a schedule, including metadata such as name, description, time period, mode, and parent segment relationships. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
+    :param reference: Represents a linked entity instance.
     :param name: The name of the schedule segment. Represents a descriptive or identifying title for the segment.
     :param description: A brief textual explanation or characterization of the schedule segment.
                         Provides additional context or details about the segment.
@@ -198,6 +220,7 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
                                       non-recurring events and for non-event segments. Used as the three-tier reuse key
                                       together with <c>ReferenceId</c>.
     """
+    reference: Optional[Union[EventEntity, ScopeEntity, TaskEntity, TaskGroupEntity]] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
     reasons_data: str = field(default='')

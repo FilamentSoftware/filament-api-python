@@ -32,13 +32,31 @@ def instant_to_wire(value: datetime.datetime) -> str:
 def instant_from_wire(value: str) -> datetime.datetime:
     """Parse a C# ``Instant`` wire string into a UTC-aware datetime.
 
-    The wire format's trailing ``Z`` denotes UTC; the returned datetime
-    carries ``tzinfo=datetime.timezone.utc`` so downstream code never has
-    to guess.
+    The canonical wire format is ``uuuu-MM-ddTHH:mm:ss.ffffffffZ`` (see
+    :data:`DATETIME_FORMAT`), but the backend emits only as many significant
+    fractional digits as the instant needs — so the fraction can be anything
+    from absent to 9 digits (e.g. ``...:57.23421050Z``, which the fixed-width
+    ``%f00`` format cannot parse).  The fractional component is therefore parsed
+    at whatever length it arrives and truncated to microseconds, the most a
+    Python ``datetime`` can represent.
+
+    The trailing ``Z`` denotes UTC; the returned datetime carries
+    ``tzinfo=datetime.timezone.utc`` so downstream code never has to guess.
     """
-    return datetime.datetime.strptime(value, DATETIME_FORMAT).replace(
-        tzinfo=datetime.timezone.utc
-    )
+    if not value.endswith("Z"):
+        raise ValueError(
+            f"Invalid Instant wire format (expected trailing 'Z'): {value!r}"
+        )
+    body = value[:-1]
+    if "." in body:
+        main, frac = body.split(".", 1)
+    else:
+        main, frac = body, ""
+    parsed = datetime.datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
+    # Right-pad then truncate to 6 digits — datetime has microsecond precision,
+    # so any 7th–9th fractional digits are dropped.
+    microseconds = int((frac + "000000")[:6]) if frac else 0
+    return parsed.replace(microsecond=microseconds, tzinfo=datetime.timezone.utc)
 
 
 def timedelta_to_wire(value: datetime.timedelta) -> str:

@@ -101,11 +101,14 @@ _AVAILABILITY_CASES = [
         f"{_CB}.DbConditionComparableProperty[str]",
         id="inherited-parent-str",
     ),
-    # Inherited Optional[EntityBase] -> Optional unwrapped, not a known scalar.
+    # Optional[Union[...]] override of ReferenceEntityBase.reference -> None
+    # stripped, union preserved, not a known scalar.
     pytest.param(
         "reference",
-        f"{_CB}.DbConditionProperty[filament.types.generated.base.base.EntityBase]",
-        id="inherited-parent-optional-entity",
+        f"{_CB}.DbConditionProperty["
+        "filament.types.generated.entities.organization_service.OfficeLocationEntity"
+        " | filament.types.generated.entities.user_service.UserEntity]",
+        id="own-optional-entity-union",
     ),
     # Inherited from a grandparent base, EntityBase (two levels up).
     pytest.param(
@@ -140,6 +143,29 @@ def test_prop_narrows_field_type(
     output = _run_mypy(source, tmp_path)
     assert _errors(output) == [], output
     assert _revealed_types(output) == [expected], output
+
+
+def test_prop_narrows_multi_arm_entity_union(tmp_path: Path) -> None:
+    """A 3+-arm ``Optional[Union[...]]`` keeps every arm, not just the first.
+
+    ``AvailabilityEntity.reference`` covers the 2-arm case; this exercises
+    ``_unwrap_optional``'s ``make_union`` path with more arms than that.
+    """
+    source = (
+        "from filament._condition_builder import Condition\n"
+        "from filament.types.generated.entities.schedule_service import "
+        "ScheduleSegmentEntity\n"
+        'reveal_type(Condition(ScheduleSegmentEntity).prop("reference"))\n'
+    )
+    output = _run_mypy(source, tmp_path)
+    assert _errors(output) == [], output
+    assert _revealed_types(output) == [
+        f"{_CB}.DbConditionProperty["
+        "filament.types.generated.entities.event_service.EventEntity"
+        " | filament.types.generated.entities.scope_service.ScopeEntity"
+        " | filament.types.generated.entities.task_service.TaskEntity"
+        " | filament.types.generated.entities.task_service.TaskGroupEntity]"
+    ], output
 
 
 def test_prop_narrows_list_field(tmp_path: Path) -> None:
@@ -202,3 +228,50 @@ def test_inherited_fields_do_not_error(tmp_path: Path) -> None:
     lines += [f'c.prop("{name}")' for name in inherited]
     output = _run_mypy("\n".join(lines) + "\n", tmp_path)
     assert _errors(output) == [], output
+
+
+# ---------------------------------------------------------------------------
+# Dynamic user-defined properties
+# ---------------------------------------------------------------------------
+
+def test_udp_attribute_is_any_but_other_unknown_attribute_errors(
+    tmp_path: Path,
+) -> None:
+    source = (
+        "from filament.types.generated.entities.task_service import TaskEntity\n"
+        "task = TaskEntity()\n"
+        "task.udp_budget = object()\n"
+        "reveal_type(task.udp_budget)\n"
+        "task.not_a_real_property\n"
+    )
+    output = _run_mypy(source, tmp_path)
+    assert _revealed_types(output) == ["Any"], output
+    errors = _errors(output)
+    assert len(errors) == 1, output
+    assert 'has no attribute "not_a_real_property"' in errors[0]
+
+
+def test_udp_constructor_literal_keys_are_validated(tmp_path: Path) -> None:
+    valid = (
+        "from filament.types.generated.entities.task_service import TaskEntity\n"
+        "TaskEntity(_user_defined_properties={'udp_budget': 12})\n"
+    )
+    assert _errors(_run_mypy(valid, tmp_path)) == []
+
+    invalid = (
+        "from filament.types.generated.entities.task_service import TaskEntity\n"
+        "TaskEntity(_user_defined_properties={'budget': 12})\n"
+    )
+    errors = _errors(_run_mypy(invalid, tmp_path))
+    assert len(errors) == 1
+    assert "keys must start with 'udp_'" in errors[0]
+
+
+def test_constructor_input_is_not_a_readable_mapping(tmp_path: Path) -> None:
+    source = (
+        "from filament.types.generated.entities.task_service import TaskEntity\n"
+        "task = TaskEntity(_user_defined_properties={'udp_budget': 12})\n"
+        "reveal_type(task._user_defined_properties)\n"
+    )
+    output = _run_mypy(source, tmp_path)
+    assert _errors(output), output

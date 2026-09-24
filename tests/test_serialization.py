@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import datetime
+import json
+from dataclasses import dataclass, field
+from typing import Union
 
+import pytest
 from uuid_utils import UUID, uuid7
 
 from filament._serialization import (
@@ -12,8 +16,12 @@ from filament._serialization import (
     snake_case_from_camel_case,
     to_dict,
 )
+from filament._wire_formats import instant_from_wire, instant_to_wire
 from filament.types.generated.base.base import EntityBase
+from filament.types.generated.entities.note_service import NoteEntity
 from filament.types.generated.entities.permissions_service import PermissionEntity
+from filament.types.generated.entities.scope_item_service import ScopeItemEntity
+from filament.types.generated.entities.task_service import TaskEntity
 from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
@@ -38,6 +46,7 @@ from filament.types.generated.misc import (
     SuccessOrErrorPublic,
     ValueOrErrorPublic_1,
 )
+from filament.types.generated.shared import FileReference
 
 
 # ---------------------------------------------------------------------------
@@ -517,3 +526,278 @@ class TestEntityBaseRoundTrip:
         )
         assert restored.given_name == "Alice"
         assert restored.family_name == "Smith"
+
+
+class TestJsonCompanionFields:
+    """`<name>` object fields auto-populated from their `<name>_data` JSON sibling.
+
+    The backend sends projections like ``UserEntity.imageData`` as a JSON string
+    with the object field ``image`` left unset; ``from_dict`` deserializes the
+    string into ``image``.
+    """
+
+    def test_image_populated_from_image_data(self) -> None:
+        image_json = json.dumps({
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "url": "https://storage/read/1",
+            "refreshable": True,
+            "metadata": {"contentType": "image/png", "size": 12, "width": 4, "height": 4},
+        })
+        user = from_dict({"id": str(uuid7()), "imageData": image_json}, UserEntity)
+
+        assert user is not None
+        # The raw projection is preserved...
+        assert user.image_data == image_json
+        # ...and the object field is deserialized from it.
+        assert isinstance(user.image, FileReference)
+        assert user.image.url == "https://storage/read/1"
+        assert user.image.metadata is not None
+        assert user.image.metadata.content_type == "image/png"
+
+    def test_absent_image_data_leaves_image_none(self) -> None:
+        user = from_dict({"id": str(uuid7())}, UserEntity)
+        assert user is not None
+        assert user.image_data is None
+        assert user.image is None
+
+    def test_empty_image_data_leaves_image_none(self) -> None:
+        user = from_dict({"id": str(uuid7()), "imageData": ""}, UserEntity)
+        assert user is not None
+        assert user.image is None
+
+    def test_malformed_image_data_leaves_image_none(self) -> None:
+        # A malformed projection must not fail the whole entity deserialization.
+        user = from_dict({"id": str(uuid7()), "imageData": "not json"}, UserEntity)
+        assert user is not None
+        assert user.image_data == "not json"
+        assert user.image is None
+
+    @pytest.mark.parametrize("payload", ["[]", "123", '"text"', "null", "true"])
+    def test_non_object_image_data_leaves_image_none(self, payload: str) -> None:
+        # Valid JSON that is not an object (array/scalar) must be ignored, not
+        # coerced into a bogus default FileReference or raised.
+        user = from_dict({"id": str(uuid7()), "imageData": payload}, UserEntity)
+        assert user is not None
+        assert user.image is None
+
+
+class TestInstantWireFormat:
+    """`instant_from_wire` parses the backend Instant format at any precision.
+
+    The canonical wire form carries up to 8 significant fractional digits (e.g.
+    ``...:57.23421050Z``); the parser must handle that, not only the special case
+    where the last two digits are ``00``.
+    """
+
+    def test_parses_eight_digit_fraction(self) -> None:
+        dt = instant_from_wire("2026-08-11T14:42:57.23421050Z")
+        assert dt == datetime.datetime(
+            2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
+        )
+
+    def test_parses_six_significant_digits_padded(self) -> None:
+        # The form to_wire emits: 6 microsecond digits + "00".
+        dt = instant_from_wire("2025-01-15T10:30:45.12345600Z")
+        assert dt.microsecond == 123456
+        assert dt.tzinfo == datetime.timezone.utc
+
+    def test_parses_without_fraction(self) -> None:
+        dt = instant_from_wire("2026-08-11T14:42:57Z")
+        assert dt.microsecond == 0
+        assert dt.tzinfo == datetime.timezone.utc
+
+    def test_truncates_sub_microsecond_digits(self) -> None:
+        # 9 fractional digits (nanoseconds) — truncate to microseconds.
+        dt = instant_from_wire("2026-08-11T14:42:57.123456789Z")
+        assert dt.microsecond == 123456
+
+    def test_requires_trailing_z(self) -> None:
+        with pytest.raises(ValueError):
+            instant_from_wire("2026-08-11T14:42:57.23421050")
+
+    def test_roundtrip_through_to_wire(self) -> None:
+        original = datetime.datetime(
+            2026, 8, 11, 14, 42, 57, 234210, tzinfo=datetime.timezone.utc
+        )
+        assert instant_from_wire(instant_to_wire(original)) == original
+
+
+# ---------------------------------------------------------------------------
+# Polymorphic union fields
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _BareUnionHolder:
+    """A union with no ``None`` arm — a shape codegen does not emit yet."""
+
+    ref: Union[ScopeItemEntity, NoteEntity] = field(
+        default_factory=lambda: NoteEntity()
+    )
+
+
+@dataclass
+class _CollectionUnionHolder:
+    """A union of two parameterised collection arms."""
+
+    ref: Union[list[str], dict[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class _BroadCollectionUnionHolder:
+    """A broad arm ahead of a parameterised collection arm."""
+
+    ref: Union[object, dict[str, datetime.datetime]] = ""
+
+
+@dataclass
+class _BroadUnionHolder:
+    """A union whose broad arm precedes the specific one."""
+
+    ref: Union[object, ScopeItemEntity] = ""
+
+
+@dataclass
+class _MixedUnionHolder:
+    """A union mixing a dataclass arm with a plain scalar arm."""
+
+    ref: Union[ScopeItemEntity, str] = ""
+
+
+class TestUnionFieldDispatch:
+    """Backend navigation properties such as ``reference`` are generated as a
+    union of the concrete entities they may point at (e.g.
+    ``TaskEntity.reference: Optional[Union[ScopeItemEntity, TaskEntity]]``).
+    Deserialization must pick the arm named by the payload's ``$type`` tag
+    rather than defaulting to the first one.
+    """
+
+    def test_picks_first_union_arm_by_type_tag(self) -> None:
+        task = from_dict(
+            {"name": "T", "reference": {"$type": "ScopeItemEntity", "name": "SI"}},
+            TaskEntity,
+        )
+        assert task is not None
+        assert isinstance(task.reference, ScopeItemEntity)
+        assert task.reference.name == "SI"
+
+    def test_picks_later_union_arm_by_type_tag(self) -> None:
+        task = from_dict(
+            {"name": "T", "reference": {"$type": "TaskEntity", "name": "REF"}},
+            TaskEntity,
+        )
+        assert task is not None
+        assert isinstance(task.reference, TaskEntity)
+        assert task.reference.name == "REF"
+
+    def test_untagged_payload_falls_back_to_first_arm(self) -> None:
+        task = from_dict({"name": "T", "reference": {"name": "SI"}}, TaskEntity)
+        assert task is not None
+        assert isinstance(task.reference, ScopeItemEntity)
+
+    def test_unknown_type_tag_raises(self) -> None:
+        """An unrecognised ``$type`` must not silently build the first arm."""
+        with pytest.raises(ValueError, match="NotAnEntity"):
+            from_dict(
+                {"name": "T", "reference": {"$type": "NotAnEntity", "name": "X"}},
+                TaskEntity,
+            )
+
+    def test_type_tag_outside_union_raises(self) -> None:
+        """A known entity that is not a declared arm must not be coerced."""
+        with pytest.raises(
+            ValueError, match="not one of the declared union members"
+        ):
+            from_dict(
+                {"name": "T", "reference": {"$type": "UserEntity", "name": "U"}},
+                TaskEntity,
+            )
+
+    def test_null_union_field_stays_none(self) -> None:
+        task = from_dict({"name": "T", "reference": None}, TaskEntity)
+        assert task is not None
+        assert task.reference is None
+
+    def test_single_arm_optional_entity_still_dispatches(self) -> None:
+        """``Optional[X]`` keeps the existing ``$type`` behaviour."""
+        note = from_dict(
+            {"title": "N", "on": {"$type": "TaskEntity", "name": "T"}}, NoteEntity
+        )
+        assert note is not None
+        assert isinstance(note.on, TaskEntity)
+        assert note.on.name == "T"
+
+    def test_bare_union_field_serializes(self) -> None:
+        """A union with no ``None`` arm must still be unwrapped by ``to_dict``.
+
+        Codegen only emits ``Optional[Union[...]]`` today, so this guards the
+        shape rather than a current type: an un-unwrapped union matches no
+        branch in ``_convert_to_dict_value`` and would leak the raw entity.
+        """
+        wire = to_dict(_BareUnionHolder(ref=NoteEntity(title="N")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["title"] == "N"
+
+    def test_mixed_union_keeps_non_dataclass_value(self) -> None:
+        """A non-dataclass value must not be routed down a dataclass arm.
+
+        With the dataclass arm declared first, taking ``members[0]`` would send
+        the ``str`` through ``to_dict``, which returns ``None`` for a
+        non-dataclass and would drop the value silently.
+        """
+        wire = to_dict(_MixedUnionHolder(ref="plain string"))
+        assert wire is not None
+        assert wire["ref"] == "plain string"
+
+    def test_mixed_union_still_serializes_entity_arm(self) -> None:
+        wire = to_dict(_MixedUnionHolder(ref=ScopeItemEntity(name="SI")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["name"] == "SI"
+
+    def test_broad_union_arm_does_not_shadow_the_specific_one(self) -> None:
+        """A superclass arm must not win over the arm that actually matches.
+
+        Every value is an instance of ``object``, so returning the first
+        isinstance match would pick ``object`` here, leave the entity
+        unserialized, and hand a raw dataclass to the JSON encoder.
+        """
+        wire = to_dict(_BroadUnionHolder(ref=ScopeItemEntity(name="SI")))
+        assert wire is not None
+        assert isinstance(wire["ref"], dict)
+        assert wire["ref"]["name"] == "SI"
+
+    def test_collection_union_picks_the_dict_arm(self) -> None:
+        """A dict value must not be serialized through the list arm."""
+        wire = to_dict(_CollectionUnionHolder(ref={"k": "v"}))
+        assert wire is not None
+        assert wire["ref"] == {"k": "v"}
+
+    def test_collection_union_picks_the_list_arm(self) -> None:
+        wire = to_dict(_CollectionUnionHolder(ref=["a", "b"]))
+        assert wire is not None
+        assert wire["ref"] == ["a", "b"]
+
+    def test_broad_arm_does_not_shadow_a_collection_arm(self) -> None:
+        """Specificity ranking must see through a parameterised arm's origin.
+
+        The value is a dict of datetimes, so routing it through the ``object``
+        arm leaves the datetimes unconverted rather than in wire format --
+        a passthrough that a dict of plain strings would not expose.
+        """
+        wire = to_dict(
+            _BroadCollectionUnionHolder(
+                ref={"k": datetime.datetime(2025, 1, 15, 10, 30, 45, 123456)}
+            )
+        )
+        assert wire is not None
+        assert wire["ref"] == {"k": "2025-01-15T10:30:45.12345600Z"}
+
+    def test_union_field_round_trips(self) -> None:
+        original = TaskEntity(name="T", reference=TaskEntity(name="REF"))
+        restored = from_dict(to_dict(original) or {}, TaskEntity)
+        assert restored is not None
+        assert isinstance(restored.reference, TaskEntity)
+        assert restored.reference.name == "REF"

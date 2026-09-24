@@ -3,7 +3,14 @@ name = "filament-api"
 version = "0.0.0"
 description = "Filament Python API"
 requires-python = ">=3.10,<4.0"
-dependencies = ["uuid-utils>=0.9", "pysignalr>=1.3.0"]
+dependencies = ["uuid-utils>=0.9", "pysignalr>=1.3.0", "httpx>=0.27"]
+
+# CRC32C checksums are only needed when a deployment's file store advertises
+# FileChecksumAlgorithm.Crc32cBase64 (GCS). stdlib has no CRC32C, so it is an
+# optional extra rather than a hard dependency: install with
+# ``pip install filament-api[crc32c]`` when required.
+[project.optional-dependencies]
+crc32c = ["google-crc32c>=1.5"]
 
 [build-system]
 requires = ["poetry-core"]
@@ -36,4 +43,9 @@ plugins = ["src/filament_mypy_plugin.py"]
 
 [[tool.mypy.overrides]]
 module = ["pysignalr", "pysignalr.*"]
+ignore_missing_imports = true
+
+# Optional extra (filament-api[crc32c]); no type stubs published.
+[[tool.mypy.overrides]]
+module = ["google_crc32c"]
 ignore_missing_imports = true

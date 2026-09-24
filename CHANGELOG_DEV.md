@@ -1,3 +1,80 @@
+## 0.7.0-dev.0.1.3 (2026-09-24 08:17)
+
+### Types
+
+#### OTHER
+- Task entities and connections now expose the module that auto-generated them
+
+## 0.7.0-dev.0.1.2 (2026-09-16 12:17)
+
+### Types
+
+#### OTHER
+- New entity fields from the backend — CurrentInstantSettingsEntity.enable_update to disable automatic instant advancement, and UserLicenseEntity.user_count for hourly license usage without the id list
+
+## 0.7.0-dev.0.1.1 (2026-09-10 15:57)
+
+### Docs
+
+#### FIX
+- The generated type reference no longer cuts entity and enum descriptions off mid-sentence
+
+### Mypy Plugin
+
+#### FIX
+- Condition.prop() on a reference property now types as every entity it can point at, rather than only the first
+
+### Serialization
+
+#### FIX
+- Deserializing a polymorphic reference whose $type names an unexpected type now fails cleanly instead of silently returning a different entity
+- Polymorphic entity references now deserialize as the type the payload names, instead of always the first candidate type
+
+### Types
+
+#### OTHER
+- Task review state is now tracked per stage, review routing moves from tags to review groups, and entity reference properties expose their concrete target types
+
+## 0.7.0-dev.0.1.0 (2026-09-03 18:07)
+
+### Client
+
+#### FEATURE
+- Adds file upload and download, and auto-populates file read projections (e.g. UserEntity.image) into FileReference objects
+
+### Serialization
+
+#### FIX
+- Fixes parsing of backend timestamps that carry more than six fractional-second digits
+
+### Types
+
+#### OTHER
+- FileMetadata and FileReference now live in filament.types.generated.shared rather than .misc
+
+## 0.7.0-dev.0.0.1 (2026-08-26 14:30)
+
+### Client
+
+#### FEATURE
+- Tenant-defined fields are now readable and writable as typed udp_* attributes on entities and connections, across reads, connected reads, writes, and subscription updates
+- get_user_defined_properties() reports each field's declared type, effective permission, and a condition factory for filtering on it
+- Field definitions refresh automatically, so definition changes are picked up without reconnecting
+
+## 0.6.1-dev.0.0.2 (2026-08-14 00:00)
+
+### Client
+
+#### FEATURE
+- Add user-defined property discovery, typed entity attributes, construction, conditions, cache maintenance, connected reads, and definition administration
+
+## 0.6.1-dev.0.0.1 (2026-08-12 16:06)
+
+### Codex
+
+#### OTHER
+- Added Codex workflow skill wrappers for repository development.
+
 ## 0.6.0-dev.0.2.0 (2026-08-04 15:44)
 
 ### Types

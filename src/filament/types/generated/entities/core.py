@@ -8,19 +8,23 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus
+from ..enums import ChangedEntityStatus, DataRequestAction, ErrorCodes, FileState, ProcessingRunStatus, RequestStatus, ScenarioEventAction, ScenarioServiceTypeEnum, ScenarioStatus, TypeSchemaPropertyType, UserDefinedPropertyStatus
 
 __all__ = [
     "ErrorEntity",
     "RequestEntity",
     "ProcessingRunEntity",
     "ProcessingSettingsEntity",
+    "FileEntity",
+    "FileStatsEntity",
     "EventLogEntity",
     "ScenarioEntity",
     "ScenarioServiceEntity",
     "ScenarioEventEntity",
     "ChangedEntity",
     "EntityProtectionEntity",
+    "UserDefinedTableEntity",
+    "UserDefinedPropertyEntity",
 ]
 
 @dataclass(kw_only=True)
@@ -54,7 +58,7 @@ class RequestEntity(Entity):
     :param requested_at: When the request was requested.
     :param status: The status of the request.
     :param error_message: Error message if the request failed.
-    :param affected_entities: List of affected entity IDs.
+    :param affected_entities: List of affected entity types.
     :param request_data: The serialized request data associated with this entity.
     """
     sequence: int = field(default=0)
@@ -116,6 +120,65 @@ class ProcessingSettingsEntity(Entity):
                               Defaults to false.
     """
     success_snapshots: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class FileEntity(Entity):
+    """
+    The record of one stored file. Hub-owned, with no providing service.
+    
+    :param name: The display name, as supplied by the client and validated server-side.
+    :param description: Alternative text or a description, for accessibility and search.
+    :param reference_type: The entity type that owns this file. Immutable after create.
+    :param reference_id: The row that owns this file. Immutable after create.
+    :param reference_property: The file-link property on <see cref="P:Filament.FSCore.CoreEntities.FileEntity.ReferenceType" /> that gates this file — the permission
+                               anchor. Required and immutable after create.
+    :param state: Where this file is in its lifecycle.
+    :param grant_expires_at: When the most recent upload grant stops being accepted.
+    :param content_type: The content type observed at completion, not the one the client declared.
+    :param size: The size observed at completion, in bytes.
+    :param checksum: The checksum observed at completion.
+    :param version_token: The provider's version identifier for the verified bytes, when the store advertises version
+                          pinning. Unused until versioning is enabled.
+    :param provider: Which store holds this file, for migration and multi-region.
+    :param location: The region or location the object lives in.
+    :param container: The bucket or container holding the object.
+    :param object_key: The server-derived object key. A client never supplies one, so this can never be used to
+                       address something the caller was not granted.
+    """
+    name: str = field(default='')
+    description: Optional[str] = field(default=None)
+    reference_type: str = field(default='')
+    reference_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    reference_property: str = field(default='')
+    state: FileState = field(default=FileState.Pending)
+    grant_expires_at: Optional[datetime.datetime] = field(default=None)
+    content_type: Optional[str] = field(default=None)
+    size: int = field(default=0)
+    checksum: Optional[str] = field(default=None)
+    version_token: Optional[str] = field(default=None)
+    provider: str = field(default='')
+    location: Optional[str] = field(default=None)
+    container: Optional[str] = field(default=None)
+    object_key: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class FileStatsEntity(Entity):
+    """
+    Per-tenant file usage. Hub-owned, and a singleton keyed on <see cref="P:Filament.FSCore.Entities.EntityBase.Id" /> of
+    <see cref="F:System.Guid.Empty" />.
+    
+    :param used_bytes: Bytes counted against the quota: <see cref="F:Filament.FSCore.CoreEntities.FileState.Available" /> plus
+                       <see cref="F:Filament.FSCore.CoreEntities.FileState.Pending" />.
+    :param pending_bytes: The part of <see cref="P:Filament.FSCore.CoreEntities.FileStatsEntity.UsedBytes" /> belonging to uploads that have not completed.
+    :param pending_count: How many uploads are currently incomplete, for the per-user concurrency ceiling.
+    :param file_count: How many files the tenant holds in total.
+    """
+    used_bytes: int = field(default=0)
+    pending_bytes: int = field(default=0)
+    pending_count: int = field(default=0)
+    file_count: int = field(default=0)
 
 
 @dataclass(kw_only=True)
@@ -261,3 +324,51 @@ class EntityProtectionEntity(Entity):
     protection_source_property: Optional[str] = field(default=None)
     protection_source_connection_type: Optional[str] = field(default=None)
     protection_source_connection_id: Optional[UUID] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class UserDefinedTableEntity(Entity):
+    """
+    One row per sidecar table — a single row for each (organisation, entity type) pair that carries user-defined
+    properties. The row names the sidecar table that holds those properties' values.
+    
+    :param entity_type_name: The name of the entity or connection type the sidecar table sits on top of.
+    :param table_name: What the sidecar table is actually called.
+    """
+    entity_type_name: str = field(default='')
+    table_name: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class UserDefinedPropertyEntity(Entity):
+    """
+    One user-defined property definition — a single column on the sidecar table named by the
+    <see cref="T:Filament.FSCore.CoreEntities.UserDefinedTableEntity" /> this row points at.
+    
+    :param table_id: The sidecar table this property is a column of.
+    :param entity_type_name: The name of the entity or connection type this property is defined on.
+    :param name: The property's identifier, carrying the reserved prefix that keeps user-defined names disjoint from
+                 schema property names.
+    :param name_key: The snake_case normalisation of <see cref="P:Filament.FSCore.CoreEntities.UserDefinedPropertyEntity.Name" />.
+    :param label: The display text a client shows for this property.
+    :param description: Optional longer client-facing text describing what the property is for.
+    :param property_type: The property's declared type, reusing the existing wire enum rather than introducing a second type
+                          vocabulary.
+    :param sub_property_types: The element, key and value types of a collection property.
+    :param nullable: Whether the property's value may be null.
+    :param default_value: The value every existing and newly created entity starts with, in wire format.
+    :param validation: The property's constraints, serialised as JSON.
+    :param status: Where the definition is in its lifecycle.
+    """
+    table_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    entity_type_name: str = field(default='')
+    name: str = field(default='')
+    name_key: str = field(default='')
+    label: str = field(default='')
+    description: Optional[str] = field(default=None)
+    property_type: TypeSchemaPropertyType = field(default=TypeSchemaPropertyType.Invalid)
+    sub_property_types: list[TypeSchemaPropertyType] = field(default_factory=list)
+    nullable: bool = field(default=False)
+    default_value: Optional[str] = field(default=None)
+    validation: Optional[str] = field(default=None)
+    status: UserDefinedPropertyStatus = field(default=UserDefinedPropertyStatus.Pending)

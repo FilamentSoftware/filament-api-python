@@ -16,8 +16,11 @@ __all__ = [
     "DbOrderDirection",
     "ErrorCodes",
     "EventUserConnectionStatus",
+    "FileChecksumAlgorithm",
+    "FileState",
     "Industry",
     "NameOrder",
+    "NoteStatusEnum",
     "NoteUserConnectionType",
     "PermissionAction",
     "PermissionType",
@@ -32,6 +35,7 @@ __all__ = [
     "ScheduleMode",
     "ScheduleSegmentModeEnum",
     "ScopeGroupChildType",
+    "ScopeGroupLevelModeEnum",
     "ScopeMilestoneDirectionEnum",
     "ScopeMilestoneModeEnum",
     "ScopeTaskTypeComplexitySource",
@@ -47,7 +51,9 @@ __all__ = [
     "TimeLogModeEnum",
     "TimeLogStatusEnum",
     "TrainingType",
+    "TypeSchemaPropertyType",
     "UserAddressType",
+    "UserDefinedPropertyStatus",
     "UserEmailType",
     "UserLicenseType",
     "UserPhoneType",
@@ -57,20 +63,34 @@ __all__ = [
 
 class ActualStatusEnum(Enum):
     """
-    Represents the status of an actual, reflecting the task's progress and readiness to proceed.
+    Represents the status of an actual, reflecting the task's progress through hands-on work
+    and the post-work pipeline (automated processing, then human review).
     
-    :cvar Waiting: The task cannot yet start because its planned start date is in the future (tomorrow or later).
-    :cvar NotReady: The task cannot yet start because at least one first-level upstream dependency is not complete.
-    :cvar ReadyToStart: All first-level upstream dependencies are complete (or the task has no dependencies),
-                        but no work has started on the task yet.
+    :cvar NotReady: The task cannot yet start because at least one first-level upstream dependency has not
+                    reached <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" />.
+    :cvar Waiting: The task cannot yet start because its planned start date is in the future (tomorrow or
+                   later, UTC date comparison). Upstream dependencies are all <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" /> —
+                   otherwise the task is <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.NotReady" />.
+    :cvar ReadyToStart: All first-level upstream dependencies are <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" /> (or the task has no
+                        dependencies) and the planned start date has arrived, but no work has started on the
+                        task yet.
     :cvar InProgress: The task has started work, indicated by either an open time log or a qualifying submitted work time log.
-    :cvar Complete: The task's billing proportion has reached 1.0.
+    :cvar RequiresProcessing: The hands-on work is done and the task is waiting for automated processing to run.
+    :cvar Processing: Automated processing is currently running for this task. Reserved for upcoming scheduler
+                      work; the status calculation does not yet produce this value.
+    :cvar RequiresReview: The hands-on work (and any processing) is done and the task is waiting for human review.
+    :cvar Finished: The task is fully done: hands-on work, processing, and review (where required) are all
+                    complete. Only this status counts as complete for upstream-dependency gating and group
+                    rollups.
     """
-    Waiting = 0
-    NotReady = 1
+    NotReady = 0
+    Waiting = 1
     ReadyToStart = 2
     InProgress = 3
-    Complete = 4
+    RequiresProcessing = 4
+    Processing = 5
+    RequiresReview = 6
+    Finished = 7
 
 
 class AvailabilityModeEnum(Enum):
@@ -343,6 +363,7 @@ class ErrorCodes(Enum):
                             limit byte counts) so the caller can narrow the query or raise the client's limit.
     :cvar ProtectionError: The operation was blocked because downstream entities have protection records
                            preventing deletion of the upstream entity.
+    :cvar ChecksumMismatch: A completed upload's bytes did not match the checksum the client declared when it requested the grant.
     """
     None_ = 0
     NotSupported = 1
@@ -361,6 +382,7 @@ class ErrorCodes(Enum):
     RateLimitExceeded = 23
     ResponseTooLarge = 25
     ProtectionError = 26
+    ChecksumMismatch = 28
 
 
 class EventUserConnectionStatus(Enum):
@@ -374,6 +396,40 @@ class EventUserConnectionStatus(Enum):
     NotAccepted = 0
     Accepted = 1
     Declined = 2
+
+
+class FileChecksumAlgorithm(Enum):
+    """
+    The checksum a file store computes, and the encoding it reports it in.
+    
+    :cvar None_: The store computes no checksum, and advertises no <c>ServerSideChecksum</c>.
+    :cvar Sha256Hex: SHA-256, lower-case hexadecimal. The Filament storage service.
+    :cvar Md5Base64: MD5, canonical padded base64. GCS <c>md5Hash</c>.
+    :cvar Crc32cBase64: CRC32C, canonical padded base64. GCS <c>crc32c</c>.
+    """
+    None_ = 0
+    Sha256Hex = 1
+    Md5Base64 = 2
+    Crc32cBase64 = 3
+
+
+class FileState(Enum):
+    """
+    Where a file is in its upload lifecycle.
+    
+    :cvar Pending: A grant has been issued and the bytes have not been confirmed. Counts against the tenant's
+                   quota, so nobody can evade it by never completing.
+    :cvar Available: The bytes arrived and were verified against what was declared.
+    :cvar Failed: Verification failed and the object was deleted. Distinct from <see cref="F:Filament.FSCore.CoreEntities.FileState.Deleted" /> so the
+                  sweeper can tell a failed upload from a removed file, and so the quota can be released at the
+                  point of failure rather than at the next sweep.
+    :cvar Deleted: Marked for removal. The row survives until the sweeper has removed the object, so a failed
+                   object delete never leaves a dangling row or vice versa.
+    """
+    Pending = 0
+    Available = 1
+    Failed = 2
+    Deleted = 3
 
 
 class Industry(Enum):
@@ -398,6 +454,17 @@ class NameOrder(Enum):
     """
     GivenNameFirst = 0
     FamilyNameFirst = 1
+
+
+class NoteStatusEnum(Enum):
+    """
+    Whether a note is still being composed or has been submitted to its recipients.
+    
+    :cvar Draft: The note is still being composed and is not visible to its recipients.
+    :cvar Submitted: The note has been submitted and is visible to its recipients.
+    """
+    Draft = 0
+    Submitted = 1
 
 
 class NoteUserConnectionType(Enum):
@@ -533,6 +600,10 @@ class RequestStatus(Enum):
     :cvar Completed: Request has been completed.
     :cvar Failed: Request has failed.
     :cvar Cancelled: Request has been cancelled.
+    :cvar Resubmitted: Request has been resubmitted. A request that ended <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Cancelled" /> or
+                       <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Failed" /> can be moved to this status, which retires it and queues a fresh copy of
+                       it as a new <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Pending" /> request. This is a terminal status for the original request -
+                       the copy carries the work from here, and nothing moves a request out of it.
     """
     Unknown = 0
     Pending = 1
@@ -540,6 +611,7 @@ class RequestStatus(Enum):
     Completed = 3
     Failed = 4
     Cancelled = 5
+    Resubmitted = 6
 
 
 class ScenarioEventAction(Enum):
@@ -649,6 +721,25 @@ class ScopeGroupChildType(Enum):
     """
     Group = 0
     Item = 1
+
+
+class ScopeGroupLevelModeEnum(Enum):
+    """
+    The role of a scope group level. <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> levels are ordinary user-defined
+    levels that populate their own derived task group level; the other modes mark the level as
+    the template for the corresponding built-in task group level, which copies the template's
+    Name, Description, and rollup configuration during population (and produces no derived
+    level of its own). Persisted as ints: never renumber existing members.
+    
+    :cvar Arbitrary: An ordinary user-defined level — the default, behaving exactly as levels always have.
+    :cvar Scope: Template for the built-in Scope task group level.
+    :cvar Item: Template for the built-in Item task group level.
+    :cvar Task: Template for the built-in Task task group level.
+    """
+    Arbitrary = 0
+    Scope = 1
+    Item = 2
+    Task = 3
 
 
 class ScopeMilestoneDirectionEnum(Enum):
@@ -848,25 +939,20 @@ class TaskMilestoneModeEnum(Enum):
 
 class TaskStatusEnum(Enum):
     """
-    Represents the status of a task within the workflow or process lifecycle.
+    Represents the state of one post-work stage (processing or review) of a task.
     
-    :cvar InProgress: Indicates that a task is currently in progress and actively being worked on.
-                      This status reflects that the task is not yet completed but has transitioned
-                      from an initial or awaiting state to active execution.
-    :cvar Processing: Represents a status where the task is undergoing processing. This indicates that
-                      the task is actively being handled by the system or a workflow stage, but is not
-                      yet in a completed or finalized state.
-    :cvar RequiresReview: Indicates that a task requires review before proceeding further in the workflow.
-                          This status reflects that the task has reached a completion or checkpoint
-                          where evaluation, validation, or approval is necessary.
-    :cvar Finished: Represents a task that has been completed successfully. This status indicates
-                    that all necessary work associated with the task has been finalized and no further
-                    actions are required.
+    :cvar Undefined: The stage has not been specified. Whether the stage is required is derived from the
+                     task's own configuration (<see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.DefaultProcessingDuration" /> for
+                     processing, <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.RequiresReview" /> for review).
+    :cvar NotRequired: The stage is explicitly not required for this task, regardless of the task's own
+                       configuration.
+    :cvar Pending: The stage is required and has not been completed yet.
+    :cvar Complete: The stage has been completed.
     """
-    InProgress = 0
-    Processing = 1
-    RequiresReview = 2
-    Finished = 3
+    Undefined = 0
+    NotRequired = 1
+    Pending = 2
+    Complete = 3
 
 
 class TimeLogModeEnum(Enum):
@@ -910,6 +996,59 @@ class TrainingType(Enum):
     WithMentor = 1
 
 
+class TypeSchemaPropertyType(Enum):
+    """
+    Represents the data types that can be assigned to a property in a type schema definition.
+    
+    :cvar Invalid: Specifies an invalid or uninitialized state for a property type in a type schema definition.
+    :cvar String: Represents a property type in a type schema definition that holds textual data.
+    :cvar Bool: Represents a boolean property type in a type schema definition.
+    :cvar Short: Represents a 16-bit signed integer data type for a property in a type schema definition.
+    :cvar Int: Represents a 32-bit signed integer data type that can be assigned to a property in a type schema definition.
+    :cvar Long: Represents a property type in a type schema definition that stores 64-bit signed integer values.
+    :cvar Float: Represents a property type in a type schema definition that stores a single-precision floating-point numeric value.
+    :cvar Double: Represents a property type in a type schema definition that stores
+                  double-precision floating-point numeric values.
+    :cvar Decimal: Represents a property type in a type schema definition that is used to store high-precision decimal numbers.
+    :cvar Guid: Represents a globally unique identifier (GUID) as a property type in a type schema definition.
+    :cvar Instant: Represents a property type in a type schema that stores an instantaneous point on the timeline,
+                   typically used for timestamps or precise temporal events.
+    :cvar Duration: Represents a property type in a type schema definition that stores a duration,
+                    typically used to define an amount of time with a specific granularity or precision.
+    :cvar Interval: Represents a range or span of values, typically defined by a start and end point, as a property type in a type schema definition.
+    :cvar LocalDate: Represents a property type in a type schema definition that stores a date value without a time-of-day or timezone component.
+    :cvar LocalTime: Represents a property type in a type schema definition that stores a time value without a date or timezone context.
+    :cvar LocalDateTime: Represents a property type in a type schema that defines a combination of local date and time without an associated time zone.
+    :cvar DateTimeZone: Represents a property type in a type schema definition that specifies a date and time with associated timezone information.
+    :cvar Enum: Represents an enumerated type, indicating that the property should store a predefined set of constant values.
+    :cvar List: Represents a collection of values of a specified type in a type schema definition.
+    :cvar Array: Represents a property type in a type schema definition
+                 that defines a collection of elements stored in an array structure.
+    :cvar Dictionary: Represents a key-value pair collection where both keys and values conform to specified data types within a type schema definition.
+    """
+    Invalid = 0
+    String = 1
+    Bool = 2
+    Short = 3
+    Int = 4
+    Long = 5
+    Float = 6
+    Double = 7
+    Decimal = 8
+    Guid = 9
+    Instant = 10
+    Duration = 11
+    Interval = 12
+    LocalDate = 13
+    LocalTime = 14
+    LocalDateTime = 15
+    DateTimeZone = 16
+    Enum = 17
+    List = 18
+    Array = 19
+    Dictionary = 20
+
+
 class UserAddressType(Enum):
     """
     An enum that defines valid types of addresses.
@@ -921,6 +1060,28 @@ class UserAddressType(Enum):
     Home = 0
     Business = 1
     Other = 2
+
+
+class UserDefinedPropertyStatus(Enum):
+    """
+    The lifecycle of a user-defined property definition, which exists because creating one is two operations
+    with very different durations: claiming the name and adding the column take milliseconds, while seeding
+    every existing entity is a table-sized write.
+    
+    :cvar Pending: Set at creation, inside the lock that claims the name. The property is invisible to clients — absent
+                   from the permission map, the join, conditions and orders — and cannot be written.
+    :cvar Active: Set once the backfill has completed. The property is fully usable: visible to clients, readable,
+                  writable, and available to conditions and orders.
+    :cvar Hidden: Set by an administrator to retire the property without deleting it — the soft delete, in the same
+                  sense that a currency is disabled rather than removed. Everywhere a value could be seen or written the
+                  property behaves exactly as <see cref="F:Filament.FSCore.CoreEntities.UserDefinedPropertyStatus.Pending" /> does: absent from the permission map, the join,
+                  conditions and orders, and refused as unknown by any request that names it. The definition row itself
+                  stays readable to callers who may read it, carrying this status, so an administrator can list what is
+                  hidden and bring it back.
+    """
+    Pending = 0
+    Active = 1
+    Hidden = 2
 
 
 class UserEmailType(Enum):

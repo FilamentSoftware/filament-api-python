@@ -11,16 +11,22 @@ Key differences from the original:
 from __future__ import annotations
 
 import datetime
+import json
+import logging
 import re
 import types
 from collections.abc import Sequence as ABCSequence
 from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
-from typing import Any, Optional, TypeVar, Type, Union, get_origin, get_args
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, get_origin, get_args
 
 import uuid_utils
 
 from .types.generated.base.base import EntityBase
+
+if TYPE_CHECKING:
+    from .user_defined_properties import UserDefinedProperty
 
 T = TypeVar("T")
 
@@ -33,6 +39,8 @@ from ._wire_formats import (  # noqa: E402
     timedelta_from_wire as timedelta_from_wire,
     timedelta_to_wire as timedelta_to_wire,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +62,14 @@ def camel_case_from_snake_case(s: str) -> str:
 def snake_case_from_camel_case(s: str) -> str:
     """Convert ``camelCase`` to ``snake_case``."""
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+
+def user_defined_python_name(name: str) -> Optional[str]:
+    """Return the canonical ``udp_snake`` name for a reserved wire name."""
+    if len(name) <= 3 or name[:3].lower() != "udp":
+        return None
+    suffix = snake_case_from_camel_case(name[3:]).lstrip("_")
+    return f"udp_{suffix}" if suffix else None
 
 
 def camel_case_wire_name(name: str) -> str:
@@ -125,6 +141,94 @@ def _unwrap_optional(tp: Any) -> Any:
     return next((a for a in get_args(tp) if a is not type(None)), tp)
 
 
+def _union_members(tp: Any) -> Optional[list[Any]]:
+    """Return the non-``None`` members of a union, or ``None`` if *tp* isn't one."""
+    if get_origin(tp) is Union or isinstance(tp, types.UnionType):
+        return [a for a in get_args(tp) if a is not type(None)]
+    return None
+
+
+def _matching_union_member(data: Any, members: list[Any]) -> Any:
+    """Pick the most specific arm *data* is an instance of, else the first arm.
+
+    A union of entities can use any arm, because ``to_dict`` re-dispatches on
+    the value's runtime type. A mixed union cannot: sending a ``str`` down the
+    dataclass arm of ``Union[SomeEntity, str]`` serializes it to ``None`` and
+    loses the value.
+
+    Specificity matters when arms overlap. Every value is an instance of
+    ``object``, so taking the first match would pick the broad arm of
+    ``Union[object, SomeEntity]``, leave the entity unserialized, and hand a
+    raw dataclass to the JSON encoder. Rank matches by their position in the
+    value's MRO so the nearest class wins.
+    """
+    # Each entry pairs the arm to return with the plain class to test against:
+    # a parameterized generic (``dict[str, str]``) is not a valid isinstance
+    # target, but its origin (``dict``) is, and the arm itself is what the
+    # caller needs in order to convert the contents.
+    matches: list[tuple[Any, type]] = []
+    for member in members:
+        runtime_type = get_origin(member) or member
+        if not isinstance(runtime_type, type):
+            continue
+        try:
+            if isinstance(data, runtime_type):
+                matches.append((member, runtime_type))
+        except TypeError:
+            continue
+    if matches:
+        # Arms outside the MRO (an ABC matched by registration, say) sort last
+        # but stay ahead of the no-match fallback.
+        mro = type(data).__mro__
+        member, _ = min(
+            matches,
+            key=lambda pair: mro.index(pair[1]) if pair[1] in mro else len(mro),
+        )
+        return member
+    return members[0]
+
+
+def _select_union_member(data: Any, members: list[Any]) -> Any:
+    """Pick the union member matching *data*'s ``$type`` tag.
+
+    Backend navigation properties such as ``reference`` are typed as a union of
+    the concrete entities they may point at. The payload names its own type, so
+    use that to choose the arm; fall back to the first arm when there is no
+    usable tag.
+
+    Raise ``ValueError`` when the payload does name a type but it cannot be
+    placed among the declared arms. Guessing an arm there would build one
+    entity out of another entity's data and hand the caller a plausible-looking
+    object whose fields silently defaulted to ``None``.
+    """
+    if not isinstance(data, dict):
+        return members[0]
+
+    type_name = data.get("$type")
+    if not isinstance(type_name, str):
+        return members[0]
+
+    # ``$type`` dispatch only applies to unions of entities.
+    entity_members = [
+        m for m in members if isinstance(m, type) and issubclass(m, EntityBase)
+    ]
+    if not entity_members:
+        return members[0]
+
+    resolved = _resolve_entity_type(type_name)
+    if resolved is None:
+        raise ValueError(f"Unknown entity type in $type tag: {type_name!r}")
+
+    for member in entity_members:
+        if issubclass(resolved, member):
+            return member
+
+    raise ValueError(
+        f"$type {type_name!r} is not one of the declared union members: "
+        f"{[m.__name__ for m in entity_members]}"
+    )
+
+
 def _is_uuid_type(tp: Any) -> bool:
     """Return ``True`` if *tp* is ``uuid_utils.UUID``."""
     try:
@@ -167,8 +271,14 @@ def _is_data_option_type(tp: Any) -> bool:
         return False
 
 
+@lru_cache(maxsize=None)
 def _resolve_entity_type(type_name: str) -> Optional[type]:
-    """Look up a concrete EntityBase subclass by name from $type tag."""
+    """Look up a concrete EntityBase subclass by name from $type tag.
+
+    Cached: this runs per union-typed field while deserializing every
+    ``DataUpdated`` push, on the event loop. The entity hierarchy is fixed once
+    ``types.generated.entities`` is imported, so the walk cannot go stale.
+    """
     from .types.generated.base.base import EntityBase
 
     def _walk(cls: type) -> Optional[type]:
@@ -249,13 +359,21 @@ def _convert_to_dict_value(
     Handles ``Optional``, ``TypeVar``, dataclasses, lists, dicts, enums,
     UUIDs, and datetimes.
     """
-    # Optional[X] -> unwrap
-    if _is_optional(field_type):
-        inner = _unwrap_optional(field_type)
-        if isinstance(inner, TypeVar):
-            inner = generic_type_arg
+    # Optional[X] / Union[X, Y] -> unwrap
+    #
+    # No ``$type`` dispatch is needed in this direction: the dataclass branch
+    # below calls ``to_dict(data, ...)``, which serializes by the value's
+    # runtime type. But the arm still has to be the right *kind* -- routing a
+    # non-dataclass value down a dataclass arm would serialize it to ``None``
+    # -- so match on the runtime type. A union left intact matches no branch
+    # below and would fall through, leaking the raw object.
+    members = _union_members(field_type)
+    if members:
         if data is None:
             return None
+        inner = _matching_union_member(data, members)
+        if isinstance(inner, TypeVar):
+            inner = generic_type_arg
         return _convert_to_dict_value(data, inner, None, convert_uuid)
 
     # TypeVar -> use the resolved generic arg, or infer from runtime value
@@ -335,13 +453,14 @@ def _convert_from_dict_value(
     Handles ``Optional``, ``TypeVar``, dataclasses (with ``$type`` dispatch),
     lists, dicts, enums, UUIDs, datetimes, and primitive coercion.
     """
-    # Optional[X] -> unwrap
-    if _is_optional(field_type):
-        inner = _unwrap_optional(field_type)
-        if isinstance(inner, TypeVar):
-            inner = generic_type_arg
+    # Optional[X] / Union[X, Y] -> unwrap, choosing the arm the payload names
+    members = _union_members(field_type)
+    if members:
         if data is None:
             return None
+        inner = members[0] if len(members) == 1 else _select_union_member(data, members)
+        if isinstance(inner, TypeVar):
+            inner = generic_type_arg
         return _convert_from_dict_value(data, inner, None)
 
     # TypeVar -> use the resolved generic arg
@@ -439,7 +558,12 @@ def _convert_from_dict_value(
 # Public API
 # ---------------------------------------------------------------------------
 
-def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
+def to_dict(
+    data: Any,
+    convert_uuid: bool = True,
+    *,
+    user_defined_properties: Optional[Mapping[str, UserDefinedProperty]] = None,
+) -> Optional[dict[str, Any]]:
     """Convert a dataclass instance to a camelCase dict for the SignalR wire format.
 
     Returns ``None`` if *data* is not a dataclass instance.
@@ -474,6 +598,37 @@ def to_dict(data: Any, convert_uuid: bool = True) -> Optional[dict[str, Any]]:
         result[camel_key] = converted
 
     if isinstance(data, EntityBase):
+        for name, value in vars(data).items():
+            if not name.startswith("udp_"):
+                continue
+            if specified_properties is not None and name not in specified_properties:
+                continue
+            udp_property = (
+                user_defined_properties.get(name) if user_defined_properties else None
+            )
+            if udp_property is None and user_defined_properties is not None:
+                # The caller supplied an authoritative definition map (modify_data
+                # does for Create/Update), so an unmatched name is a typo rather
+                # than a property we simply have no metadata for.  Guessing a wire
+                # name here would send the raw Python value: Decimal, UUID,
+                # datetime and timedelta then fail in the JSON encoder with an
+                # error that never names the offending property.
+                raise ValueError(
+                    f"{name!r} is not a known user-defined property of "
+                    f"{data.__class__.__name__}"
+                )
+            wire_name = (
+                udp_property.wire_name
+                if udp_property is not None
+                else camel_case_from_snake_case(name)
+            )
+            if wire_name in result:
+                continue
+            result[wire_name] = (
+                udp_property.adapter.to_wire(value)
+                if udp_property is not None
+                else value
+            )
         result["$type"] = data.__class__.__name__
 
     return result
@@ -537,7 +692,84 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
         dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
 
     result: T = concrete_cls(**dataclass_data)
+    if isinstance(result, EntityBase):
+        known_keys = {
+            camel_case_from_snake_case(f.name)
+            for f in dc_fields
+            if not f.metadata.get("ignore", False)
+        }
+        known_keys.update(f.name for f in dc_fields)
+        for key, value in data.items():
+            if key in known_keys or key == "$type":
+                continue
+            python_name = user_defined_python_name(key)
+            if python_name is not None:
+                object.__setattr__(result, python_name, value)
     # Clear specified_properties for deserialized entities so all fields serialize.
     if hasattr(result, "specified_properties"):
         object.__setattr__(result, "specified_properties", None)
+    _populate_json_companion_fields(result, concrete_cls, hints)
     return result
+
+
+def _populate_json_companion_fields(
+    instance: Any, cls: Any, hints: dict[str, Any],
+) -> None:
+    """Populate object fields from their JSON-string ``<name>_data`` companions.
+
+    The backend emits certain read projections as a JSON string in a
+    ``<name>_data`` field alongside a matching object field ``<name>`` that
+    "arrives unset" — e.g. ``UserEntity.image_data`` (a serialized
+    :class:`FileReference`) and ``UserEntity.image``
+    (``Optional[FileReference]``).  Here we deserialize ``<name>_data`` into
+    ``<name>`` so callers get the ready object without a manual parse.
+
+    A field pair qualifies when ``<name>`` is (optionally) a dataclass type and a
+    sibling ``<name>_data`` field exists.  A missing, empty, non-string, or
+    malformed ``<name>_data`` leaves ``<name>`` as ``None``; an explicitly set
+    ``<name>`` is never overwritten.
+    """
+    field_names = {f.name for f in fields(cls)}
+    for f in fields(cls):
+        data_name = f"{f.name}_data"
+        if data_name not in field_names:
+            continue
+
+        field_type = hints.get(f.name, f.type)
+        inner = _unwrap_optional(field_type) if _is_optional(field_type) else field_type
+        if not (isinstance(inner, type) and is_dataclass(inner)):
+            continue
+
+        # The backend sends the object field unset; never clobber a real value.
+        if getattr(instance, f.name, None) is not None:
+            continue
+        raw = getattr(instance, data_name, None)
+        if not isinstance(raw, str) or not raw:
+            continue
+
+        try:
+            decoded = json.loads(raw)
+        except ValueError:
+            logger.warning(
+                "Failed to parse %s.%s from its %s JSON projection (invalid JSON)",
+                getattr(cls, "__name__", cls), f.name, data_name,
+            )
+            continue
+        # Only a JSON object maps onto the dataclass; an array or scalar is a
+        # malformed projection and must not produce a bogus default instance.
+        if not isinstance(decoded, dict):
+            logger.warning(
+                "Ignoring %s.%s: its %s projection is not a JSON object",
+                getattr(cls, "__name__", cls), f.name, data_name,
+            )
+            continue
+        try:
+            parsed = from_dict(decoded, inner)
+        except (ValueError, TypeError, KeyError):
+            logger.warning(
+                "Failed to deserialize %s.%s from its %s JSON projection",
+                getattr(cls, "__name__", cls), f.name, data_name,
+            )
+            continue
+        if parsed is not None:
+            object.__setattr__(instance, f.name, parsed)

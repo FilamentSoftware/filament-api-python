@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
+from ..entities.review_group_service import ReviewGroupEntity
+from ..entities.task_service import TaskGroupEntity
 from ..entities.user_service import UserEntity
 from ..enums import RepeatDaysEnum, RepeatModeEnum
 
@@ -31,7 +33,14 @@ class EventEntity(Entity):
     :param earliest_start_date_time: The earliest time the event can start.
     :param latest_start_date_time: The latest time the event can start.
     :param date_time_zone: What time zone the event is being called under.
-    :param review_task_groups: A list of all review tasks group that this event will use to auto generate a task review list.
+    :param task_review_group_type: The type name of the entity this event reviews tasks for: either a
+                                   <see cref="T:Filament.Services.CoreServices.Entities.ReviewGroupService.ReviewGroupEntity" /> or a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />. Empty when this event
+                                   does not review tasks.
+    :param task_review_group_id: The id of the review group or task group this event reviews tasks for. Empty when this
+                                 event does not review tasks.
+    :param task_review_group: Represents the review group or task group this event reviews tasks for. When set, it
+                              assigns <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.TaskReviewGroupType" /> and <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.TaskReviewGroupId" /> based on the
+                              provided entity instance; setting <c>null</c> clears both.
     :param include_review_task_users: Should the users who created content to be reviewed be automatically invited to the event?
     :param repeat_mode: How often this event should repeat. <see cref="F:Filament.FSCore.Entities.Recurrence.RepeatModeEnum.None" /> means
                         the event has a single occurrence.
@@ -52,7 +61,9 @@ class EventEntity(Entity):
     earliest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     latest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     date_time_zone: str = field(default='UTC')
-    review_task_groups: list[str] = field(default_factory=list)
+    task_review_group_type: str = field(default='')
+    task_review_group_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    task_review_group: Optional[Union[ReviewGroupEntity, TaskGroupEntity]] = field(default=None)
     include_review_task_users: bool = field(default=False)
     repeat_mode: RepeatModeEnum = field(default=RepeatModeEnum.None_)
     repeat_days: RepeatDaysEnum = field(default=RepeatDaysEnum.None_)

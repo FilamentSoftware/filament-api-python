@@ -66,6 +66,19 @@ class ScheduleSettingsEntity(Entity):
                                                         uses a lookahead pass to pick a single target time-within-period that the most of the
                                                         first N occurrences can land at simultaneously. From the (N+1)th anchor onward, the
                                                         mode-of-history calculation drives the target instead. Default: 4.
+    :param event_history_sample_size: Number of historical occurrences of a recurring event the planner looks back over. It bounds
+                                      two things at once:
+                                      <list type="bullet">
+                                      <item><description>the history sample fed to the mode-of-history offset calculation — the
+                                      newest N started anchors (plus any placements made earlier in the same pass) decide the
+                                      time-within-period that future occurrences are aligned to, so recent cadence outweighs
+                                      year-old placements;</description></item>
+                                      <item><description>the occurrence walk-back on an ordinary (non-repair) pass — enumeration
+                                      starts no earlier than the target of the Nth-newest started anchor, so retained history is
+                                      not re-walked every cycle. Holes older than that are back-filled only on an operator
+                                      <c>FullSchedule</c> pass.</description></item>
+                                      </list>
+                                      Both arms are additionally clamped by <c>MaxEventRepeat</c>. Default: 20.
     """
     full_schedule: bool = field(default=False)
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -83,6 +96,7 @@ class ScheduleSettingsEntity(Entity):
     task_priority_window_order_weight_multiplier: float = field(default=1)
     max_event_repeat: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     initial_repeating_event_alignment_lookahead: int = field(default=4)
+    event_history_sample_size: int = field(default=20)
 
 
 @dataclass(kw_only=True)
@@ -101,6 +115,12 @@ class ScheduleScopeSettingsEntity(Entity):
     :param far_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the far distance.
     :param far_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the far distance.
     :param far_buffer_max_proportion: The maximum proportion of a task's duration that should be used as buffer at the far distance.
+    :param max_review_event_search_distance: How far ahead the scheduler searches for a review-event occurrence when automatically
+                                             linking a task that needs review. The search window is
+                                             <c>[searchStart, searchStart + MaxReviewEventSearchDistance]</c>, where <c>searchStart</c>
+                                             is the later of the task's processing end and the current instant. Tasks with no matching
+                                             occurrence inside the window are not linked (threshold-miss behaviour is decided by the
+                                             scheduler).
     :param user_priority_reference_cost_weight_multiplier: Multiplier applied to the user-selection ReferenceCost priority weight from
                                                            <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
                                                            unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
@@ -145,6 +165,7 @@ class ScheduleScopeSettingsEntity(Entity):
     far_buffer_min_proportion: float = field(default=0.05)
     far_buffer_initial_proportion: float = field(default=0.1)
     far_buffer_max_proportion: float = field(default=0.15)
+    max_review_event_search_distance: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     user_priority_reference_cost_weight_multiplier: float = field(default=1)
     user_priority_actual_user_weight_multiplier: float = field(default=1)
     user_priority_user_last_worked_on_task_weight_multiplier: float = field(default=1)

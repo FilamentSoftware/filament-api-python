@@ -198,11 +198,8 @@ type to fetch related entities, described by `ReadConnectedDataRequest` /
 `ReadConnectedDataTypeRequest` and returning `ServiceDataReadConnected`. These
 request/response types are available in `filament.types`.
 
-> **Note:** the current `FilamentClient` exposes `read_data`, `modify_data`,
-> `subscribe`, `unsubscribe`, `unsubscribe_all`, `get_entity_permissions`, and
-> `get_entity_property_permissions`. The backend's full SignalR contract (in
-> `types/generated/api.py`) additionally defines `read_connected_data`,
-> `preview_data`, `switch_user`, `set_permissions_roles`, `resubscribe`, and
-> `get_status`; these are part of the wire protocol but are not yet wrapped by a
-> dedicated client method. See the [API Reference](api-reference.md) for the
-> methods that are implemented today.
+`FilamentClient.read_connected_data()` implements this operation. It also loads
+and applies [user-defined property](user-defined-properties.md) definitions for
+both the connection and entity type before returning the result. Connected
+reads do not currently use the automatic response-size paging provided by
+`read_data`.

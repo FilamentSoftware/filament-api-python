@@ -7,10 +7,12 @@ from .core import *
 from .currency_service import *
 from .current_instant_service import *
 from .event_service import *
+from .file_settings_service import *
 from .generic import *
 from .note_service import *
 from .organization_service import *
 from .permissions_service import *
+from .review_group_service import *
 from .schedule_service import *
 from .schedule_settings_service import *
 from .scope_category_service import *

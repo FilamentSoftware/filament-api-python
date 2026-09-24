@@ -12,6 +12,7 @@ from ..entities.generic import GenericComplexityBase
 from ..entities.scope_category_service import ScopeCategoryEntity
 from ..entities.scope_service import ScopeStatusEntity
 from ..entities.user_service import UserEntity
+from ..shared import FileReference
 
 __all__ = [
     "ScopeItemNoteEntity",
@@ -48,7 +49,9 @@ class ScopeItemEntity(Entity):
     
     :param name: The name of this scope item.
     :param description: A short description of the item.
-    :param image_link: A link to an image to use when referencing this Scope Item
+    :param image_id: An image to use when referencing this Scope Item.
+    :param image_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemEntity.ImageId" />, carrying a <c>FileReference</c>.
+    :param image: The image as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>ImageData</c>.</b>
     :param category_id: The category of this entity. E.g. Shot, Asset, Development.
     :param category: A helper method for setting the category id.
     :param size: The size of this item.   In film this might be the frame count.
@@ -75,7 +78,9 @@ class ScopeItemEntity(Entity):
     """
     name: str = field(default='')
     description: str = field(default='')
-    image_link: Optional[str] = field(default=None)
+    image_id: Optional[UUID] = field(default=None)
+    image_data: Optional[str] = field(default=None)
+    image: Optional[FileReference] = field(default=None)
     category_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     category: Optional[ScopeCategoryEntity] = field(default=None)
     size: float = field(default=1)

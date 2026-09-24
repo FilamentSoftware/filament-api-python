@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import get_args
 
 import pytest
 import uuid_utils
@@ -27,6 +28,7 @@ from filament.types.conditions import (
     DbConditionType,
     condition_to_dict,
 )
+from filament.types.generated.entities.scope_item_service import ScopeItemEntity
 from filament.types.generated.entities.task_service import TaskEntity, TaskGroupEntity
 from filament.types.generated.entities.user_service import UserEntity
 from filament.types.generated.enums import UserStatusEnum
@@ -121,6 +123,12 @@ class TestClassifyField:
     def test_optional_entity_is_base(self) -> None:
         cat, _ = _classify_field(UserEntity, "office_location")
         assert cat == "base"
+
+    def test_optional_entity_union_keeps_every_arm(self) -> None:
+        """A multi-arm union must not be classified by its first member."""
+        cat, inner = _classify_field(TaskEntity, "reference")
+        assert cat == "base"
+        assert set(get_args(inner)) == {ScopeItemEntity, TaskEntity}
 
     def test_list_field_is_list(self) -> None:
         cat, _ = _classify_field(TaskGroupEntity, "ancestor_group_ids")
