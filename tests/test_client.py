@@ -792,6 +792,48 @@ class TestConnectionClose:
         assert client._last_connection is websocket
 
     @pytest.mark.asyncio
+    async def test_send_waiting_for_connection_survives_reconnect(self) -> None:
+        """An invocation still waiting in send() is not failed by a close or reconnect.
+
+        pysignalr's send() blocks until a connection is available; on reconnect it
+        resumes after on_open fires and writes to the new socket, so failing it
+        there would report an error for a request the server actually received.
+        """
+        client = _make_client(mock_invoke=False)
+        connected = asyncio.Event()
+        captured: dict[str, Any] = {}
+
+        async def send_after_reconnect(method: str, args: list[Any], on_invocation: Any) -> None:
+            await connected.wait()
+            captured["on_invocation"] = on_invocation
+
+        client._signalr_client.send = AsyncMock(side_effect=send_after_reconnect)
+        invoke_task = asyncio.create_task(client._invoke("SomeMethod"))
+        await asyncio.sleep(0)
+
+        await client._handle_close()
+        connected.set()
+        await client._on_open()
+        assert not invoke_task.done()
+
+        for _ in range(10):
+            if client._pending_invocations:
+                break
+            await asyncio.sleep(0)
+        await captured["on_invocation"](CompletionMessage(invocation_id="x", result={"ok": True}))
+        assert await invoke_task == {"ok": True}
+
+    @pytest.mark.asyncio
+    async def test_send_failure_includes_close_detail(self) -> None:
+        """A send failure after a drop names the close code of the last connection."""
+        client = _make_client(mock_invoke=False)
+        client._last_connection = MagicMock(close_code=1009, close_reason="message too big")
+        client._signalr_client.send = AsyncMock(side_effect=RuntimeError("Connection is closed"))
+
+        with pytest.raises(FilamentConnectionError, match=r"close 1009 \(message too big\)"):
+            await client._invoke("SomeMethod")
+
+    @pytest.mark.asyncio
     async def test_run_task_ending_fails_pending_invocations(self) -> None:
         """A run loop that dies without firing on_close still fails in-flight invocations."""
         client = _make_client(mock_invoke=False)
