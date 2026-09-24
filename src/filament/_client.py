@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import collections
 import contextlib
 import inspect
 import logging
 import math
 import re
+from collections import deque
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from types import TracebackType
@@ -185,9 +185,9 @@ class FilamentClient:
         # completions arrive on the same receive loop that runs the DataUpdated
         # handler, so it must never run inside the handler itself.  Each entry
         # carries the client subscriptions that existed when the update arrived.
-        self._data_update_queue: collections.deque[
+        self._data_update_queue: deque[
             tuple[UUID, ServiceDataUpdate, frozenset[UUID]]
-        ] = collections.deque()
+        ] = deque()
         self._data_update_worker: Optional[asyncio.Task[None]] = None
 
         # User-registered event callbacks
