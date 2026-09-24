@@ -544,6 +544,15 @@ class FilamentClient:
         self._fail_pending_invocations(
             f"SignalR connection lost before the server response arrived ({detail})"
         )
+        # As in _handle_close: nothing will reconnect, so a queued update needing
+        # UDP hydration would wait on a hub reply that can never arrive.
+        if self._data_update_queue:
+            logger.warning(
+                "Discarding %d queued DataUpdated event(s) (%s)",
+                len(self._data_update_queue),
+                detail,
+            )
+            self._data_update_queue.clear()
 
     async def _on_open(self) -> None:
         """Called when the SignalR connection is established (first connect and reconnects)."""
