@@ -1487,6 +1487,25 @@ class TestPartReassembly:
         assert [call.args[0].sequence_idx for call in callback.call_args_list] == [1, 2]
 
     @pytest.mark.asyncio
+    async def test_update_queued_before_a_subscribe_is_not_delivered_to_it(self) -> None:
+        """Recipients are fixed on arrival, as inline dispatch would have fixed them.
+
+        The backend shares one ID between duplicate subscriptions, so a caller who
+        subscribes while an update waits in the queue must not receive it.
+        """
+        client = _make_client()
+        backend_id = uuid7()
+        _, early = await _make_subscription(client, backend_id)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        _, late = await _make_subscription(client, backend_id)
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        early.assert_called_once()
+        late.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_close_discards_queued_updates(self) -> None:
         client = _make_client()
         backend_id = uuid7()
@@ -1508,12 +1527,14 @@ class TestPartReassembly:
         real_dispatch = client._dispatch_data_update
         calls = 0
 
-        async def dispatch(backend: UUID, update: ServiceDataUpdate) -> None:
+        async def dispatch(
+            backend: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+        ) -> None:
             nonlocal calls
             calls += 1
             if calls == 1:
                 raise FilamentConnectionError("dropped mid-dispatch")
-            await real_dispatch(backend, update)
+            await real_dispatch(backend, update, client_ids)
 
         client._dispatch_data_update = dispatch
         await client._handle_data_updated(
@@ -1843,6 +1864,58 @@ class TestPartReassembly:
         })
         await client.unsubscribe_all()
         assert client._part_buffers == {}
+
+    @staticmethod
+    def _count_dispatches(client: FilamentClient) -> list[UUID]:
+        dispatched: list[UUID] = []
+        real_dispatch = client._dispatch_data_update
+
+        async def dispatch(
+            backend: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+        ) -> None:
+            dispatched.append(backend)
+            await real_dispatch(backend, update, client_ids)
+
+        client._dispatch_data_update = dispatch
+        return dispatched
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_discards_queued_updates_for_that_subscription(self) -> None:
+        client = _make_client()
+        backend_a = uuid7()
+        backend_b = uuid7()
+        client_a, _ = await _make_subscription(client, backend_a)
+        _, callback_b = await _make_subscription(client, backend_b)
+        dispatched = self._count_dispatches(client)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_a))
+        await client._handle_data_updated(self._part_payload(backend_id=backend_b))
+        client._invoke = AsyncMock(return_value={
+            "success": True, "message": "", "errorCode": 0, "errorId": None,
+        })
+        await client.unsubscribe(SubscriptionId(id=client_a))
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        assert dispatched == [backend_b]
+        callback_b.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_all_discards_queued_updates(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        await _make_subscription(client, backend_id)
+        dispatched = self._count_dispatches(client)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        client._invoke = AsyncMock(return_value={
+            "success": True, "message": "", "errorCode": 0, "errorId": None,
+        })
+        await client.unsubscribe_all()
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        assert dispatched == []
 
     # ------------------------------------------------------------------
     # Malformed metadata
