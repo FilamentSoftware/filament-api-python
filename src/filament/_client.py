@@ -1171,17 +1171,18 @@ class FilamentClient:
             self._all_user_defined_property_tasks.add(task)
             task.add_done_callback(self._forget_user_defined_property_task)
         try:
-            # Shielded: the loader is shared by every caller for this type, so one
-            # caller being cancelled must not cancel it for the others.
-            await asyncio.shield(task)
-        except asyncio.CancelledError:
-            # Only client shutdown cancels a loader.  Its callers were not cancelled
-            # themselves, and must see the dead connection, not a CancelledError.
-            if task.cancelled() and not _current_task_cancelling():
+            # The loader is shared by every caller for this type, so one caller being
+            # cancelled must not cancel it for the others.  wait() neither cancels the
+            # task nor raises its outcome, so a CancelledError here is always this
+            # caller's own cancellation and propagates as-is.
+            await asyncio.wait({task})
+            if task.cancelled():
+                # Only client shutdown cancels a loader.  Its callers must see the
+                # dead connection, not a CancelledError they did not ask for.
                 raise FilamentConnectionError(
                     f"Client closed while loading UDP definitions for {entity_type_name}"
-                ) from None
-            raise
+                )
+            task.result()
         finally:
             if self._user_defined_property_tasks.get(entity_type_name) is task:
                 del self._user_defined_property_tasks[entity_type_name]
@@ -2246,16 +2247,6 @@ def _error_result_public(message: str) -> SuccessOrErrorPublic:
         error_code=ErrorCodes.InternalError,
         error_id=None,
     )
-
-
-def _current_task_cancelling() -> bool:
-    """Whether the running task has a cancellation request pending.
-
-    ``Task.cancelling()`` is Python 3.11+; on 3.10 this reports ``False``.
-    """
-    task = asyncio.current_task()
-    cancelling = getattr(task, "cancelling", None)
-    return bool(cancelling()) if cancelling is not None else False
 
 
 async def _invoke_callback(callback: Callback, *args: Any) -> None:
