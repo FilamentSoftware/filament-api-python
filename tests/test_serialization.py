@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Any, Union
 
 import pytest
 from uuid_utils import UUID, uuid7
 
+from filament import _serialization
 from filament._serialization import (
     camel_case_from_snake_case,
     camel_case_property_names,
@@ -573,6 +575,31 @@ class TestJsonCompanionFields:
         assert user is not None
         assert user.image_data == "not json"
         assert user.image is None
+
+    def test_image_data_raising_attribute_error_leaves_image_none(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        # from_dict can raise AttributeError for a malformed nested object (the
+        # same family file_reference_from_json normalises); that must leave the
+        # one field None rather than fail the whole entity.
+        real_from_dict = _serialization.from_dict
+
+        def from_dict_raising_for_file_reference(data: Any, cls: Any) -> Any:
+            if cls is FileReference:
+                raise AttributeError("malformed nested object")
+            return real_from_dict(data, cls)
+
+        monkeypatch.setattr(
+            _serialization, "from_dict", from_dict_raising_for_file_reference,
+        )
+        payload = json.dumps({"success": True, "errorCode": 0})
+        with caplog.at_level(logging.WARNING, logger="filament._serialization"):
+            user = real_from_dict({"id": str(uuid7()), "imageData": payload}, UserEntity)
+
+        assert user is not None
+        assert user.image_data == payload
+        assert user.image is None
+        assert "Failed to deserialize UserEntity.image" in caplog.text
 
     @pytest.mark.parametrize("payload", ["[]", "123", '"text"', "null", "true"])
     def test_non_object_image_data_leaves_image_none(self, payload: str) -> None:
