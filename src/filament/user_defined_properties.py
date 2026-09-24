@@ -15,7 +15,7 @@ from ._condition_builder import (
     DbConditionListProperty,
     DbConditionProperty,
 )
-from ._serialization import camel_case_from_snake_case, user_defined_python_name
+from ._serialization import user_defined_python_name
 from ._wire_formats import (
     instant_from_wire,
     instant_to_wire,
@@ -315,10 +315,19 @@ def build_user_defined_properties(
             raise ValueError(
                 f"Backend returned invalid user-defined property name {definition.name!r}"
             )
+        existing = result.get(python_name)
+        if existing is not None:
+            raise ValueError(
+                f"User-defined properties {existing.definition.name!r} and "
+                f"{definition.name!r} both map to {python_name!r}"
+            )
         result[python_name] = UserDefinedProperty(
             entity_type_name=entity_type_name,
             python_name=python_name,
-            wire_name=camel_case_from_snake_case(python_name),
+            # The backend's own name, camelCased like every other wire key.  Do
+            # not rebuild it from python_name: that round trip is lossy (str.title
+            # capitalises after a digit, so UdpFoo2bar would come back udpFoo2Bar).
+            wire_name=definition.name[:1].lower() + definition.name[1:],
             permission=permission,
             definition=definition,
             adapter=UserDefinedValueAdapter(definition),
