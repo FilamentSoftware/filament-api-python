@@ -2175,7 +2175,12 @@ class FilamentClient:
                     }
                     # Likewise complete updates still queued for dispatch: hydrating
                     # them would cost hub calls for a callback that no longer exists.
-                    queued = [e for e in self._data_update_queue if e[0] != backend_id]
+                    # UDP definition pushes stay: this ID may be a private subscription
+                    # that reconciliation has since replaced, and the backend does not
+                    # resend the push on the new one.
+                    queued = [
+                        e for e in self._data_update_queue if e[0] != backend_id or e[3]
+                    ]
                     self._data_update_queue.clear()
                     self._data_update_queue.extend(queued)
                     backend_sub = SubscriptionId(id=backend_id)
