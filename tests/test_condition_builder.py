@@ -28,7 +28,6 @@ from filament.types.conditions import (
     DbConditionType,
     condition_to_dict,
 )
-from filament.types.generated.entities.note_service import NoteEntity
 from filament.types.generated.entities.scope_item_service import ScopeItemEntity
 from filament.types.generated.entities.task_service import TaskEntity, TaskGroupEntity
 from filament.types.generated.entities.user_service import UserEntity
@@ -129,7 +128,7 @@ class TestClassifyField:
         """A multi-arm union must not be classified by its first member."""
         cat, inner = _classify_field(TaskEntity, "reference")
         assert cat == "base"
-        assert set(get_args(inner)) == {ScopeItemEntity, NoteEntity}
+        assert set(get_args(inner)) == {ScopeItemEntity, TaskEntity}
 
     def test_list_field_is_list(self) -> None:
         cat, _ = _classify_field(TaskGroupEntity, "ancestor_group_ids")
