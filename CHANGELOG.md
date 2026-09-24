@@ -1,3 +1,43 @@
+## 0.7.0 (2026-09-24 08:29)
+
+### Client
+
+#### FEATURE
+- Adds file upload and download, and auto-populates file read projections (e.g. UserEntity.image) into FileReference objects
+- Tenant-defined fields are now readable and writable as typed udp_* attributes on entities and connections, across reads, connected reads, writes, and subscription updates
+- get_user_defined_properties() reports each field's declared type, effective permission, and a condition factory for filtering on it
+- Field definitions refresh automatically, so definition changes are picked up without reconnecting
+
+### Codex
+
+#### OTHER
+- Added Codex workflow skill wrappers for repository development.
+
+### Docs
+
+#### FIX
+- The generated type reference no longer cuts entity and enum descriptions off mid-sentence
+
+### Mypy Plugin
+
+#### FIX
+- Condition.prop() on a reference property now types as every entity it can point at, rather than only the first
+
+### Serialization
+
+#### FIX
+- Deserializing a polymorphic reference whose $type names an unexpected type now fails cleanly instead of silently returning a different entity
+- Polymorphic entity references now deserialize as the type the payload names, instead of always the first candidate type
+- Fixes parsing of backend timestamps that carry more than six fractional-second digits
+
+### Types
+
+#### OTHER
+- Task entities and connections now expose the module that auto-generated them
+- New entity fields from the backend — CurrentInstantSettingsEntity.enable_update to disable automatic instant advancement, and UserLicenseEntity.user_count for hourly license usage without the id list
+- Task review state is now tracked per stage, review routing moves from tags to review groups, and entity reference properties expose their concrete target types
+- FileMetadata and FileReference now live in filament.types.generated.shared rather than .misc
+
 ## 0.6.0 (2026-08-04 17:18)
 
 ### Types
