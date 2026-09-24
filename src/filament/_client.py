@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import collections
 import contextlib
 import inspect
 import logging
@@ -179,6 +180,14 @@ class FilamentClient:
         # fresh buffer (we cannot trust later parts of a sequence the backend has
         # already proven inconsistent for).  Cleared on close / unsubscribe.
         self._poisoned_part_buffer_keys: set[tuple[UUID, int]] = set()
+        # Complete updates awaiting dispatch, drained in order by one worker task.
+        # Dispatch can await hub invocations (UDP discovery and hydration), whose
+        # completions arrive on the same receive loop that runs the DataUpdated
+        # handler, so it must never run inside the handler itself.
+        self._data_update_queue: collections.deque[tuple[UUID, ServiceDataUpdate]] = (
+            collections.deque()
+        )
+        self._data_update_worker: Optional[asyncio.Task[None]] = None
 
         # User-registered event callbacks
         self._on_processing_started_callbacks: list[Callback] = []
@@ -333,7 +342,14 @@ class FilamentClient:
                 pass
             except Exception:
                 logger.debug("SignalR run loop ended with an error at close", exc_info=True)
-        self._clear_user_defined_property_state()
+        self._data_update_queue.clear()
+        worker = self._data_update_worker
+        self._data_update_worker = None
+        if worker is not None and not worker.done():
+            worker.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
+        self._clear_user_defined_property_state(cancel_tasks=True)
 
     # ------------------------------------------------------------------
     # SignalR invoke helper
@@ -586,6 +602,8 @@ class FilamentClient:
         - Discards any in-progress multi-part :class:`ServiceDataUpdate`
           reassemblies and any poisoned-sequence markers — the server has
           no idea what we'd buffered and cannot resume across a reconnect.
+        - Drops complete updates still queued for dispatch, for the same reason.
+          An update already being dispatched finishes (or fails) on its own.
         """
         self._close_count += 1
         detail = self._close_detail()
@@ -614,16 +632,36 @@ class FilamentClient:
         # `if` block from accidentally dropping the clears.
         self._part_buffers.clear()
         self._poisoned_part_buffer_keys.clear()
+        if self._data_update_queue:
+            logger.warning(
+                "Discarding %d queued DataUpdated event(s) (connection closed)",
+                len(self._data_update_queue),
+            )
+            self._data_update_queue.clear()
         self._clear_user_defined_property_state()
 
-    def _clear_user_defined_property_state(self) -> None:
-        """Discard UDP metadata and private-subscription state without I/O."""
-        for task in self._all_user_defined_property_tasks:
-            task.cancel()
+    def _clear_user_defined_property_state(self, *, cancel_tasks: bool = False) -> None:
+        """Discard UDP metadata and private-subscription state without I/O.
+
+        In-flight loaders are cancelled only when *cancel_tasks* is set (shutdown).
+        On a connection close their ``_invoke`` already fails with
+        :class:`FilamentConnectionError`; cancelling them as well would race that
+        error and hand their awaiting callers a ``CancelledError`` instead.
+        """
+        if cancel_tasks:
+            for task in self._all_user_defined_property_tasks:
+                task.cancel()
+            self._all_user_defined_property_tasks.clear()
+        # Bump rather than reset the generations: a loader left running whose reply
+        # landed just before the close must not publish into the cleared cache.
+        for name in set(self._user_defined_property_generations) | set(
+            self._user_defined_property_tasks
+        ):
+            self._user_defined_property_generations[name] = (
+                self._user_defined_property_generations.get(name, 0) + 1
+            )
         self._user_defined_property_tasks.clear()
-        self._all_user_defined_property_tasks.clear()
         self._user_defined_properties.clear()
-        self._user_defined_property_generations.clear()
         self._user_defined_subscription_id = None
         self._user_defined_subscription_types = frozenset()
 
@@ -686,7 +724,7 @@ class FilamentClient:
 
         # 4. Fast path: unchunked update, no buffering.
         if update.part_count == 1:
-            await self._dispatch_data_update(backend_id, update)
+            self._enqueue_data_update(backend_id, update)
             return
 
         # 5. Multi-part: buffer until all parts arrive.  Multiple sequence_idx values
@@ -695,7 +733,31 @@ class FilamentClient:
         # sequence_idx boundaries.
         merged = self._buffer_part(backend_id, update)
         if merged is not None:
-            await self._dispatch_data_update(backend_id, merged)
+            self._enqueue_data_update(backend_id, merged)
+
+    def _enqueue_data_update(self, backend_id: UUID, update: ServiceDataUpdate) -> None:
+        """Queue a complete update for dispatch, starting the worker if it is idle.
+
+        pysignalr awaits each handler before reading the next frame, so awaiting a
+        hub invocation inside the handler would wait for a completion that can never
+        be read.  One worker drains the queue, which keeps delivery in arrival order.
+        """
+        self._data_update_queue.append((backend_id, update))
+        if self._data_update_worker is None or self._data_update_worker.done():
+            self._data_update_worker = asyncio.create_task(self._drain_data_updates())
+
+    async def _drain_data_updates(self) -> None:
+        """Dispatch queued updates in order; exit once the queue is empty."""
+        while self._data_update_queue:
+            backend_id, update = self._data_update_queue.popleft()
+            try:
+                await self._dispatch_data_update(backend_id, update)
+            except Exception:
+                # E.g. FilamentConnectionError from UDP discovery when the connection
+                # drops mid-dispatch.  Losing one update must not stop the worker.
+                logger.exception(
+                    "Failed to dispatch DataUpdated for subscription %s", backend_id,
+                )
 
     async def _dispatch_data_update(
         self, backend_id: UUID, update: ServiceDataUpdate,
@@ -1107,9 +1169,19 @@ class FilamentClient:
             )
             self._user_defined_property_tasks[entity_type_name] = task
             self._all_user_defined_property_tasks.add(task)
-            task.add_done_callback(self._all_user_defined_property_tasks.discard)
+            task.add_done_callback(self._forget_user_defined_property_task)
         try:
-            await task
+            # Shielded: the loader is shared by every caller for this type, so one
+            # caller being cancelled must not cancel it for the others.
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # Only client shutdown cancels a loader.  Its callers were not cancelled
+            # themselves, and must see the dead connection, not a CancelledError.
+            if task.cancelled() and not _current_task_cancelling():
+                raise FilamentConnectionError(
+                    f"Client closed while loading UDP definitions for {entity_type_name}"
+                ) from None
+            raise
         finally:
             if self._user_defined_property_tasks.get(entity_type_name) is task:
                 del self._user_defined_property_tasks[entity_type_name]
@@ -1126,6 +1198,16 @@ class FilamentClient:
                 self._user_defined_properties.pop(entity_type_name, None)
                 raise
         return cached
+
+    def _forget_user_defined_property_task(
+        self, task: asyncio.Task[Mapping[str, UserDefinedProperty]],
+    ) -> None:
+        self._all_user_defined_property_tasks.discard(task)
+        # Every waiter re-raises the loader's failure itself; retrieving it here
+        # keeps a loader whose waiters were all cancelled from logging "Task
+        # exception was never retrieved".
+        if not task.cancelled():
+            task.exception()
 
     async def _reconcile_user_defined_property_subscription(self) -> None:
         """Subscribe privately to definition changes for every cached type."""
@@ -2164,6 +2246,16 @@ def _error_result_public(message: str) -> SuccessOrErrorPublic:
         error_code=ErrorCodes.InternalError,
         error_id=None,
     )
+
+
+def _current_task_cancelling() -> bool:
+    """Whether the running task has a cancellation request pending.
+
+    ``Task.cancelling()`` is Python 3.11+; on 3.10 this reports ``False``.
+    """
+    task = asyncio.current_task()
+    cancelling = getattr(task, "cancelling", None)
+    return bool(cancelling()) if cancelling is not None else False
 
 
 async def _invoke_callback(callback: Callback, *args: Any) -> None:
