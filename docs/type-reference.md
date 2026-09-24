@@ -1378,7 +1378,7 @@ A note entity that can be attached to any other entity.
 | `chargeable` | `bool` | `False` | Whether the work this note asks for is chargeable to the client. |
 | `on_id` | `UUID` | — | The id of the entity this note is on. |
 | `on_type` | `str` | `''` | The type of the entity this note is on. |
-| `on` | `Optional[entities_task_service.TaskEntity]` | `None` | The entity this note is on. |
+| `on` | `Optional[TaskEntity]` | `None` | The entity this note is on. |
 
 #### Connections
 
@@ -2209,6 +2209,7 @@ _Extends:_ `ReferenceEntityBase`
 | `parent_ids` | `list[UUID]` | — | The ids of this level's parent levels, in order. The order is semantic: rollup-config inheritance walks the first parent at each step; the remaining entries are topology only. |
 | `parents` | `Optional[list[TaskGroupLevelEntity]]` | `None` | Represents the parent levels of this level. Assigning values to this property populates the associated `ParentIds` property with the corresponding identifiers, in the given order. |
 | `actual_status_rollup_rules_data` | `Optional[str]` | `None` | JSON-serialized `ActualStatusRollupRules` for this level, copied from the backing `ScopeGroupLevelEntity` (or its mode-matched template for built-in levels) during population. Null means the level inherits the nearest ancestor level's config (walking `ParentIds`[0]), or the built-in default when no ancestor defines one. |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this task group level during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskMilestoneEntity`
 
@@ -2227,6 +2228,7 @@ _Extends:_ `ReferenceEntityBase`
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone is due. If the Instant is null, the milestone is flexible and can be moved |
 | `direction` | `TaskMilestoneDirectionEnum` | `TaskMilestoneDirectionEnum.EndBefore` | Should tasks start after this milestone, or end before it? |
 | `warnings_data` | `Optional[str]` | `None` | JSON-serialized list of warnings raised while processing this milestone - each is a `TaskMilestoneWarning` describing an issue, such as an assignment that attached to no tasks. Null when there are no warnings. |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this task milestone during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskGroupEntity`
 
@@ -2253,6 +2255,7 @@ _Extends:_ `ReferenceEntityBase`
 | `child_group_levels` | `Optional[list[TaskGroupLevelEntity]]` | `None` | Represents the child group levels associated with the current task group entity. |
 | `ancestor_group_ids` | `list[UUID]` | — | Identifies the IDs of all ancestor task groups in the hierarchy that are related to this instance of `TaskGroupEntity`. |
 | `ancestor_groups` | `Optional[list[TaskGroupEntity]]` | `None` | Contains the collection of ancestor task groups that are hierarchically above the current task group. This property is used to establish relationships between task groups in a hierarchical structure, identifying all ancestor groups for the current entity. |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this task group during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskEntity`
 
@@ -2264,8 +2267,8 @@ _Extends:_ `ReferenceEntityBase`
 | ----- | ---- | ------- | ----------- |
 | `reference_type` | `str` | `''` | The entity type this references |
 | `reference_id` | `UUID` | — | The id of the referenced entity |
-| `reference` | `Optional[Union[ScopeItemEntity, entities_note_service.NoteEntity]]` | `None` | Represents a linked entity instance. |
-| `contexts` | `dict[str, str]` | — | A dictionary of context key-value pairs associated with the task. This property is used to store and retrieve contextual information relevant to the task. The keys represent the context identifiers, and the values contain their corresponding details as strings. |
+| `reference` | `Optional[Union[ScopeItemEntity, TaskEntity]]` | `None` | Represents a linked entity instance. |
+| `contexts` | `dict[str, str]` | — | Context key-value pairs. On a task a module generated they are the module's: the scope module writes the originating step, combine key and instance number; the note module writes the note lineage and its NoteChargeableTicks marker. A task created by hand may carry any contexts a client chooses - the property is client-writable - which is why neither module trusts contexts alone: a task is a module's only when `AutoGeneratedBy` is set as well. |
 | `name` | `str` | `''` | The given name for this task. |
 | `description` | `str` | `''` | The description of this task |
 | `duration` | `datetime.timedelta` | — | This task's duration. |
@@ -2281,6 +2284,7 @@ _Extends:_ `ReferenceEntityBase`
 | `currency` | `Optional[CurrencyEntity]` | `None` | A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type. |
 | `specialty_id` | `UUID` | — | The specialty this task falls under. Populated by TaskScopeModule from the owning `ScopeTaskTypeEntity` for a generated task, or supplied directly for a manually created task — deliberately not a calculated property, for the same reason as `Deliverables`. |
 | `specialty` | `Optional[SpecialtyEntity]` | `None` | A helper method for setting the SpecialtyId property. Pass in a SpecialtyEntity type. |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this task during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 #### Connections
 
@@ -2288,25 +2292,33 @@ _Extends:_ `ReferenceEntityBase`
 
 Represents a connection that defines a dependency relationship between two task entities.
 
-_No type-specific fields beyond the common base fields._
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this dependency during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskGroupConnection`
 
 Represents a connection between a task entity and a task group entity. This class is a specialization of `EntityConnection` to handle connections specifically between `TaskEntity` and `TaskGroupEntity`. Implements the `IEquatable` interface for equality checks.
 
-_No type-specific fields beyond the common base fields._
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this group membership during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskGroupParentConnection`
 
 Represents a connection between a task group entity and its parent task group entity.
 
-_No type-specific fields beyond the common base fields._
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this group parent link during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskMilestoneConnection`
 
 Represents a connection between a TaskEntity and a TaskMilestoneEntity. Used to define and manage the association between tasks and their respective milestones. This class extends from the EntityConnection generic base class and implements equality checks.
 
-_No type-specific fields beyond the common base fields._
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this milestone link during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskSkillConnection`
 
@@ -2321,6 +2333,7 @@ _Extends:_ `GenericTaskSkillConnection_1`
 | `min_skill_level` | `int` | `0` | The minimum skill level required for the task. |
 | `max_skill_level` | `int` | `0` | The maximum skill level allowed for the task. |
 | `primary_skill` | `bool` | — | Is this the primary skill used for the task? Used to determine what skills are being fed back on by the machine learning system. |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this skill requirement during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ##### `TaskOfficeLocationConnection`
 
@@ -2329,6 +2342,7 @@ Represents a connection between a task and an office location within the system,
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `priority` | `int` | `1` | Represents the priority of the task-office location connection. This value determines the priority level associated with the connection between a task and an office location. |
+| `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this office location link during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ### Task Status Service
 

@@ -8,7 +8,7 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..entities import task_service as entities_task_service
+from ..entities.task_service import TaskEntity
 from ..entities.user_service import UserEntity
 from ..enums import NoteStatusEnum, TaskStatusEnum
 
@@ -54,4 +54,4 @@ class NoteEntity(Entity):
     chargeable: bool = field(default=False)
     on_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     on_type: str = field(default='')
-    on: Optional[entities_task_service.TaskEntity] = field(default=None)
+    on: Optional[TaskEntity] = field(default=None)
