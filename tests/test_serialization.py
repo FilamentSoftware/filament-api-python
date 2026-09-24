@@ -668,7 +668,7 @@ class _MixedUnionHolder:
 class TestUnionFieldDispatch:
     """Backend navigation properties such as ``reference`` are generated as a
     union of the concrete entities they may point at (e.g.
-    ``TaskEntity.reference: Optional[Union[ScopeItemEntity, NoteEntity]]``).
+    ``TaskEntity.reference: Optional[Union[ScopeItemEntity, TaskEntity]]``).
     Deserialization must pick the arm named by the payload's ``$type`` tag
     rather than defaulting to the first one.
     """
@@ -684,12 +684,12 @@ class TestUnionFieldDispatch:
 
     def test_picks_later_union_arm_by_type_tag(self) -> None:
         task = from_dict(
-            {"name": "T", "reference": {"$type": "NoteEntity", "title": "N"}},
+            {"name": "T", "reference": {"$type": "TaskEntity", "name": "REF"}},
             TaskEntity,
         )
         assert task is not None
-        assert isinstance(task.reference, NoteEntity)
-        assert task.reference.title == "N"
+        assert isinstance(task.reference, TaskEntity)
+        assert task.reference.name == "REF"
 
     def test_untagged_payload_falls_back_to_first_arm(self) -> None:
         task = from_dict({"name": "T", "reference": {"name": "SI"}}, TaskEntity)
@@ -796,8 +796,8 @@ class TestUnionFieldDispatch:
         assert wire["ref"] == {"k": "2025-01-15T10:30:45.12345600Z"}
 
     def test_union_field_round_trips(self) -> None:
-        original = TaskEntity(name="T", reference=NoteEntity(title="N"))
+        original = TaskEntity(name="T", reference=TaskEntity(name="REF"))
         restored = from_dict(to_dict(original) or {}, TaskEntity)
         assert restored is not None
-        assert isinstance(restored.reference, NoteEntity)
-        assert restored.reference.title == "N"
+        assert isinstance(restored.reference, TaskEntity)
+        assert restored.reference.name == "REF"

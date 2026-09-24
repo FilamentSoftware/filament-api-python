@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 from ..base.base import EntityConnection
 from ..connections.generic import GenericTaskSkillConnection_1
@@ -18,7 +19,16 @@ __all__ = [
 
 @dataclass(kw_only=True)
 class TaskDependencyConnection(EntityConnection):
-    """Represents a connection that defines a dependency relationship between two task entities."""
+    """
+    Represents a connection that defines a dependency relationship between two task entities.
+    
+    :param auto_generated_by: The name of the task module that generated this dependency during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
+    """
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -28,12 +38,28 @@ class TaskGroupConnection(EntityConnection):
     This class is a specialization of <see cref="T:Filament.FSCore.Entities.EntityConnection`2" /> to handle
     connections specifically between <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" /> and <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />.
     Implements the <see cref="T:System.IEquatable`1" /> interface for equality checks.
+    
+    :param auto_generated_by: The name of the task module that generated this group membership during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
 class TaskGroupParentConnection(EntityConnection):
-    """Represents a connection between a task group entity and its parent task group entity."""
+    """
+    Represents a connection between a task group entity and its parent task group entity.
+    
+    :param auto_generated_by: The name of the task module that generated this group parent link during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
+    """
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -42,7 +68,14 @@ class TaskMilestoneConnection(EntityConnection):
     Represents a connection between a TaskEntity and a TaskMilestoneEntity.
     Used to define and manage the association between tasks and their respective milestones.
     This class extends from the EntityConnection generic base class and implements equality checks.
+    
+    :param auto_generated_by: The name of the task module that generated this milestone link during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -51,7 +84,14 @@ class TaskSkillConnection(GenericTaskSkillConnection_1[TaskEntity]):
     Represents a specific connection between a task and a skill,
     extending functionality of a generic task-skill connection.
     This class provides equality checks suited for TaskSkillConnection objects.
+    
+    :param auto_generated_by: The name of the task module that generated this skill requirement during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
+    auto_generated_by: Optional[str] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -62,5 +102,11 @@ class TaskOfficeLocationConnection(EntityConnection):
     :param priority: Represents the priority of the task-office location connection.
                      This value determines the priority level associated with the connection
                      between a task and an office location.
+    :param auto_generated_by: The name of the task module that generated this office location link during propagation - <c>TaskScopeModule</c> or
+                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+                              entry module refuses to create, update or delete anything a module generated, and refuses to set this.
+                              Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
+                              touches it.
     """
     priority: int = field(default=1)
+    auto_generated_by: Optional[str] = field(default=None)
