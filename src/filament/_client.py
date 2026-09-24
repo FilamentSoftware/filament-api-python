@@ -15,6 +15,7 @@ from typing import Any, Optional, Type, Union
 
 import httpx
 from pysignalr.client import SignalRClient
+from pysignalr.exceptions import HubError
 from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
 
@@ -196,6 +197,13 @@ class FilamentClient:
             url=self._url,
             headers=headers,
             connection_timeout=int(connection_timeout),
+            # Do NOT lower this to make dropped connections surface sooner. It is the
+            # *websockets* ping interval, and websockets enforces its own pong timeout on
+            # the same schedule: on a loop that is starved (a long synchronous pass on a
+            # shared loop), the pong would arrive late and websockets would tear the
+            # connection down from a second direction, earlier than the server would have.
+            # Keeping the transport off a busy loop is what actually fixes starvation;
+            # this number only decides how loudly it fails.
             ping_interval=3600,
             max_size=max_size,
         )
@@ -221,6 +229,15 @@ class FilamentClient:
         # response exceeds the client's max frame size — otherwise
         # the awaiting caller would hang indefinitely).
         self._pending_invocations: set[asyncio.Future[Any]] = set()
+        # The websocket connection object from the most recent open, kept only so a close
+        # can be *named* — see _close_detail.  pysignalr clears its own reference before
+        # firing on_close, so this is the only place the close code survives.
+        self._last_connection: Any = None
+        # Bumped on every connection-ending event (close callback, run loop ending).
+        # pysignalr only fires on_close on a state change, so opens and closes
+        # alternate; _invoke compares this across send() to tell whether the socket
+        # its request was written to has since gone.
+        self._close_count = 0
         self._signalr_client.on_close(self._handle_close)
 
         # Background task for pysignalr's run() loop
@@ -242,6 +259,7 @@ class FilamentClient:
         self._signalr_client.on_open(self._on_open)
 
         self._run_task = asyncio.create_task(self._signalr_client.run())
+        self._run_task.add_done_callback(self._handle_run_task_done)
 
         # Wait for either: connection established, run() failing, or timeout
         wait_connected = asyncio.ensure_future(self._connected.wait())
@@ -298,11 +316,23 @@ class FilamentClient:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        """Close the SignalR connection."""
+        """Close the SignalR connection.
+
+        A transport already broken at close time can surface its own error from the
+        cancelled run task (e.g. pysignalr's ``ConnectionError``). Closing must never
+        re-raise it: the caller is done with the connection, and pysignalr's exception
+        classes are frozen dataclasses that Python cannot even re-raise through a
+        ``@contextmanager`` (assigning ``__traceback__`` hits the frozen guard). Log
+        and swallow everything except the cancellation we requested.
+        """
         if self._run_task is not None:
             self._run_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            try:
                 await self._run_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.debug("SignalR run loop ended with an error at close", exc_info=True)
         self._clear_user_defined_property_state()
 
     # ------------------------------------------------------------------
@@ -326,19 +356,61 @@ class FilamentClient:
                 return
             if isinstance(message, CompletionMessage):
                 if message.error:
-                    future.set_exception(Exception(message.error))
+                    # Name the method: the server's error text alone ("Sequence contains no
+                    # elements") says nothing about which invocation produced it. The class
+                    # stays a bare ``Exception`` on purpose — ``_send_client_hello``
+                    # distinguishes it from ``FilamentError`` to tolerate older servers.
+                    future.set_exception(Exception(f"{method}: {message.error}"))
                 else:
                     future.set_result(message.result)
 
-        self._pending_invocations.add(future)
-        future.add_done_callback(self._pending_invocations.discard)
-
+        close_count = self._close_count
         try:
             await self._signalr_client.send(method, list(args), on_invocation=on_completion)
+        except (HubError, OSError, RuntimeError) as exc:
+            # Translate transport failures to this package's exception family. Besides
+            # giving callers one family to catch, this is load-bearing: pysignalr's
+            # exception classes are frozen dataclasses, and Python cannot re-raise a
+            # frozen exception through a ``@contextmanager`` (assigning __traceback__
+            # hits the frozen guard and masks the real error with FrozenInstanceError).
+            # RuntimeError is in the tuple because pysignalr's transport raises a bare
+            # ``RuntimeError('Connection is closed')`` for a send on a dead connection —
+            # left untranslated it slips past callers that reconnect on
+            # FilamentConnectionError, so one dropped websocket turns into an endless
+            # string of failed operations that look like generic, retryable errors.
+            if not future.done():
+                future.cancel()
+            raise FilamentConnectionError(
+                f"SignalR send failed: {exc} ({self._close_detail()})"
+            ) from exc
         except BaseException:
             if not future.done():
                 future.cancel()
             raise
+
+        # Register only once send() has returned, i.e. the invocation is on a socket.
+        # pysignalr's send() waits for a connection while reconnecting and wakes just
+        # before on_open fires; registering earlier would let _on_open fail a future
+        # whose request then goes out on the new socket, so the caller would see an
+        # error for a write the server received (and a retry would duplicate it).
+        #
+        # The flip side: a close can land *during* send() (e.g. while it waits on
+        # flow control) and send() may still return normally.  The close handler has
+        # then already failed the pending set, so registering would leave the caller
+        # waiting forever.  A close during send() always means the socket the request
+        # went out on is gone: a send started while connected writes to that socket,
+        # and a send queued while disconnected starts after the preceding close was
+        # counted, so the next close is the one ending the socket it was written to.
+        # There is no await between this check and registering, so no close can slip
+        # in between.
+        if not future.done() and self._close_count != close_count:
+            future.cancel()
+            raise FilamentConnectionError(
+                "SignalR connection closed before the server response arrived "
+                f"({self._close_detail()})"
+            )
+        self._pending_invocations.add(future)
+        future.add_done_callback(self._pending_invocations.discard)
         return await future
 
     async def _send_client_hello(self) -> None:
@@ -416,8 +488,64 @@ class FilamentClient:
                 await handler(arguments)
         return wrapper
 
+    def _fail_pending_invocations(self, reason: str) -> None:
+        """Fail every in-flight :meth:`_invoke` future with :class:`FilamentConnectionError`.
+
+        An invocation cannot survive its connection: the server ties completions to
+        the socket they were requested on, so once that socket is gone the reply can
+        never arrive and the awaiting caller would hang forever.  Only invocations
+        already written to a socket are pending; one still waiting in ``send()`` for a
+        connection is untouched and goes out on whichever socket comes up.  Every connection
+        lifecycle edge that ends a socket's usefulness must call this — the close
+        callback, a successful *re*-connect (new socket, old invocations orphaned),
+        and the transport run loop ending without pysignalr firing ``on_close``.
+        """
+        if not self._pending_invocations:
+            return
+        error = FilamentConnectionError(reason)
+        for future in list(self._pending_invocations):
+            if not future.done():
+                future.set_exception(error)
+
+    def _handle_run_task_done(self, task: asyncio.Task[None]) -> None:
+        """Fail in-flight invocations when the transport's run loop ends.
+
+        pysignalr's ``run()`` can die with an exception (or be cancelled) without the
+        ``on_close`` callback ever firing — in that state no completion, close, or
+        reconnect event will ever arrive, and an awaiting :meth:`_invoke` hangs
+        indefinitely.  Retrieving the task's exception here also keeps asyncio from
+        logging "Task exception was never retrieved" at teardown.
+        """
+        self._close_count += 1
+        if task.cancelled():
+            detail = "the connection was closed"
+        else:
+            exc = task.exception()
+            detail = f"the transport loop ended: {exc}" if exc else "the transport loop ended"
+        self._fail_pending_invocations(
+            f"SignalR connection lost before the server response arrived ({detail})"
+        )
+
     async def _on_open(self) -> None:
-        """Called when the SignalR connection is established."""
+        """Called when the SignalR connection is established (first connect and reconnects)."""
+        # Stash the live websocket while it is still reachable.  pysignalr sets its
+        # transport's ``_ws`` back to None *before* firing the close callback, so by
+        # the time _handle_close runs there is nothing left to ask for the close code.
+        # getattr-guarded because this reaches into pysignalr internals: a future
+        # version that renames the attribute must degrade to "close code unavailable",
+        # never break the connection lifecycle.
+        self._last_connection = getattr(
+            getattr(self._signalr_client, "_transport", None), "_ws", None
+        )
+
+        # A successful *re*-connect strands any invocation sent on the previous
+        # socket — the new connection knows nothing of it, so its completion will
+        # never arrive.  Fail those callers now rather than letting them hang.
+        # On the first open the pending set is empty and this is a no-op.
+        self._fail_pending_invocations(
+            "SignalR connection was re-established before the server response arrived"
+        )
+
         # Brief yield to let immediate server messages (e.g.
         # AuthenticationFailed) arrive before we signal ready.
         await asyncio.sleep(0.1)
@@ -428,24 +556,43 @@ class FilamentClient:
         """Handle invocation errors from the server."""
         logger.error("SignalR invocation error: %s", message.error)
 
+    def _close_detail(self) -> str:
+        """Describe the websocket close that just happened, for diagnostics.
+
+        The close code is the single most diagnostic fact about a dropped Filament
+        connection: 1006 (no close frame) is the keep-alive-starvation signature, 1009 is
+        the client's own frame cap, 1011 is a server error and 1000 an orderly shutdown.
+        Without it every drop reads the same in the logs.
+
+        Every lookup is guarded and the failure mode is a fixed string: this runs on the
+        failure path, where an AttributeError would mask the failure it is describing.
+        """
+        connection = getattr(self, "_last_connection", None)
+        code = getattr(connection, "close_code", None) if connection is not None else None
+        if code is None:
+            return "close code unavailable"
+        reason = getattr(connection, "close_reason", None)
+        return f"close {code} ({reason})" if reason else f"close {code}"
+
     async def _handle_close(self) -> None:
         """Tidy up in-flight state when the SignalR connection drops.
 
         - Fails any awaiting :meth:`_invoke` futures with
           :class:`FilamentConnectionError`, so callers see an exception
           instead of hanging when the websocket closes (e.g. close code
-          1009 — message too big).
+          1009 — message too big).  The close code travels in the failure
+          message (see :meth:`_close_detail`) so the caller's log names
+          *why* the socket went, not just that it did.
         - Discards any in-progress multi-part :class:`ServiceDataUpdate`
           reassemblies and any poisoned-sequence markers — the server has
           no idea what we'd buffered and cannot resume across a reconnect.
         """
-        if self._pending_invocations:
-            error = FilamentConnectionError(
-                "SignalR connection closed before the server response arrived"
-            )
-            for future in list(self._pending_invocations):
-                if not future.done():
-                    future.set_exception(error)
+        self._close_count += 1
+        detail = self._close_detail()
+        logger.warning("SignalR connection closed (%s)", detail)
+        self._fail_pending_invocations(
+            f"SignalR connection closed before the server response arrived ({detail})"
+        )
 
         if self._part_buffers or self._poisoned_part_buffer_keys:
             logger.info(
