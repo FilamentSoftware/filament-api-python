@@ -15,7 +15,7 @@ from ._condition_builder import (
     DbConditionListProperty,
     DbConditionProperty,
 )
-from ._serialization import user_defined_python_name
+from ._serialization import backend_camel_case, user_defined_python_name
 from ._wire_formats import (
     instant_from_wire,
     instant_to_wire,
@@ -324,10 +324,11 @@ def build_user_defined_properties(
         result[python_name] = UserDefinedProperty(
             entity_type_name=entity_type_name,
             python_name=python_name,
-            # The backend's own name, camelCased like every other wire key.  Do
-            # not rebuild it from python_name: that round trip is lossy (str.title
-            # capitalises after a digit, so UdpFoo2bar would come back udpFoo2Bar).
-            wire_name=definition.name[:1].lower() + definition.name[1:],
+            # The key the backend writes for this property.  Derive it from the
+            # definition name with the backend's own transform, not from
+            # python_name: snake_case loses the casing of capital runs, so
+            # UDPFooBar would come back udpFooBar instead of uDPFooBar.
+            wire_name=backend_camel_case(definition.name),
             permission=permission,
             definition=definition,
             adapter=UserDefinedValueAdapter(definition),

@@ -64,8 +64,46 @@ def snake_case_from_camel_case(s: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
 
 
+def backend_camel_case(name: str) -> str:
+    """Convert *name* to camelCase exactly as the backend's ``ToCamelCase`` does.
+
+    The backend writes user-defined property keys with this transform, so it is
+    the only way to reproduce their wire form from a definition name.  The
+    first character is lowercased; a character following a separator, or
+    sitting on a digit/letter boundary, is uppercased; every other character
+    keeps its case.  So ``"UdpFoo2bar"`` becomes ``"udpFoo2Bar"`` and
+    ``"UDPFooBar"`` becomes ``"uDPFooBar"``.
+    """
+    chars: list[str] = []
+    next_is_upper = False
+    last_was_digit = False
+    for c in name:
+        is_digit = c.isdecimal()
+        if not (is_digit or c.isalpha()):
+            # Leading separators are ignored; otherwise the next character starts a new word.
+            next_is_upper = bool(chars)
+            continue
+        if chars and is_digit != last_was_digit:
+            next_is_upper = True
+        if not chars:
+            chars.append(c.lower())
+        elif next_is_upper:
+            chars.append(c.upper())
+        else:
+            chars.append(c)
+        next_is_upper = False
+        last_was_digit = is_digit
+    return "".join(chars)
+
+
 def user_defined_python_name(name: str) -> Optional[str]:
-    """Return the canonical ``udp_snake`` name for a reserved wire name."""
+    """Return the canonical ``udp_snake`` name for a reserved wire name.
+
+    *name* is first normalised to the backend's wire form, so a definition name
+    (``UdpFoo2bar``) and the key the backend emits for it (``udpFoo2Bar``) map
+    to the same Python name.
+    """
+    name = backend_camel_case(name)
     if len(name) <= 3 or name[:3].lower() != "udp":
         return None
     suffix = snake_case_from_camel_case(name[3:]).lstrip("_")
