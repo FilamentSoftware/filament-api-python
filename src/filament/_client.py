@@ -359,9 +359,6 @@ class FilamentClient:
                 else:
                     future.set_result(message.result)
 
-        self._pending_invocations.add(future)
-        future.add_done_callback(self._pending_invocations.discard)
-
         try:
             await self._signalr_client.send(method, list(args), on_invocation=on_completion)
         except (HubError, OSError, RuntimeError) as exc:
@@ -377,11 +374,23 @@ class FilamentClient:
             # string of failed operations that look like generic, retryable errors.
             if not future.done():
                 future.cancel()
-            raise FilamentConnectionError(f"SignalR send failed: {exc}") from exc
+            raise FilamentConnectionError(
+                f"SignalR send failed: {exc} ({self._close_detail()})"
+            ) from exc
         except BaseException:
             if not future.done():
                 future.cancel()
             raise
+
+        # Register only once send() has returned, i.e. the invocation is on a socket.
+        # pysignalr's send() waits for a connection while reconnecting and wakes just
+        # before on_open fires; registering earlier would let _on_open fail a future
+        # whose request then goes out on the new socket, so the caller would see an
+        # error for a write the server received (and a retry would duplicate it).
+        # There is no await between send() returning and this line, so a close
+        # cannot slip in between.
+        self._pending_invocations.add(future)
+        future.add_done_callback(self._pending_invocations.discard)
         return await future
 
     async def _send_client_hello(self) -> None:
@@ -464,7 +473,9 @@ class FilamentClient:
 
         An invocation cannot survive its connection: the server ties completions to
         the socket they were requested on, so once that socket is gone the reply can
-        never arrive and the awaiting caller would hang forever.  Every connection
+        never arrive and the awaiting caller would hang forever.  Only invocations
+        already written to a socket are pending; one still waiting in ``send()`` for a
+        connection is untouched and goes out on whichever socket comes up.  Every connection
         lifecycle edge that ends a socket's usefulness must call this — the close
         callback, a successful *re*-connect (new socket, old invocations orphaned),
         and the transport run loop ending without pysignalr firing ``on_close``.
