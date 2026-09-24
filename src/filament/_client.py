@@ -233,6 +233,11 @@ class FilamentClient:
         # can be *named* — see _close_detail.  pysignalr clears its own reference before
         # firing on_close, so this is the only place the close code survives.
         self._last_connection: Any = None
+        # Bumped on every connection-ending event (close callback, run loop ending).
+        # pysignalr only fires on_close on a state change, so opens and closes
+        # alternate; _invoke compares this across send() to tell whether the socket
+        # its request was written to has since gone.
+        self._close_count = 0
         self._signalr_client.on_close(self._handle_close)
 
         # Background task for pysignalr's run() loop
@@ -359,6 +364,7 @@ class FilamentClient:
                 else:
                     future.set_result(message.result)
 
+        close_count = self._close_count
         try:
             await self._signalr_client.send(method, list(args), on_invocation=on_completion)
         except (HubError, OSError, RuntimeError) as exc:
@@ -387,8 +393,22 @@ class FilamentClient:
         # before on_open fires; registering earlier would let _on_open fail a future
         # whose request then goes out on the new socket, so the caller would see an
         # error for a write the server received (and a retry would duplicate it).
-        # There is no await between send() returning and this line, so a close
-        # cannot slip in between.
+        #
+        # The flip side: a close can land *during* send() (e.g. while it waits on
+        # flow control) and send() may still return normally.  The close handler has
+        # then already failed the pending set, so registering would leave the caller
+        # waiting forever.  A close during send() always means the socket the request
+        # went out on is gone: a send started while connected writes to that socket,
+        # and a send queued while disconnected starts after the preceding close was
+        # counted, so the next close is the one ending the socket it was written to.
+        # There is no await between this check and registering, so no close can slip
+        # in between.
+        if not future.done() and self._close_count != close_count:
+            future.cancel()
+            raise FilamentConnectionError(
+                "SignalR connection closed before the server response arrived "
+                f"({self._close_detail()})"
+            )
         self._pending_invocations.add(future)
         future.add_done_callback(self._pending_invocations.discard)
         return await future
@@ -496,6 +516,7 @@ class FilamentClient:
         indefinitely.  Retrieving the task's exception here also keeps asyncio from
         logging "Task exception was never retrieved" at teardown.
         """
+        self._close_count += 1
         if task.cancelled():
             detail = "the connection was closed"
         else:
@@ -566,6 +587,7 @@ class FilamentClient:
           reassemblies and any poisoned-sequence markers — the server has
           no idea what we'd buffered and cannot resume across a reconnect.
         """
+        self._close_count += 1
         detail = self._close_detail()
         logger.warning("SignalR connection closed (%s)", detail)
         self._fail_pending_invocations(
