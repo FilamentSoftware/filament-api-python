@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import functools
 import inspect
 import logging
 import math
@@ -1189,7 +1190,9 @@ class FilamentClient:
             )
             self._user_defined_property_tasks[entity_type_name] = task
             self._all_user_defined_property_tasks.add(task)
-            task.add_done_callback(self._forget_user_defined_property_task)
+            task.add_done_callback(
+                functools.partial(self._forget_user_defined_property_task, entity_type_name)
+            )
         try:
             # The loader is shared by every caller for this type, so one caller being
             # cancelled must not cancel it for the others.  wait() neither cancels the
@@ -1204,7 +1207,10 @@ class FilamentClient:
                 )
             task.result()
         finally:
-            if self._user_defined_property_tasks.get(entity_type_name) is task:
+            # A cancelled waiter leaves the loader running for the other callers, so
+            # only a finished loader is deregistered here.  The done callback also
+            # deregisters it, but runs later than this waiter can retry.
+            if task.done() and self._user_defined_property_tasks.get(entity_type_name) is task:
                 del self._user_defined_property_tasks[entity_type_name]
         cached = self._user_defined_properties.get(entity_type_name)
         if cached is None:
@@ -1221,9 +1227,14 @@ class FilamentClient:
         return cached
 
     def _forget_user_defined_property_task(
-        self, task: asyncio.Task[Mapping[str, UserDefinedProperty]],
+        self,
+        entity_type_name: str,
+        task: asyncio.Task[Mapping[str, UserDefinedProperty]],
     ) -> None:
         self._all_user_defined_property_tasks.discard(task)
+        # Identity check: an eviction may already have registered a replacement.
+        if self._user_defined_property_tasks.get(entity_type_name) is task:
+            del self._user_defined_property_tasks[entity_type_name]
         # Every waiter re-raises the loader's failure itself; retrieving it here
         # keeps a loader whose waiters were all cancelled from logging "Task
         # exception was never retrieved".
