@@ -765,7 +765,7 @@ def _populate_json_companion_fields(
             continue
         try:
             parsed = from_dict(decoded, inner)
-        except (ValueError, TypeError, KeyError):
+        except (AttributeError, ValueError, TypeError, KeyError):
             logger.warning(
                 "Failed to deserialize %s.%s from its %s JSON projection",
                 getattr(cls, "__name__", cls), f.name, data_name,
