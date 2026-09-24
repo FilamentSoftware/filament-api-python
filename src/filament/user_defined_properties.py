@@ -15,7 +15,7 @@ from ._condition_builder import (
     DbConditionListProperty,
     DbConditionProperty,
 )
-from ._serialization import camel_case_from_snake_case, user_defined_python_name
+from ._serialization import backend_camel_case, user_defined_python_name
 from ._wire_formats import (
     instant_from_wire,
     instant_to_wire,
@@ -315,10 +315,20 @@ def build_user_defined_properties(
             raise ValueError(
                 f"Backend returned invalid user-defined property name {definition.name!r}"
             )
+        existing = result.get(python_name)
+        if existing is not None:
+            raise ValueError(
+                f"User-defined properties {existing.definition.name!r} and "
+                f"{definition.name!r} both map to {python_name!r}"
+            )
         result[python_name] = UserDefinedProperty(
             entity_type_name=entity_type_name,
             python_name=python_name,
-            wire_name=camel_case_from_snake_case(python_name),
+            # The key the backend writes for this property.  Derive it from the
+            # definition name with the backend's own transform, not from
+            # python_name: snake_case loses the casing of capital runs, so
+            # UDPFooBar would come back udpFooBar instead of uDPFooBar.
+            wire_name=backend_camel_case(definition.name),
             permission=permission,
             definition=definition,
             adapter=UserDefinedValueAdapter(definition),

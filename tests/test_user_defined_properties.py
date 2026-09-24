@@ -272,3 +272,75 @@ def test_dataclasses_replace_works_on_entities() -> None:
 
     with pytest.raises(AttributeError, match="constructor-only"):
         task._user_defined_properties = {"udp_x": 1}
+
+
+def test_wire_name_matches_the_backend_camel_case_key() -> None:
+    """The wire name is the key the backend writes: ``ToCamelCase(definition.name)``.
+
+    The backend starts a new word at a digit/letter boundary, so ``UdpFoo2bar``
+    is written as ``udpFoo2Bar``.
+    """
+    definition = _definition("UdpFoo2bar", TypeSchemaPropertyType.Decimal)
+    properties = build_user_defined_properties(
+        "TaskEntity",
+        EntityPropertyPermissions(properties={
+            "udpFoo2Bar": EntityPropertyPermission(user_defined_data=definition),
+        }),
+    )
+
+    udp_property = properties["udp_foo2_bar"]
+    assert udp_property.wire_name == "udpFoo2Bar"
+    condition = udp_property.condition().equal_to(Decimal("1"))
+    assert isinstance(condition, DbConditionComparison)
+    assert condition.property == "udpFoo2Bar"
+    task = TaskEntity(_user_defined_properties={"udp_foo2_bar": Decimal("3.5")})
+    serialized = to_dict(task, user_defined_properties=properties)
+    assert serialized["udpFoo2Bar"] == "3.5"  # type: ignore[index]
+
+
+def test_wire_name_preserves_capital_runs() -> None:
+    definition = _definition("UDPFooBar", TypeSchemaPropertyType.String)
+    properties = build_user_defined_properties(
+        "TaskEntity",
+        EntityPropertyPermissions(properties={
+            "uDPFooBar": EntityPropertyPermission(user_defined_data=definition),
+        }),
+    )
+
+    assert properties["udp_foo_bar"].wire_name == "uDPFooBar"
+
+
+def test_backend_key_reads_back_onto_the_registry_python_name() -> None:
+    """A value read from the backend lands on the attribute the registry knows.
+
+    The registry names come from the definition name and the read path names
+    come from the wire key; both must agree for digit/letter boundaries.
+    """
+    definition = _definition("UdpFoo2bar", TypeSchemaPropertyType.Decimal)
+    properties = build_user_defined_properties(
+        "TaskEntity",
+        EntityPropertyPermissions(properties={
+            "udpFoo2Bar": EntityPropertyPermission(user_defined_data=definition),
+        }),
+    )
+    task = from_dict(
+        {"$type": "TaskEntity", "id": str(uuid7()), "udpFoo2Bar": "3.5"}, TaskEntity,
+    )
+    assert task is not None
+
+    assert hydrate_user_defined_properties(task, properties) == set()
+    assert task.udp_foo2_bar == Decimal("3.5")
+
+
+def test_definitions_mapping_to_one_python_name_are_rejected() -> None:
+    first = _definition("UdpFooBar", TypeSchemaPropertyType.String)
+    second = _definition("UDPFooBar", TypeSchemaPropertyType.String)
+
+    with pytest.raises(ValueError, match="'UdpFooBar' and 'UDPFooBar'"):
+        build_user_defined_properties(
+            "TaskEntity",
+            EntityPropertyPermissions(properties={
+                "udpFooBar": EntityPropertyPermission(user_defined_data=first),
+                "UDPFooBar": EntityPropertyPermission(user_defined_data=second),
+            }),
+        )

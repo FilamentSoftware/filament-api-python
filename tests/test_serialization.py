@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Any, Union
 
 import pytest
 from uuid_utils import UUID, uuid7
 
+from filament import _serialization
 from filament._serialization import (
+    backend_camel_case,
     camel_case_from_snake_case,
     camel_case_property_names,
     from_dict,
@@ -67,6 +70,28 @@ class TestCaseConversion:
         assert camel_case_from_snake_case("foo__bar") == "fooBar"
         assert camel_case_from_snake_case("trailing_") == "trailing"
         assert camel_case_from_snake_case("__") == ""
+
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("UdpFooBar", "udpFooBar"),
+            ("udpFooBar", "udpFooBar"),
+            # A digit/letter boundary starts a new word in both directions.
+            ("UdpFoo2bar", "udpFoo2Bar"),
+            ("UdpFoo2Bar", "udpFoo2Bar"),
+            ("Udp2ndValue", "udp2NdValue"),
+            # Casing is otherwise preserved: capital runs stay capitalised.
+            ("UDPFooBar", "uDPFooBar"),
+            # Separators are dropped and start a new word; leading ones are ignored.
+            ("_foo_bar", "fooBar"),
+            ("foo bar", "fooBar"),
+            ("", ""),
+        ],
+    )
+    def test_backend_camel_case_mirrors_backend_to_camel_case(
+        self, name: str, expected: str,
+    ) -> None:
+        assert backend_camel_case(name) == expected
 
     def test_camel_to_snake(self) -> None:
         assert snake_case_from_camel_case("helloWorld") == "hello_world"
@@ -573,6 +598,31 @@ class TestJsonCompanionFields:
         assert user is not None
         assert user.image_data == "not json"
         assert user.image is None
+
+    def test_image_data_raising_attribute_error_leaves_image_none(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        # from_dict can raise AttributeError for a malformed nested object (the
+        # same family file_reference_from_json normalises); that must leave the
+        # one field None rather than fail the whole entity.
+        real_from_dict = _serialization.from_dict
+
+        def from_dict_raising_for_file_reference(data: Any, cls: Any) -> Any:
+            if cls is FileReference:
+                raise AttributeError("malformed nested object")
+            return real_from_dict(data, cls)
+
+        monkeypatch.setattr(
+            _serialization, "from_dict", from_dict_raising_for_file_reference,
+        )
+        payload = json.dumps({"success": True, "errorCode": 0})
+        with caplog.at_level(logging.WARNING, logger="filament._serialization"):
+            user = real_from_dict({"id": str(uuid7()), "imageData": payload}, UserEntity)
+
+        assert user is not None
+        assert user.image_data == payload
+        assert user.image is None
+        assert "Failed to deserialize UserEntity.image" in caplog.text
 
     @pytest.mark.parametrize("payload", ["[]", "123", '"text"', "null", "true"])
     def test_non_object_image_data_leaves_image_none(self, payload: str) -> None:
