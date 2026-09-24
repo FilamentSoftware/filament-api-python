@@ -184,9 +184,10 @@ class FilamentClient:
         # Dispatch can await hub invocations (UDP discovery and hydration), whose
         # completions arrive on the same receive loop that runs the DataUpdated
         # handler, so it must never run inside the handler itself.  Each entry
-        # carries the client subscriptions that existed when the update arrived.
+        # carries the client subscriptions that existed when the update arrived,
+        # and whether it arrived on the private UDP-definition subscription.
         self._data_update_queue: deque[
-            tuple[UUID, ServiceDataUpdate, frozenset[UUID]]
+            tuple[UUID, ServiceDataUpdate, frozenset[UUID], bool]
         ] = deque()
         self._data_update_worker: Optional[asyncio.Task[None]] = None
 
@@ -744,19 +745,25 @@ class FilamentClient:
         be read.  One worker drains the queue, which keeps delivery in arrival order.
 
         The recipients are fixed now, as inline dispatch would have fixed them: a
-        client that subscribes while the update waits must not receive it.
+        client that subscribes while the update waits must not receive it.  So is
+        whether this is a UDP definition push: reconciliation may replace the private
+        subscription ID before the worker reaches it.
         """
         client_ids = frozenset(self._backend_to_client.get(backend_id, ()))
-        self._data_update_queue.append((backend_id, update, client_ids))
+        from_udp = backend_id == self._user_defined_subscription_id
+        self._data_update_queue.append((backend_id, update, client_ids, from_udp))
         if self._data_update_worker is None or self._data_update_worker.done():
             self._data_update_worker = asyncio.create_task(self._drain_data_updates())
 
     async def _drain_data_updates(self) -> None:
         """Dispatch queued updates in order; exit once the queue is empty."""
         while self._data_update_queue:
-            backend_id, update, client_ids = self._data_update_queue.popleft()
+            backend_id, update, client_ids, from_udp = self._data_update_queue.popleft()
             try:
-                await self._dispatch_data_update(backend_id, update, client_ids)
+                await self._dispatch_data_update(
+                    backend_id, update, client_ids,
+                    from_user_defined_subscription=from_udp,
+                )
             except Exception:
                 # E.g. FilamentConnectionError from UDP discovery when the connection
                 # drops mid-dispatch.  Losing one update must not stop the worker.
@@ -765,14 +772,21 @@ class FilamentClient:
                 )
 
     async def _dispatch_data_update(
-        self, backend_id: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+        self,
+        backend_id: UUID,
+        update: ServiceDataUpdate,
+        client_ids: frozenset[UUID],
+        *,
+        from_user_defined_subscription: bool,
     ) -> None:
         """Fan out a (possibly merged) ``ServiceDataUpdate`` to its client callbacks.
 
         *client_ids* are the subscriptions that existed when the update arrived; any
         that have since been unsubscribed are skipped.
+        *from_user_defined_subscription* marks a UDP definition push, which refreshes
+        the cached registries before any client callbacks run.
         """
-        if backend_id == self._user_defined_subscription_id:
+        if from_user_defined_subscription:
             await self._handle_user_defined_property_update(update)
             # The backend returns the same subscription ID for duplicate
             # type/permission combinations, so a caller who subscribes to
