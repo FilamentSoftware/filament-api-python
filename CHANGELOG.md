@@ -1,3 +1,22 @@
+## 0.7.2 (2026-09-24 16:20)
+
+### Client
+
+#### FIX
+- On Python 3.10, cancelling a call (e.g. via asyncio.wait_for) while the client is closing now raises CancelledError instead of FilamentConnectionError
+- A connection drop during UDP loading raises FilamentConnectionError instead of CancelledError, and UDP loading inside a DataUpdated no longer stalls the connection
+
+### Serialization
+
+#### FIX
+- A malformed <name>_data projection that raises AttributeError is logged and skipped instead of failing the whole entity
+
+### Udp
+
+#### FIX
+- UDP names with a digit followed by a letter now match the backend's wire key (e.g. udpFoo2Bar) and read back correctly; their Python attribute is now udp_foo2_bar
+- Definitions whose names map to the same Python attribute now fail the UDP load instead of one silently overwriting the other
+
 ## 0.7.1 (2026-09-24 10:55)
 
 ### Client
