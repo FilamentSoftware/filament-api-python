@@ -389,7 +389,9 @@ async def test_shared_backend_id_still_reaches_the_user_callback() -> None:
         scenario_id=UUID("00000000-0000-0000-0000-000000000000"),
         modified_entities={},
     )
-    await client._dispatch_data_update(shared_id, update, frozenset({client_id}))
+    await client._dispatch_data_update(
+        shared_id, update, frozenset({client_id}), from_user_defined_subscription=True,
+    )
 
     assert len(received) == 1, "user callback was swallowed by the metadata handler"
 

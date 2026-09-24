@@ -1506,6 +1506,28 @@ class TestPartReassembly:
         late.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_udp_push_queued_before_resubscribe_still_refreshes_the_cache(
+        self,
+    ) -> None:
+        """A definition push is recognised on arrival, not by the ID at dispatch.
+
+        Reconciliation can replace the private subscription while the push waits in
+        the queue; the backend does not resend it on the new subscription.
+        """
+        client = _make_client()
+        udp_id = client._user_defined_subscription_id
+        assert udp_id is not None
+        refresh = AsyncMock()
+        client._handle_user_defined_property_update = refresh
+
+        await client._handle_data_updated(self._part_payload(backend_id=udp_id))
+        client._user_defined_subscription_id = uuid7()
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_close_discards_queued_updates(self) -> None:
         client = _make_client()
         backend_id = uuid7()
@@ -1529,12 +1551,13 @@ class TestPartReassembly:
 
         async def dispatch(
             backend: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+            **kwargs: Any,
         ) -> None:
             nonlocal calls
             calls += 1
             if calls == 1:
                 raise FilamentConnectionError("dropped mid-dispatch")
-            await real_dispatch(backend, update, client_ids)
+            await real_dispatch(backend, update, client_ids, **kwargs)
 
         client._dispatch_data_update = dispatch
         await client._handle_data_updated(
@@ -1872,9 +1895,10 @@ class TestPartReassembly:
 
         async def dispatch(
             backend: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+            **kwargs: Any,
         ) -> None:
             dispatched.append(backend)
-            await real_dispatch(backend, update, client_ids)
+            await real_dispatch(backend, update, client_ids, **kwargs)
 
         client._dispatch_data_update = dispatch
         return dispatched
