@@ -12,6 +12,7 @@ from uuid_utils import UUID, uuid7
 
 from filament import _serialization
 from filament._serialization import (
+    backend_camel_case,
     camel_case_from_snake_case,
     camel_case_property_names,
     from_dict,
@@ -69,6 +70,28 @@ class TestCaseConversion:
         assert camel_case_from_snake_case("foo__bar") == "fooBar"
         assert camel_case_from_snake_case("trailing_") == "trailing"
         assert camel_case_from_snake_case("__") == ""
+
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("UdpFooBar", "udpFooBar"),
+            ("udpFooBar", "udpFooBar"),
+            # A digit/letter boundary starts a new word in both directions.
+            ("UdpFoo2bar", "udpFoo2Bar"),
+            ("UdpFoo2Bar", "udpFoo2Bar"),
+            ("Udp2ndValue", "udp2NdValue"),
+            # Casing is otherwise preserved: capital runs stay capitalised.
+            ("UDPFooBar", "uDPFooBar"),
+            # Separators are dropped and start a new word; leading ones are ignored.
+            ("_foo_bar", "fooBar"),
+            ("foo bar", "fooBar"),
+            ("", ""),
+        ],
+    )
+    def test_backend_camel_case_mirrors_backend_to_camel_case(
+        self, name: str, expected: str,
+    ) -> None:
+        assert backend_camel_case(name) == expected
 
     def test_camel_to_snake(self) -> None:
         assert snake_case_from_camel_case("helloWorld") == "hello_world"
