@@ -1,3 +1,10 @@
+## 0.7.0-dev.0.1.3 (2026-09-24 08:17)
+
+### Types
+
+#### OTHER
+- Task entities and connections now expose the module that auto-generated them
+
 ## 0.7.0-dev.0.1.2 (2026-09-16 12:17)
 
 ### Types
