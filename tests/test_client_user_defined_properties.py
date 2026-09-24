@@ -554,6 +554,49 @@ async def test_cancelling_one_caller_does_not_cancel_shared_discovery() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancelled_sole_caller_leaves_the_running_loader_shared() -> None:
+    """A later caller joins the still-running loader instead of starting another."""
+    client = _client()
+    release = asyncio.Event()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            await release.wait()
+            return _permissions_response()
+        if method == "Subscribe":
+            return {
+                "success": True, "message": "", "errorCode": 0,
+                "data": {"id": str(uuid7())},
+            }
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    first = asyncio.create_task(client.get_user_defined_properties("TaskEntity"))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    loader = client._user_defined_property_tasks["TaskEntity"]
+
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    assert client._user_defined_property_tasks.get("TaskEntity") is loader
+
+    second = asyncio.create_task(client.get_user_defined_properties("TaskEntity"))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    release.set()
+    result = await second
+
+    assert result.success and result.data is not None
+    permission_calls = [
+        call for call in client._invoke.await_args_list
+        if call.args[0] == "GetEntityPropertyPermissions"
+    ]
+    assert len(permission_calls) == 1
+    assert "TaskEntity" not in client._user_defined_property_tasks
+
+
+@pytest.mark.asyncio
 async def test_shutdown_during_discovery_raises_connection_error_not_cancelled() -> None:
     """``__aexit__`` cancels loaders; callers waiting on them see a connection error."""
     client = _client()
