@@ -74,6 +74,14 @@ def _make_client(*, mock_invoke: bool = True, **kwargs: Any) -> FilamentClient:
         return client
 
 
+async def _deliver(client: FilamentClient, data: Any) -> None:
+    """Feed one ``DataUpdated`` frame and wait for the dispatch worker to drain it."""
+    await client._handle_data_updated(data)
+    worker = client._data_update_worker
+    if worker is not None:
+        await worker
+
+
 async def _make_subscription(
     client: FilamentClient,
     backend_id: UUID,
@@ -380,7 +388,7 @@ class TestSubscriptionRouting:
             "progressAmount": 0.0,
             "sequenceIdx": 0,
         }
-        await client._handle_data_updated(update_data)
+        await _deliver(client, update_data)
 
         cb1.assert_called_once()
         cb2.assert_called_once()
@@ -403,7 +411,7 @@ class TestSubscriptionRouting:
             "sequenceIdx": 0,
         }
         # Should not raise
-        await client._handle_data_updated(update_data)
+        await _deliver(client, update_data)
 
     @pytest.mark.asyncio
     async def test_unsubscribe_last_client_calls_backend(self) -> None:
@@ -1451,12 +1459,175 @@ class TestPartReassembly:
         backend_id = uuid7()
         _, callback = await _make_subscription(client, backend_id)
 
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_count=1),
         )
 
         callback.assert_called_once()
         assert client._part_buffers == {}
+
+    @pytest.mark.asyncio
+    async def test_updates_are_dispatched_off_the_handler_in_order(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        _, callback = await _make_subscription(client, backend_id)
+
+        await client._handle_data_updated(
+            self._part_payload(backend_id=backend_id, sequence_idx=1),
+        )
+        await client._handle_data_updated(
+            self._part_payload(backend_id=backend_id, sequence_idx=2),
+        )
+        # The handler only queues; dispatch happens on the worker.
+        callback.assert_not_called()
+
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+        assert [call.args[0].sequence_idx for call in callback.call_args_list] == [1, 2]
+
+    @pytest.mark.asyncio
+    async def test_update_queued_before_a_subscribe_is_not_delivered_to_it(self) -> None:
+        """Recipients are fixed on arrival, as inline dispatch would have fixed them.
+
+        The backend shares one ID between duplicate subscriptions, so a caller who
+        subscribes while an update waits in the queue must not receive it.
+        """
+        client = _make_client()
+        backend_id = uuid7()
+        _, early = await _make_subscription(client, backend_id)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        _, late = await _make_subscription(client, backend_id)
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        early.assert_called_once()
+        late.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_udp_push_queued_before_resubscribe_still_refreshes_the_cache(
+        self,
+    ) -> None:
+        """A definition push is recognised on arrival, not by the ID at dispatch.
+
+        Reconciliation can replace the private subscription while the push waits in
+        the queue; the backend does not resend it on the new subscription.
+        """
+        client = _make_client()
+        udp_id = client._user_defined_subscription_id
+        assert udp_id is not None
+        refresh = AsyncMock()
+        client._handle_user_defined_property_update = refresh
+
+        await client._handle_data_updated(self._part_payload(backend_id=udp_id))
+        client._user_defined_subscription_id = uuid7()
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_run_loop_ending_without_close_discards_queued_updates(self) -> None:
+        """A dead run loop never reconnects, so queued updates are dropped."""
+        client = _make_client()
+        backend_id = uuid7()
+        _, callback = await _make_subscription(client, backend_id)
+        run_task = MagicMock()
+        run_task.cancelled.return_value = True
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        client._handle_run_task_done(run_task)
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        callback.assert_not_called()
+        assert not client._data_update_queue
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_keeps_a_queued_udp_push_for_a_replaced_private_id(
+        self,
+    ) -> None:
+        """Unsubscribing the last user of a former private ID keeps its queued push."""
+        client = _make_client()
+        old_udp_id = client._user_defined_subscription_id
+        assert old_udp_id is not None
+        client_id, callback = await _make_subscription(client, old_udp_id)
+        refresh = AsyncMock()
+        client._handle_user_defined_property_update = refresh
+
+        await client._handle_data_updated(self._part_payload(backend_id=old_udp_id))
+        client._user_defined_subscription_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True, "message": "", "errorCode": 0, "errorId": None,
+        })
+        await client.unsubscribe(SubscriptionId(id=client_id))
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        refresh.assert_awaited_once()
+        callback.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_close_discards_queued_updates(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        _, callback = await _make_subscription(client, backend_id)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        await client._handle_close()
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        callback.assert_not_called()
+        assert not client._data_update_queue
+
+    @pytest.mark.asyncio
+    async def test_failed_dispatch_does_not_stop_the_worker(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        _, callback = await _make_subscription(client, backend_id)
+        real_dispatch = client._dispatch_data_update
+        calls = 0
+
+        async def dispatch(
+            backend: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+            **kwargs: Any,
+        ) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise FilamentConnectionError("dropped mid-dispatch")
+            await real_dispatch(backend, update, client_ids, **kwargs)
+
+        client._dispatch_data_update = dispatch
+        await client._handle_data_updated(
+            self._part_payload(backend_id=backend_id, sequence_idx=1),
+        )
+        await _deliver(client, self._part_payload(backend_id=backend_id, sequence_idx=2))
+
+        callback.assert_called_once()
+        assert callback.call_args.args[0].sequence_idx == 2
+
+    @pytest.mark.asyncio
+    async def test_aexit_cancels_the_dispatch_worker(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        started = asyncio.Event()
+
+        async def slow_callback(update: ServiceDataUpdate) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+        await _make_subscription(client, backend_id, callback=slow_callback)
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        worker = client._data_update_worker
+        await started.wait()
+
+        await client.__aexit__(None, None, None)
+
+        assert worker is not None and worker.cancelled()
+        assert client._data_update_worker is None
 
     # ------------------------------------------------------------------
     # Reassembly happy paths
@@ -1468,12 +1639,14 @@ class TestPartReassembly:
         backend_id = uuid7()
         _, callback = await _make_subscription(client, backend_id)
 
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
         )
         callback.assert_not_called()
 
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=1, part_count=2),
         )
         callback.assert_called_once()
@@ -1487,12 +1660,14 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         # Fire idx 1 first, then idx 0.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=1, part_count=2),
         )
         callback.assert_not_called()
 
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
         )
         callback.assert_called_once()
@@ -1505,7 +1680,8 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         # Only 1 of 3 parts.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=3),
         )
         callback.assert_not_called()
@@ -1595,21 +1771,25 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         # Interleave: seq=1 idx=0, seq=2 idx=0, seq=1 idx=1, seq=2 idx=1.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, sequence_idx=1, part_idx=0, part_count=2),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, sequence_idx=2, part_idx=0, part_count=2),
         )
         callback.assert_not_called()
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, sequence_idx=1, part_idx=1, part_count=2),
         )
         assert callback.call_count == 1
         first_delivery: ServiceDataUpdate = callback.call_args_list[0][0][0]
         assert first_delivery.sequence_idx == 1
 
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, sequence_idx=2, part_idx=1, part_count=2),
         )
         assert callback.call_count == 2
@@ -1626,16 +1806,20 @@ class TestPartReassembly:
         _, cb_b = await _make_subscription(client, backend_b)
 
         # Interleave 2-part updates for both subs.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_a, part_idx=0, part_count=2),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_b, part_idx=0, part_count=2),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_a, part_idx=1, part_count=2),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_b, part_idx=1, part_count=2),
         )
 
@@ -1653,7 +1837,8 @@ class TestPartReassembly:
         client = _make_client()
         backend_id = uuid7()
         await _make_subscription(client, backend_id)
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
         )
         assert client._part_buffers
@@ -1667,7 +1852,8 @@ class TestPartReassembly:
         client = _make_client()
         backend_id = uuid7()
         await _make_subscription(client, backend_id)
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
         )
         assert client._part_buffers
@@ -1699,10 +1885,12 @@ class TestPartReassembly:
         await _make_subscription(client, backend_b)
 
         # Buffer partials for both subs.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_a, part_idx=0, part_count=2),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_b, part_idx=0, part_count=2),
         )
         assert (backend_a, 0) in client._part_buffers
@@ -1725,10 +1913,12 @@ class TestPartReassembly:
         backend_b = uuid7()
         await _make_subscription(client, backend_a)
         await _make_subscription(client, backend_b)
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_a, part_idx=0, part_count=2),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_b, part_idx=0, part_count=2),
         )
         assert len(client._part_buffers) == 2
@@ -1738,6 +1928,59 @@ class TestPartReassembly:
         })
         await client.unsubscribe_all()
         assert client._part_buffers == {}
+
+    @staticmethod
+    def _count_dispatches(client: FilamentClient) -> list[UUID]:
+        dispatched: list[UUID] = []
+        real_dispatch = client._dispatch_data_update
+
+        async def dispatch(
+            backend: UUID, update: ServiceDataUpdate, client_ids: frozenset[UUID],
+            **kwargs: Any,
+        ) -> None:
+            dispatched.append(backend)
+            await real_dispatch(backend, update, client_ids, **kwargs)
+
+        client._dispatch_data_update = dispatch
+        return dispatched
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_discards_queued_updates_for_that_subscription(self) -> None:
+        client = _make_client()
+        backend_a = uuid7()
+        backend_b = uuid7()
+        client_a, _ = await _make_subscription(client, backend_a)
+        _, callback_b = await _make_subscription(client, backend_b)
+        dispatched = self._count_dispatches(client)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_a))
+        await client._handle_data_updated(self._part_payload(backend_id=backend_b))
+        client._invoke = AsyncMock(return_value={
+            "success": True, "message": "", "errorCode": 0, "errorId": None,
+        })
+        await client.unsubscribe(SubscriptionId(id=client_a))
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        assert dispatched == [backend_b]
+        callback_b.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_all_discards_queued_updates(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        await _make_subscription(client, backend_id)
+        dispatched = self._count_dispatches(client)
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        client._invoke = AsyncMock(return_value={
+            "success": True, "message": "", "errorCode": 0, "errorId": None,
+        })
+        await client.unsubscribe_all()
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        assert dispatched == []
 
     # ------------------------------------------------------------------
     # Malformed metadata
@@ -1752,10 +1995,12 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         with caplog.at_level("WARNING"):
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
             )
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 # Duplicate idx=0 — should overwrite and log a warning.
                 self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
             )
@@ -1769,7 +2014,8 @@ class TestPartReassembly:
     async def test_unknown_subscription_part_dropped_before_buffering(self) -> None:
         client = _make_client()
         # No subscription registered.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=uuid7(), part_idx=0, part_count=2),
         )
         assert client._part_buffers == {}
@@ -1784,11 +2030,13 @@ class TestPartReassembly:
 
         with caplog.at_level("WARNING"):
             # part_idx == part_count
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=2, part_count=2),
             )
             # negative
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=-1, part_count=2),
             )
 
@@ -1805,14 +2053,16 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         # Buffer part 0 of a 3-part update.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=3),
         )
         assert (backend_id, 0) in client._part_buffers
 
         # Send a part with conflicting part_count=2.
         with caplog.at_level("WARNING"):
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=1, part_count=2),
             )
 
@@ -1824,10 +2074,12 @@ class TestPartReassembly:
         # A follow-up "consistent" batch under the new part_count=2 must still be dropped.
         with caplog.at_level("WARNING"):
             caplog.clear()
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=0, part_count=2),
             )
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=1, part_count=2),
             )
 
@@ -1842,17 +2094,20 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         # Fire parts 0 and 2 of a 3-part update.  Index set {0, 2} != {0, 1, 2}.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=0, part_count=3),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=2, part_count=3),
         )
         callback.assert_not_called()
         assert len(client._part_buffers[(backend_id, 0)]) == 2
 
         # Fire the missing part 1 — now {0, 1, 2} is complete and callback fires.
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, part_idx=1, part_count=3),
         )
         callback.assert_called_once()
@@ -1867,10 +2122,12 @@ class TestPartReassembly:
         _, callback = await _make_subscription(client, backend_id)
 
         with caplog.at_level("WARNING"):
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=0, part_count=0),
             )
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, part_idx=0, part_count=-1),
             )
 
@@ -1884,10 +2141,12 @@ class TestPartReassembly:
 
     async def _poison_sequence(self, client: FilamentClient, backend_id: UUID, seq: int = 0) -> None:
         """Trigger a part_count inconsistency to poison ``(backend_id, seq)``."""
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, sequence_idx=seq, part_idx=0, part_count=3),
         )
-        await client._handle_data_updated(
+        await _deliver(
+            client,
             self._part_payload(backend_id=backend_id, sequence_idx=seq, part_idx=1, part_count=2),
         )
         assert (backend_id, seq) in client._poisoned_part_buffer_keys
@@ -1967,7 +2226,8 @@ class TestPartReassembly:
         callback.reset_mock()  # ignore any noise from the poison-trigger calls
 
         with caplog.at_level("WARNING"):
-            await client._handle_data_updated(
+            await _deliver(
+                client,
                 self._part_payload(backend_id=backend_id, sequence_idx=0,
                                     part_idx=0, part_count=1),
             )
