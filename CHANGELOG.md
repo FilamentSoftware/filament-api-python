@@ -1,3 +1,10 @@
+## 0.7.1 (2026-09-24 10:55)
+
+### Client
+
+#### FIX
+- Dropped connections now raise FilamentConnectionError with the websocket close code instead of hanging or leaking raw pysignalr errors
+
 ## 0.7.0 (2026-09-24 08:29)
 
 ### Client
