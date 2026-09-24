@@ -272,3 +272,41 @@ def test_dataclasses_replace_works_on_entities() -> None:
 
     with pytest.raises(AttributeError, match="constructor-only"):
         task._user_defined_properties = {"udp_x": 1}
+
+
+def test_wire_name_comes_from_the_backend_definition() -> None:
+    """The wire name is the backend's name, not one rebuilt from the Python name.
+
+    Rebuilding is lossy: ``str.title`` capitalises a letter after a digit, so
+    ``UdpFoo2bar`` would round-trip to ``udpFoo2Bar``, a different property.
+    """
+    definition = _definition("UdpFoo2bar", TypeSchemaPropertyType.Decimal)
+    properties = build_user_defined_properties(
+        "TaskEntity",
+        EntityPropertyPermissions(properties={
+            "udpFoo2bar": EntityPropertyPermission(user_defined_data=definition),
+        }),
+    )
+
+    udp_property = properties["udp_foo2bar"]
+    assert udp_property.wire_name == "udpFoo2bar"
+    condition = udp_property.condition().equal_to(Decimal("1"))
+    assert isinstance(condition, DbConditionComparison)
+    assert condition.property == "udpFoo2bar"
+    task = TaskEntity(_user_defined_properties={"udp_foo2bar": Decimal("3.5")})
+    serialized = to_dict(task, user_defined_properties=properties)
+    assert serialized["udpFoo2bar"] == "3.5"  # type: ignore[index]
+
+
+def test_definitions_mapping_to_one_python_name_are_rejected() -> None:
+    first = _definition("UdpFooBar", TypeSchemaPropertyType.String)
+    second = _definition("UDPFooBar", TypeSchemaPropertyType.String)
+
+    with pytest.raises(ValueError, match="'UdpFooBar' and 'UDPFooBar'"):
+        build_user_defined_properties(
+            "TaskEntity",
+            EntityPropertyPermissions(properties={
+                "udpFooBar": EntityPropertyPermission(user_defined_data=first),
+                "UDPFooBar": EntityPropertyPermission(user_defined_data=second),
+            }),
+        )
