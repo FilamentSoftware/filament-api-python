@@ -793,7 +793,7 @@ class TestConnectionClose:
 
     @pytest.mark.asyncio
     async def test_send_waiting_for_connection_survives_reconnect(self) -> None:
-        """An invocation still waiting in send() is not failed by a close or reconnect.
+        """An invocation queued in send() while disconnected is not failed by the reconnect.
 
         pysignalr's send() blocks until a connection is available; on reconnect it
         resumes after on_open fires and writes to the new socket, so failing it
@@ -808,10 +808,10 @@ class TestConnectionClose:
             captured["on_invocation"] = on_invocation
 
         client._signalr_client.send = AsyncMock(side_effect=send_after_reconnect)
+        await client._handle_close()
         invoke_task = asyncio.create_task(client._invoke("SomeMethod"))
         await asyncio.sleep(0)
 
-        await client._handle_close()
         connected.set()
         await client._on_open()
         assert not invoke_task.done()
@@ -822,6 +822,26 @@ class TestConnectionClose:
             await asyncio.sleep(0)
         await captured["on_invocation"](CompletionMessage(invocation_id="x", result={"ok": True}))
         assert await invoke_task == {"ok": True}
+
+    @pytest.mark.asyncio
+    async def test_close_during_send_fails_invocation(self) -> None:
+        """A close that lands while send() is still running fails the invocation.
+
+        send() can return normally after the socket it wrote to has closed (e.g. it
+        was waiting on flow control); the close handler has then already run, so
+        registering the future afterwards would leave the caller hanging forever.
+        """
+        client = _make_client(mock_invoke=False)
+        client._last_connection = MagicMock(close_code=1000, close_reason="")
+
+        async def send_then_close(method: str, args: list[Any], on_invocation: Any) -> None:
+            await client._handle_close()
+
+        client._signalr_client.send = AsyncMock(side_effect=send_then_close)
+
+        with pytest.raises(FilamentConnectionError, match=r"closed before .*\(close 1000\)"):
+            await asyncio.wait_for(client._invoke("SomeMethod"), timeout=1)
+        assert client._pending_invocations == set()
 
     @pytest.mark.asyncio
     async def test_send_failure_includes_close_detail(self) -> None:
