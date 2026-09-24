@@ -574,6 +574,34 @@ async def test_shutdown_during_discovery_raises_connection_error_not_cancelled()
 
 
 @pytest.mark.asyncio
+async def test_caller_cancelled_as_its_loader_is_cancelled_sees_cancelled_error() -> None:
+    """A caller's own cancellation wins over a concurrent loader cancellation.
+
+    Converting it to ``FilamentConnectionError`` would break the caller's own
+    unwind (``asyncio.wait_for`` timeouts, task-group teardown).
+    """
+    client = _client()
+    never = asyncio.Event()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        await never.wait()
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    caller = asyncio.create_task(client.get_user_defined_properties("TaskEntity"))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    (loader,) = client._all_user_defined_property_tasks
+
+    loader.cancel()
+    caller.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await caller
+    await client.__aexit__(None, None, None)
+
+
+@pytest.mark.asyncio
 async def test_data_update_needing_discovery_does_not_block_the_receive_loop() -> None:
     """Discovery triggered by a ``DataUpdated`` must not deadlock the transport.
 
