@@ -1528,6 +1528,47 @@ class TestPartReassembly:
         refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_run_loop_ending_without_close_discards_queued_updates(self) -> None:
+        """A dead run loop never reconnects, so queued updates are dropped."""
+        client = _make_client()
+        backend_id = uuid7()
+        _, callback = await _make_subscription(client, backend_id)
+        run_task = MagicMock()
+        run_task.cancelled.return_value = True
+
+        await client._handle_data_updated(self._part_payload(backend_id=backend_id))
+        client._handle_run_task_done(run_task)
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        callback.assert_not_called()
+        assert not client._data_update_queue
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_keeps_a_queued_udp_push_for_a_replaced_private_id(
+        self,
+    ) -> None:
+        """Unsubscribing the last user of a former private ID keeps its queued push."""
+        client = _make_client()
+        old_udp_id = client._user_defined_subscription_id
+        assert old_udp_id is not None
+        client_id, callback = await _make_subscription(client, old_udp_id)
+        refresh = AsyncMock()
+        client._handle_user_defined_property_update = refresh
+
+        await client._handle_data_updated(self._part_payload(backend_id=old_udp_id))
+        client._user_defined_subscription_id = uuid7()
+        client._invoke = AsyncMock(return_value={
+            "success": True, "message": "", "errorCode": 0, "errorId": None,
+        })
+        await client.unsubscribe(SubscriptionId(id=client_id))
+        assert client._data_update_worker is not None
+        await client._data_update_worker
+
+        refresh.assert_awaited_once()
+        callback.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_close_discards_queued_updates(self) -> None:
         client = _make_client()
         backend_id = uuid7()
