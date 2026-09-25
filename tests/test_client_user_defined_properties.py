@@ -189,6 +189,30 @@ async def test_concurrent_reads_share_one_rejected_definition_subscribe() -> Non
 
 
 @pytest.mark.asyncio
+async def test_permissions_survive_rejected_definition_subscribe() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {"success": False, "message": "denied", "errorCode": 0, "data": None}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    first = await client.get_entity_property_permissions("TaskEntity")
+    # Inside the rejection backoff, a second call refreshes without re-subscribing.
+    second = await client.get_entity_property_permissions("TaskEntity")
+
+    assert first.success and first.data is not None
+    assert second.success and second.data is not None
+    assert "TaskEntity" in client._user_defined_properties
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods.count("GetEntityPropertyPermissions") == 2
+    assert methods.count("Subscribe") == 1
+
+
+@pytest.mark.asyncio
 async def test_invalidated_in_flight_discovery_cannot_publish_stale_properties() -> None:
     client = _client()
     first_started = asyncio.Event()
