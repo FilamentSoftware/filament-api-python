@@ -1189,7 +1189,9 @@ class FilamentClient:
                 entity_type_name not in self._user_defined_subscription_types
                 or self._user_defined_subscription_id is None
             ):
-                await self._reconcile_user_defined_property_subscription()
+                await self._reconcile_user_defined_property_subscription_or_warn(
+                    entity_type_name,
+                )
             return cached
         task = self._user_defined_property_tasks.get(entity_type_name)
         if task is None:
@@ -1228,12 +1230,28 @@ class FilamentClient:
                 entity_type_name, reconcile=reconcile,
             )
         if reconcile:
-            try:
-                await self._reconcile_user_defined_property_subscription()
-            except _UserDefinedPropertyLoadError:
-                self._user_defined_properties.pop(entity_type_name, None)
-                raise
+            await self._reconcile_user_defined_property_subscription_or_warn(
+                entity_type_name,
+            )
         return cached
+
+    async def _reconcile_user_defined_property_subscription_or_warn(
+        self, entity_type_name: str,
+    ) -> None:
+        """Reconcile, keeping loaded definitions usable if the subscribe fails.
+
+        A failed reconcile leaves the subscription state untouched, so the type
+        stays uncovered and the next ``_ensure_user_defined_properties`` call
+        retries it.
+        """
+        try:
+            await self._reconcile_user_defined_property_subscription()
+        except _UserDefinedPropertyLoadError as exc:
+            logger.warning(
+                "Could not subscribe to UDP definition changes for %s: %s",
+                entity_type_name,
+                exc.message,
+            )
 
     def _forget_user_defined_property_task(
         self,
