@@ -1447,11 +1447,9 @@ class FilamentClient:
                 return _value_error(
                     f"Invalid UDP definitions for {entity_type_name}: {exc}"
                 )
-            try:
-                await self._reconcile_user_defined_property_subscription()
-            except _UserDefinedPropertyLoadError as exc:
-                self._user_defined_properties.pop(entity_type_name, None)
-                return _value_error(exc.message, exc.error_code)
+            await self._reconcile_user_defined_property_subscription_or_warn(
+                entity_type_name,
+            )
         return result
 
     async def read_data(
