@@ -905,12 +905,9 @@ class FilamentClient:
                     logger.error(
                         "Could not refresh UDP definitions for %s: %s", name, result,
                     )
-            try:
-                await self._reconcile_user_defined_property_subscription()
-            except _UserDefinedPropertyLoadError:
-                logger.exception(
-                    "Could not reconcile UDP definition subscription after refresh"
-                )
+            await self._reconcile_user_defined_property_subscription_or_warn(
+                ", ".join(cached_names),
+            )
 
     def _buffer_part(
         self, backend_id: UUID, part: ServiceDataUpdate,
@@ -1244,13 +1241,14 @@ class FilamentClient:
         return cached
 
     async def _reconcile_user_defined_property_subscription_or_warn(
-        self, entity_type_name: str,
+        self, entity_type_names: str,
     ) -> None:
         """Reconcile, keeping loaded definitions usable if the subscribe fails.
 
         A failed reconcile leaves the subscription state untouched, so the type
         stays uncovered and a later ``_ensure_user_defined_properties`` call
-        retries it once the rejection backoff has elapsed.
+        retries it once the rejection backoff has elapsed.  *entity_type_names*
+        only labels the warning.
         """
         try:
             await self._reconcile_user_defined_property_subscription(
@@ -1259,7 +1257,7 @@ class FilamentClient:
         except _UserDefinedPropertyLoadError as exc:
             logger.warning(
                 "Could not subscribe to UDP definition changes for %s: %s",
-                entity_type_name,
+                entity_type_names,
                 exc.message,
             )
 
