@@ -85,6 +85,10 @@ _DEFAULT_PATH = "api/v0"
 _DEFAULT_CONNECTION_TIMEOUT = 10.0
 # Matches the websockets-library default that pysignalr uses; pass ``None`` for unlimited.
 _DEFAULT_MAX_SIZE = 2**20  # 1 MiB
+# Backoff, in seconds, before retrying a rejected UDP definition-change ``Subscribe``
+# from a read.  Doubles per consecutive rejection up to the maximum.
+_UDP_SUBSCRIBE_RETRY_INITIAL = 5.0
+_UDP_SUBSCRIBE_RETRY_MAX = 300.0
 
 # Parses the byte counts out of a ``ResponseTooLarge`` error message.  The backend
 # formats it as ``"Response would be {actual:N0} bytes; client limit is {limit:N0}
@@ -170,6 +174,8 @@ class FilamentClient:
         self._user_defined_subscription_id: Optional[UUID] = None
         self._user_defined_subscription_types: frozenset[str] = frozenset()
         self._user_defined_subscription_lock = asyncio.Lock()
+        self._user_defined_subscription_failures = 0
+        self._user_defined_subscription_retry_at = 0.0
 
         # Reassembly buffers for chunked DataUpdated events.
         # Key: (backend_subscription_id, sequence_idx) — the logical update being reassembled.
@@ -676,6 +682,8 @@ class FilamentClient:
         self._user_defined_properties.clear()
         self._user_defined_subscription_id = None
         self._user_defined_subscription_types = frozenset()
+        self._user_defined_subscription_failures = 0
+        self._user_defined_subscription_retry_at = 0.0
 
     async def _handle_authentication_failed(self, message: str = "") -> None:
         """Record an ``AuthenticationFailed`` event from the server."""
@@ -1241,11 +1249,13 @@ class FilamentClient:
         """Reconcile, keeping loaded definitions usable if the subscribe fails.
 
         A failed reconcile leaves the subscription state untouched, so the type
-        stays uncovered and the next ``_ensure_user_defined_properties`` call
-        retries it.
+        stays uncovered and a later ``_ensure_user_defined_properties`` call
+        retries it once the rejection backoff has elapsed.
         """
         try:
-            await self._reconcile_user_defined_property_subscription()
+            await self._reconcile_user_defined_property_subscription(
+                respect_backoff=True,
+            )
         except _UserDefinedPropertyLoadError as exc:
             logger.warning(
                 "Could not subscribe to UDP definition changes for %s: %s",
@@ -1268,8 +1278,15 @@ class FilamentClient:
         if not task.cancelled():
             task.exception()
 
-    async def _reconcile_user_defined_property_subscription(self) -> None:
-        """Subscribe privately to definition changes for every cached type."""
+    async def _reconcile_user_defined_property_subscription(
+        self, *, respect_backoff: bool = False,
+    ) -> None:
+        """Subscribe privately to definition changes for every cached type.
+
+        With *respect_backoff*, skip the attempt while a previous rejection's
+        backoff is still running, so repeated or concurrent reads don't each
+        re-issue a ``Subscribe`` the backend keeps rejecting.
+        """
         async with self._user_defined_subscription_lock:
             # Include active refreshes so a temporarily evicted map does not
             # shrink the still-needed maintenance subscription mid-refresh.
@@ -1279,6 +1296,12 @@ class FilamentClient:
             old_id = self._user_defined_subscription_id
             if desired == self._user_defined_subscription_types and (
                 old_id is not None or not desired
+            ):
+                return
+            if (
+                respect_backoff
+                and asyncio.get_running_loop().time()
+                < self._user_defined_subscription_retry_at
             ):
                 return
 
@@ -1298,6 +1321,15 @@ class FilamentClient:
                     response_dict, ValueOrErrorPublic_1[SubscriptionId]
                 )
                 if response is None or not response.success or response.data is None:
+                    self._user_defined_subscription_failures += 1
+                    self._user_defined_subscription_retry_at = (
+                        asyncio.get_running_loop().time()
+                        + min(
+                            _UDP_SUBSCRIBE_RETRY_INITIAL
+                            * 2 ** (self._user_defined_subscription_failures - 1),
+                            _UDP_SUBSCRIBE_RETRY_MAX,
+                        )
+                    )
                     raise _UserDefinedPropertyLoadError(
                         response.message if response is not None else (
                             "Invalid response while subscribing to UDP definition changes"
@@ -1310,6 +1342,8 @@ class FilamentClient:
 
             self._user_defined_subscription_id = new_id
             self._user_defined_subscription_types = desired
+            self._user_defined_subscription_failures = 0
+            self._user_defined_subscription_retry_at = 0.0
             if old_id is not None and old_id != new_id:
                 response_dict = await self._invoke(
                     "Unsubscribe", to_dict(SubscriptionId(id=old_id)),
