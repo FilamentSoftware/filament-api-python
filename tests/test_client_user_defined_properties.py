@@ -102,7 +102,7 @@ async def test_concurrent_discovery_is_shared_and_warm_cache_is_reused() -> None
 
 
 @pytest.mark.asyncio
-async def test_failed_definition_subscribe_keeps_definitions_and_retries(
+async def test_failed_definition_subscribe_keeps_definitions_and_retries_after_backoff(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     client = _client()
@@ -123,13 +123,29 @@ async def test_failed_definition_subscribe_keeps_definitions_and_retries(
             return subscribe_results.pop(0)
         raise AssertionError(method)
 
+    def subscribe_count() -> int:
+        return [call.args[0] for call in client._invoke.await_args_list].count("Subscribe")
+
+    def backoff() -> float:
+        return client._user_defined_subscription_retry_at - asyncio.get_running_loop().time()
+
     client._invoke = AsyncMock(side_effect=invoke)
     with caplog.at_level("WARNING", logger="filament._client"):
         fresh = await client.get_user_defined_properties("TaskEntity")
-        cached = await client.get_user_defined_properties("TaskEntity")
+        assert subscribe_count() == 1
+        assert 0 < backoff() <= 5
 
-    assert fresh.success and cached.success
-    assert fresh.data is cached.data
+        # Inside the backoff window the cached definitions are served without a retry.
+        cached = await client.get_user_defined_properties("TaskEntity")
+        assert subscribe_count() == 1
+
+        client._user_defined_subscription_retry_at = 0.0
+        rejected_again = await client.get_user_defined_properties("TaskEntity")
+        assert subscribe_count() == 2
+        assert 5 < backoff() <= 10
+
+    assert fresh.success and cached.success and rejected_again.success
+    assert fresh.data is cached.data is rejected_again.data
     assert client._user_defined_subscription_id is None
     assert client._user_defined_subscription_types == frozenset()
     assert sum(
@@ -137,13 +153,39 @@ async def test_failed_definition_subscribe_keeps_definitions_and_retries(
         for record in caplog.records
     ) == 2
 
+    client._user_defined_subscription_retry_at = 0.0
     retried = await client.get_user_defined_properties("TaskEntity")
 
     assert retried.success and retried.data is fresh.data
     assert client._user_defined_subscription_id == backend_subscription_id
+    assert client._user_defined_subscription_failures == 0
+    assert client._user_defined_subscription_retry_at == 0.0
     methods = [call.args[0] for call in client._invoke.await_args_list]
     assert methods.count("GetEntityPropertyPermissions") == 1
-    assert methods.count("Subscribe") == 3
+    assert subscribe_count() == 3
+
+
+@pytest.mark.asyncio
+async def test_concurrent_reads_share_one_rejected_definition_subscribe() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            await asyncio.sleep(0)
+            return _permissions_response()
+        if method == "Subscribe":
+            await asyncio.sleep(0)
+            return {"success": False, "message": "denied", "errorCode": 0, "data": None}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    results = await asyncio.gather(
+        *(client.get_user_defined_properties("TaskEntity") for _ in range(3))
+    )
+
+    assert all(result.success for result in results)
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods.count("Subscribe") == 1
 
 
 @pytest.mark.asyncio
