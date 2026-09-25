@@ -41,6 +41,10 @@ _LIST_CLASS = "filament._condition_builder.DbConditionListProperty"
 _DICT_CLASS = "filament._condition_builder.DbConditionDictProperty"
 _ENTITY_BASE = "filament.types.generated.base.base.EntityBase"
 _GENERATED_ENTITY_PREFIX = "filament.types.generated.entities."
+_GENERATED_PREFIX = "filament.types.generated."
+# Unknown attributes resolve through this class's ``__getattr__``, so mypy
+# reports them under its fullname rather than the entity's.
+_SPECIFIED_PROPERTIES_BASE = "filament._specified_properties.SpecifiedPropertiesBase"
 
 
 # ---------------------------------------------------------------------------
@@ -117,8 +121,10 @@ class FilamentConditionPlugin(Plugin):
         self, fullname: str,
     ) -> Optional[Callable[[AttributeContext], MypyType]]:
         """Type UDP attributes and retain strictness around all other names."""
-        name = fullname.rsplit(".", 1)[-1]
-        return lambda ctx: self._entity_attribute_hook(ctx, name)
+        owner, _, name = fullname.rpartition(".")
+        if owner.startswith(_GENERATED_PREFIX) or owner == _SPECIFIED_PROPERTIES_BASE:
+            return lambda ctx: self._entity_attribute_hook(ctx, name)
+        return None
 
     def get_function_hook(
         self, fullname: str,
