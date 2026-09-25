@@ -102,6 +102,51 @@ async def test_concurrent_discovery_is_shared_and_warm_cache_is_reused() -> None
 
 
 @pytest.mark.asyncio
+async def test_failed_definition_subscribe_keeps_definitions_and_retries(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _client()
+    backend_subscription_id = uuid7()
+    subscribe_results = [
+        {"success": False, "message": "denied", "errorCode": 0, "data": None},
+        {"success": False, "message": "denied", "errorCode": 0, "data": None},
+        {
+            "success": True, "message": "", "errorCode": 0,
+            "data": {"id": str(backend_subscription_id)},
+        },
+    ]
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return subscribe_results.pop(0)
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    with caplog.at_level("WARNING", logger="filament._client"):
+        fresh = await client.get_user_defined_properties("TaskEntity")
+        cached = await client.get_user_defined_properties("TaskEntity")
+
+    assert fresh.success and cached.success
+    assert fresh.data is cached.data
+    assert client._user_defined_subscription_id is None
+    assert client._user_defined_subscription_types == frozenset()
+    assert sum(
+        "Could not subscribe to UDP definition changes" in record.getMessage()
+        for record in caplog.records
+    ) == 2
+
+    retried = await client.get_user_defined_properties("TaskEntity")
+
+    assert retried.success and retried.data is fresh.data
+    assert client._user_defined_subscription_id == backend_subscription_id
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods.count("GetEntityPropertyPermissions") == 1
+    assert methods.count("Subscribe") == 3
+
+
+@pytest.mark.asyncio
 async def test_invalidated_in_flight_discovery_cannot_publish_stale_properties() -> None:
     client = _client()
     first_started = asyncio.Event()
