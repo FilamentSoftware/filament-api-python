@@ -189,6 +189,45 @@ async def test_concurrent_reads_share_one_rejected_definition_subscribe() -> Non
 
 
 @pytest.mark.asyncio
+async def test_null_definition_subscribe_response_keeps_definitions() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return None
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    result = await client.get_user_defined_properties("TaskEntity")
+
+    assert result.success and result.data is not None
+    assert client._user_defined_subscription_failures == 1
+    assert client._user_defined_subscription_id is None
+
+
+@pytest.mark.asyncio
+async def test_definition_subscribe_backoff_is_capped_after_many_rejections() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {"success": False, "message": "denied", "errorCode": 0, "data": None}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    client._user_defined_subscription_failures = 5000
+    result = await client.get_user_defined_properties("TaskEntity")
+
+    assert result.success
+    backoff = client._user_defined_subscription_retry_at - asyncio.get_running_loop().time()
+    assert 299 < backoff <= 300
+
+
+@pytest.mark.asyncio
 async def test_permissions_survive_rejected_definition_subscribe() -> None:
     client = _client()
 
