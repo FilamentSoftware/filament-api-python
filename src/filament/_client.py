@@ -1315,16 +1315,21 @@ class FilamentClient:
                     mode=SubscriptionMode.Data,
                 )
                 response_dict: Any = await self._invoke("Subscribe", to_dict(config))
-                response = from_dict(
-                    response_dict, ValueOrErrorPublic_1[SubscriptionId]
-                )
+                response: Optional[ValueOrErrorPublic_1[SubscriptionId]]
+                try:
+                    response = from_dict(
+                        response_dict, ValueOrErrorPublic_1[SubscriptionId]
+                    )
+                except (AttributeError, TypeError, ValueError, KeyError):
+                    response = None
                 if response is None or not response.success or response.data is None:
                     self._user_defined_subscription_failures += 1
                     self._user_defined_subscription_retry_at = (
                         asyncio.get_running_loop().time()
                         + min(
                             _UDP_SUBSCRIBE_RETRY_INITIAL
-                            * 2 ** (self._user_defined_subscription_failures - 1),
+                            # Capped so a long run of rejections can't overflow the float.
+                            * 2 ** min(self._user_defined_subscription_failures - 1, 16),
                             _UDP_SUBSCRIBE_RETRY_MAX,
                         )
                     )
