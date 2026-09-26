@@ -102,6 +102,156 @@ async def test_concurrent_discovery_is_shared_and_warm_cache_is_reused() -> None
 
 
 @pytest.mark.asyncio
+async def test_failed_definition_subscribe_keeps_definitions_and_retries_after_backoff(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _client()
+    backend_subscription_id = uuid7()
+    subscribe_results = [
+        {"success": False, "message": "denied", "errorCode": 0, "data": None},
+        {"success": False, "message": "denied", "errorCode": 0, "data": None},
+        {
+            "success": True, "message": "", "errorCode": 0,
+            "data": {"id": str(backend_subscription_id)},
+        },
+    ]
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return subscribe_results.pop(0)
+        raise AssertionError(method)
+
+    def subscribe_count() -> int:
+        return [call.args[0] for call in client._invoke.await_args_list].count("Subscribe")
+
+    def backoff() -> float:
+        return client._user_defined_subscription_retry_at - asyncio.get_running_loop().time()
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    with caplog.at_level("WARNING", logger="filament._client"):
+        fresh = await client.get_user_defined_properties("TaskEntity")
+        assert subscribe_count() == 1
+        assert 0 < backoff() <= 5
+
+        # Inside the backoff window the cached definitions are served without a retry.
+        cached = await client.get_user_defined_properties("TaskEntity")
+        assert subscribe_count() == 1
+
+        client._user_defined_subscription_retry_at = 0.0
+        rejected_again = await client.get_user_defined_properties("TaskEntity")
+        assert subscribe_count() == 2
+        assert 5 < backoff() <= 10
+
+    assert fresh.success and cached.success and rejected_again.success
+    assert fresh.data is cached.data is rejected_again.data
+    assert client._user_defined_subscription_id is None
+    assert client._user_defined_subscription_types == frozenset()
+    assert sum(
+        "Could not subscribe to UDP definition changes" in record.getMessage()
+        for record in caplog.records
+    ) == 2
+
+    client._user_defined_subscription_retry_at = 0.0
+    retried = await client.get_user_defined_properties("TaskEntity")
+
+    assert retried.success and retried.data is fresh.data
+    assert client._user_defined_subscription_id == backend_subscription_id
+    assert client._user_defined_subscription_failures == 0
+    assert client._user_defined_subscription_retry_at == 0.0
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods.count("GetEntityPropertyPermissions") == 1
+    assert subscribe_count() == 3
+
+
+@pytest.mark.asyncio
+async def test_concurrent_reads_share_one_rejected_definition_subscribe() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            await asyncio.sleep(0)
+            return _permissions_response()
+        if method == "Subscribe":
+            await asyncio.sleep(0)
+            return {"success": False, "message": "denied", "errorCode": 0, "data": None}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    results = await asyncio.gather(
+        *(client.get_user_defined_properties("TaskEntity") for _ in range(3))
+    )
+
+    assert all(result.success for result in results)
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods.count("Subscribe") == 1
+
+
+@pytest.mark.asyncio
+async def test_null_definition_subscribe_response_keeps_definitions() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return None
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    result = await client.get_user_defined_properties("TaskEntity")
+
+    assert result.success and result.data is not None
+    assert client._user_defined_subscription_failures == 1
+    assert client._user_defined_subscription_id is None
+
+
+@pytest.mark.asyncio
+async def test_definition_subscribe_backoff_is_capped_after_many_rejections() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {"success": False, "message": "denied", "errorCode": 0, "data": None}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    client._user_defined_subscription_failures = 5000
+    result = await client.get_user_defined_properties("TaskEntity")
+
+    assert result.success
+    backoff = client._user_defined_subscription_retry_at - asyncio.get_running_loop().time()
+    assert 299 < backoff <= 300
+
+
+@pytest.mark.asyncio
+async def test_permissions_survive_rejected_definition_subscribe() -> None:
+    client = _client()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {"success": False, "message": "denied", "errorCode": 0, "data": None}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    first = await client.get_entity_property_permissions("TaskEntity")
+    # Inside the rejection backoff, a second call refreshes without re-subscribing.
+    second = await client.get_entity_property_permissions("TaskEntity")
+
+    assert first.success and first.data is not None
+    assert second.success and second.data is not None
+    assert "TaskEntity" in client._user_defined_properties
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods.count("GetEntityPropertyPermissions") == 2
+    assert methods.count("Subscribe") == 1
+
+
+@pytest.mark.asyncio
 async def test_invalidated_in_flight_discovery_cannot_publish_stale_properties() -> None:
     client = _client()
     first_started = asyncio.Event()

@@ -251,6 +251,34 @@ def test_udp_attribute_is_any_but_other_unknown_attribute_errors(
     assert 'has no attribute "not_a_real_property"' in errors[0]
 
 
+@pytest.mark.parametrize(
+    "fullname, claimed",
+    [
+        pytest.param(
+            "filament._specified_properties.SpecifiedPropertiesBase.udp_budget",
+            True,
+            id="specified-properties-base",
+        ),
+        pytest.param(
+            "filament.types.generated.entities.task_service.TaskEntity.name",
+            False,
+            id="declared-entity-field",
+        ),
+        pytest.param("builtins.str.upper", False, id="non-filament-class"),
+    ],
+)
+def test_attribute_hook_is_claimed_only_for_specified_properties_base(
+    fullname: str, claimed: bool,
+) -> None:
+    # A claimed hook blocks any other plugin from typing the same attribute.
+    from mypy.options import Options
+
+    from filament_mypy_plugin import FilamentConditionPlugin
+
+    plugin = FilamentConditionPlugin(Options())
+    assert (plugin.get_attribute_hook(fullname) is not None) is claimed
+
+
 def test_udp_constructor_literal_keys_are_validated(tmp_path: Path) -> None:
     valid = (
         "from filament.types.generated.entities.task_service import TaskEntity\n"

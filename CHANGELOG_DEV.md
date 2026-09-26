@@ -1,3 +1,17 @@
+## 0.7.3-dev.0.0.1 (2026-09-26 11:32)
+
+### Client
+
+#### FIX
+- get_entity_property_permissions returns the fetched permissions and keeps the UDP cache when the definition-change subscription is rejected, matching read paths
+- Reads no longer re-send a rejected UDP definition-change subscription on every call; retries back off from 5s up to 5 minutes
+- UDP definitions are still returned with a warning when subscribing to their changes fails, and the subscribe is retried on the next call
+
+### Mypy Plugin
+
+#### FIX
+- Other mypy plugins can now type attributes that aren't on Filament entities
+
 ## 0.7.2-dev.0.0.1 (2026-09-24 16:15)
 
 ### Client
