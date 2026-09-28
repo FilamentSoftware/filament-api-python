@@ -1347,7 +1347,14 @@ class FilamentClient:
             self._user_defined_subscription_types = desired
             self._user_defined_subscription_failures = 0
             self._user_defined_subscription_retry_at = 0.0
-            if old_id is not None and old_id != new_id:
+            # A user subscription may share the superseded backend ID (the backend
+            # dedupes identical subscriptions); unsubscribe() sends the backend
+            # Unsubscribe once its last client is removed, so leave it alone here.
+            if (
+                old_id is not None
+                and old_id != new_id
+                and old_id not in self._backend_to_client
+            ):
                 response_dict = await self._invoke(
                     "Unsubscribe", to_dict(SubscriptionId(id=old_id)),
                 )
