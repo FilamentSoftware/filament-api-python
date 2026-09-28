@@ -1350,6 +1350,10 @@ class FilamentClient:
             # A user subscription may share the superseded backend ID (the backend
             # dedupes identical subscriptions); unsubscribe() sends the backend
             # Unsubscribe once its last client is removed, so leave it alone here.
+            # Known gap: subscribe() doesn't hold _user_defined_subscription_lock and
+            # only registers in _backend_to_client after its Subscribe returns, so a
+            # concurrent identical user subscribe can still be deduped onto old_id
+            # and then cancelled by the Unsubscribe below.
             if (
                 old_id is not None
                 and old_id != new_id
