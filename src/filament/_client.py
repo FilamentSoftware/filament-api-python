@@ -2219,7 +2219,8 @@ class FilamentClient:
                         # _reconcile_user_defined_property_subscription would
                         # then early-return and never restore it.  Leave the
                         # backend subscription — and its in-flight buffers —
-                        # alone.
+                        # alone; once reconcile moves off this ID it sends the
+                        # deferred Unsubscribe itself.
                         return SuccessOrErrorPublic(
                             success=True,
                             message="",
