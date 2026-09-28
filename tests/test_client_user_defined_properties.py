@@ -626,6 +626,52 @@ async def test_reconcile_does_not_cancel_a_shared_user_subscription() -> None:
 
 
 @pytest.mark.asyncio
+async def test_unsubscribe_during_reconcile_releases_the_superseded_id_once() -> None:
+    """A user unsubscribe mid-reconcile defers, and reconcile sends, one Unsubscribe."""
+    client = _client()
+    shared_id = uuid7()
+    subscribe_ids = iter((shared_id, uuid7()))
+    client_id = uuid7()
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            new_id = next(subscribe_ids)
+            if new_id != shared_id:
+                # The user's last client goes while the private ID is still shared_id.
+                result = await client.unsubscribe(SubscriptionId(id=client_id))
+                assert result.success
+            return {
+                "success": True, "message": "", "errorCode": 0,
+                "data": {"id": str(new_id)},
+            }
+        if method == "Unsubscribe":
+            return {"success": True, "message": "", "errorCode": 0}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    await client.get_user_defined_properties("TaskEntity")
+    assert client._user_defined_subscription_id == shared_id
+
+    client._backend_to_client[shared_id] = {client_id}
+    client._client_callbacks[client_id] = lambda _update: None
+    client._client_to_backend[client_id] = shared_id
+
+    await client.get_user_defined_properties("UserEntity")
+
+    unsubscribes = [
+        call.args[1] for call in client._invoke.await_args_list
+        if call.args[0] == "Unsubscribe"
+    ]
+    assert unsubscribes == [{"id": str(shared_id)}], (
+        "the superseded shared ID must be released exactly once, by reconcile"
+    )
+    assert client._user_defined_subscription_id != shared_id
+    assert shared_id not in client._backend_to_client
+
+
+@pytest.mark.asyncio
 async def test_unsubscribe_all_restores_a_subscription_covering_every_type() -> None:
     """``unsubscribe_all`` must leave the private subscription covering all types.
 
