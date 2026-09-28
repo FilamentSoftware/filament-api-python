@@ -583,6 +583,49 @@ async def test_unsubscribe_does_not_cancel_the_shared_private_subscription() -> 
 
 
 @pytest.mark.asyncio
+async def test_reconcile_does_not_cancel_a_shared_user_subscription() -> None:
+    """Superseding the private subscription must not kill a user one sharing its ID."""
+    client = _client()
+    shared_id = uuid7()
+    subscribe_ids = iter((shared_id, uuid7()))
+
+    async def invoke(method: str, *args: Any) -> Any:
+        if method == "GetEntityPropertyPermissions":
+            return _permissions_response()
+        if method == "Subscribe":
+            return {
+                "success": True, "message": "", "errorCode": 0,
+                "data": {"id": str(next(subscribe_ids))},
+            }
+        if method == "Unsubscribe":
+            return {"success": True, "message": "", "errorCode": 0}
+        raise AssertionError(method)
+
+    client._invoke = AsyncMock(side_effect=invoke)
+    await client.get_user_defined_properties("TaskEntity")
+    assert client._user_defined_subscription_id == shared_id
+
+    client_id = uuid7()
+    client._backend_to_client[shared_id] = {client_id}
+    client._client_callbacks[client_id] = lambda _update: None
+    client._client_to_backend[client_id] = shared_id
+
+    await client.get_user_defined_properties("UserEntity")
+
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert "Unsubscribe" not in methods, (
+        "reconcile cancelled a user subscription sharing the superseded ID"
+    )
+    assert client._user_defined_subscription_id != shared_id
+
+    # Once the user's last client goes, the shared backend ID is released.
+    result = await client.unsubscribe(SubscriptionId(id=client_id))
+    assert result.success
+    methods = [call.args[0] for call in client._invoke.await_args_list]
+    assert methods[-1] == "Unsubscribe"
+
+
+@pytest.mark.asyncio
 async def test_unsubscribe_all_restores_a_subscription_covering_every_type() -> None:
     """``unsubscribe_all`` must leave the private subscription covering all types.
 
