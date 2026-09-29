@@ -1,3 +1,10 @@
+## 0.7.4-dev.0.0.2 (2026-09-29 14:42)
+
+### Types
+
+#### OTHER
+- Split entity `priority` fields into `priority_weight` (higher wins) and `priority_order` (lower wins), and added milestone priority ordering and a priority-milestone weight multiplier
+
 ## 0.7.4-dev.0.0.1 (2026-09-29 10:22)
 
 ### Client
