@@ -99,14 +99,14 @@ class TaskOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a task and an office location within the system, extending the EntityConnection functionality.
     
-    :param priority: Represents the priority of the task-office location connection.
-                     This value determines the priority level associated with the connection
-                     between a task and an office location.
+    :param priority_order: The rank of this office among the offices the task can be assigned to. <b>Lower is higher
+                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+                           the smallest value are equally preferred.
     :param auto_generated_by: The name of the task module that generated this office location link during propagation - <c>TaskScopeModule</c> or
                               <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
     """
-    priority: int = field(default=1)
+    priority_order: int = field(default=1)
     auto_generated_by: Optional[str] = field(default=None)

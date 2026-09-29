@@ -977,7 +977,7 @@ _Extends:_ `PermissionsRoleConnectionBase_1`
 
 ##### `AvailabilityEntity`
 
-For storing availability information for a user. Multiple Availability entities can be stacked, using the `Priority` property to determine the relative priorities.
+For storing availability information for a user. Multiple Availability entities can be stacked, using the `PriorityWeight` property to determine which takes precedence (higher wins).
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -988,7 +988,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[Union[OfficeLocationEntity, UserEntity]]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | A human-readable name for this Availability entity. |
 | `description` | `str` | `''` | An optional description providing additional detail about this Availability entity. |
-| `priority` | `int` | `0` | The priority of this Availability entity. The higher the priority, the more this entity takes precedence. |
+| `priority_weight` | `int` | `0` | The precedence of this Availability entity. Higher is higher priority: where availabilities overlap, the one with the larger PriorityWeight takes precedence. Between equal weights the most restrictive `AvailabilityMode` wins (`Unavailable`, then `AvailableIfRequired`, then `Available`), then the lowest `Id`. |
 | `availability_mode` | `AvailabilityModeEnum` | `AvailabilityModeEnum.Unknown` | Whether this Availability entity sets the availability to be Available, Unavailable or AvailableIfRequired. |
 | `start_date_time` | `datetime.datetime` | — | The start time (in local time) of this Availability block. |
 | `end_date_time` | `datetime.datetime` | — | The end time (in local time) of this Availability block. |
@@ -1048,11 +1048,11 @@ _Extends:_ `GenericTaskSkillConnection_1`
 
 ##### `CastOfficeLocationConnection`
 
-Represents the relationship between a cast entity and an office location entity. This connection may include additional metadata such as priority to determine the importance or ranking of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
+Represents the relationship between a cast entity and an office location entity. `PriorityOrder` ranks the office among the cast's offices. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `priority` | `int` | `0` | Represents the priority level assigned to the connection between a CastEntity and an OfficeLocationEntity. |
+| `priority_order` | `int` | `0` | The rank of this office among the offices the cast's tasks can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 
 ### Currency Service
 
@@ -1151,7 +1151,7 @@ Represents an agenda item within an event.
 | `event` | `Optional[EventEntity]` | `None` | A helper property for setting EventId. Pass in an EventEntity type. |
 | `title` | `str` | `''` | The agenda item title |
 | `description` | `str` | `''` | A more detailed description of the agenda item. |
-| `priority` | `int` | `1` | The priority of this item in the agenda. |
+| `priority_order` | `int` | `1` | The position of this item in the agenda. Lower is higher priority: items run in ascending PriorityOrder, so 1 comes first. |
 
 #### Connections
 
@@ -1587,7 +1587,7 @@ _Extends:_ `ReferenceEntityBase`
 | `mode` | `ScheduleSegmentModeEnum` | `ScheduleSegmentModeEnum.Unknown` | The mode of the schedule segment, specifying its functional purpose within the schedule. Possible values include Unknown, Work, Buffer, Processing, Group, User, and Event. |
 | `parent_ids` | `list[UUID]` | — | The identifier of the parent segments associated with the current schedule segment entity. Used to establish hierarchical relationships between segments. |
 | `parents` | `Optional[list[ScheduleSegmentEntity]]` | `None` | The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment. |
-| `priority` | `float` | `1` | The priority of this schedule segment, derived from the associated task's priority. Meeting segments have a priority of 1.0. |
+| `priority_weight` | `float` | `1` | The scheduling weight of this schedule segment, copied from the associated task's `PriorityWeight`. Higher is higher priority. Meeting segments have a weight of 1.0. |
 | `time_log_id` | `Optional[UUID]` | `None` | The identifier of the time log entry associated with this schedule segment. This is used to link logged work time segments back to their source time log. |
 | `duration_multiplier` | `Optional[float]` | `None` | Snapshot of the `DurationMultiplier` for the user who performed the logged work, captured at the time the segment was first created. Only populated on segments with `Mode` = `TimeLog`; null for all other modes and when no matching `CastUserConnection` existed at creation time. The value is intentionally frozen — later changes to the underlying `DurationMultiplier` do not update this snapshot. |
 | `time_log` | `Optional[TimeLogEntity]` | `None` | The time log entry associated with this schedule segment. Used to conveniently link a segment to its source time log. |
@@ -1639,6 +1639,7 @@ Represents the settings for a schedule within the scheduling service.
 | `task_priority_task_priority_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority TaskPriority weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
 | `task_priority_siblings_scheduled_score_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority SiblingsScheduledScore weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
 | `task_priority_window_order_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority PreviousScheduleOrderInMaintainWindow weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the in-window task-ordering boost; values above 1.0 amplify it. See the maintain-schedule feature for context. |
+| `priority_milestone_weight_multiplier` | `float` | `1` | Multiplier applied to the priority-milestone weight from SchedulePrioritySettings (SpringLayout.PriorityMilestone.Weight), which sets how hard a Priority milestone front-loads its upstream tasks. 1.0 leaves the default unchanged; 0.0 disables Priority milestones' pull; values above 1.0 amplify it. Does not affect Fixed milestones the scheduler demotes to Priority for a run. |
 | `max_event_repeat` | `datetime.timedelta` | — | Maximum horizon past CurrentInstant for which recurring events are materialised. Occurrences whose target start is beyond this horizon are not scheduled until a later run when CurrentInstant has advanced. Default: 365 days. |
 | `initial_repeating_event_alignment_lookahead` | `int` | `4` | Number of leading occurrences across which the planner attempts to align a recurring event's time-within-period. Until this many anchors have been persisted, the planner uses a lookahead pass to pick a single target time-within-period that the most of the first N occurrences can land at simultaneously. From the (N+1)th anchor onward, the mode-of-history calculation drives the target instead. Default: 4. |
 | `event_history_sample_size` | `int` | `20` | Number of historical occurrences of a recurring event the planner looks back over. It bounds two things at once: the history sample fed to the mode-of-history offset calculation — the newest N started anchors (plus any placements made earlier in the same pass) decide the time-within-period that future occurrences are aligned to, so recent cadence outweighs year-old placements; the occurrence walk-back on an ordinary (non-repair) pass — enumeration starts no earlier than the target of the Nth-newest started anchor, so retained history is not re-walked every cycle. Holes older than that are back-filled only on an operator FullSchedule pass. Both arms are additionally clamped by MaxEventRepeat. Default: 20. |
@@ -1797,7 +1798,7 @@ Represents a single item within a scope.
 | `count` | `int` | `1` | The total number of items in the collection. |
 | `task_duration_multiplier` | `float` | `1` | This allows fine-grained control over task durations on a per item basis. |
 | `chargeable_multiplier` | `float` | `1` | A multiplier on the chargeable cost for this item. Used for discounting (or adding surplus) to chargeable costs. |
-| `priority` | `float` | `1` | The priority of this scope item. Used to influence task scheduling priority. Must be between 0 and 1 (inclusive). |
+| `priority_weight` | `float` | `1` | The scheduling weight of this scope item, between 0 and 1 (inclusive). Higher is higher priority: it multiplies with the scope's `PriorityWeight` into the weight of every task generated from the item. |
 | `status_id` | `UUID` | — | The status assigned to this scope item. |
 | `status` | `Optional[ScopeStatusEntity]` | `None` | A helper method for setting the StatusId property. |
 | `internal_note_id` | `Optional[UUID]` | `None` | A link to the internal note for this ScopeItem. |
@@ -1845,7 +1846,7 @@ Represents a connection between a `ScopeItemEntity` and an `OfficeLocationEntity
 | ----- | ---- | ------- | ----------- |
 | `scope_task_type_id` | `Optional[UUID]` | `None` | The identifier for the associated `ScopeTaskTypeEntity`. This property establishes a link to a specific task type within the scope, allowing for detailed categorization and context for the connection. |
 | `scope_task_type` | `Optional[ScopeTaskTypeEntity]` | `None` | A helper property for setting the scope task type ID. |
-| `priority` | `int` | `1` | What is the priority order of offices that this task can be assigned to. |
+| `priority_order` | `int` | `1` | The rank of this office among the offices this scope item's tasks can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 | `scope_item_context_id` | `Optional[UUID]` | `None` | A link to another scope item to use as scope context for the office connection. |
 | `scope_item_context` | `Optional[ScopeItemEntity]` | `None` | A helper property for setting the scope item context ID. |
 | `scope_template_item_context_id` | `Optional[UUID]` | `None` | A link to a template item to use as scope context for the office connection. |
@@ -1895,6 +1896,7 @@ Represents a milestone within a scope.
 | `name` | `str` | `''` | The name of the milestone. |
 | `description` | `str` | `''` | A description of the milestone. |
 | `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
+| `priority_order` | `float` | `1` | The rank of this milestone among `Priority` milestones. Lower is higher priority: the scheduler's pull strength is the priority-milestone weight divided by PriorityOrder, so order 1 pulls twice as hard as order 2, and a value of zero or less applies no pull. Copied to the derived `TaskMilestoneEntity`. Has no effect in the other modes. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone begins or ends (depending on its Direction) If the Instant is null, then it if flexible and can be moved |
 | `direction` | `ScopeMilestoneDirectionEnum` | `ScopeMilestoneDirectionEnum.StartAfter` | Is this a start milestone or a delivery milestone. StartAfter means connected tasks must start after the milestone. EndBefore means the tasks must be finished before this milestone. |
 | `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections whose own ScopeTaskTypeStepIds is null. A connection's non-null list overrides this (an empty one suppressing it entirely); when neither yields a step id the milestone attaches to the item's leaf tasks instead. |
@@ -1917,7 +1919,7 @@ Represents a specific entity with associated metadata and behaviors, categorized
 | `image` | `Optional[FileReference]` | `None` | The image as a FileReference. Arrives unset — populate it from ImageData. |
 | `task_duration_multiplier` | `float` | `1` | An overall multiplier that applies to all task durations. This allows a project to effectively adjust the duration of all tasks in one place. |
 | `chargeable_multiplier` | `float` | `1` | An overall multiplier on chargeable costs. This is used to set global discounts for an entire project. |
-| `priority` | `float` | `1` | The priority of this scope. Used to influence task scheduling priority. Must be between 0 and 1 (inclusive). |
+| `priority_weight` | `float` | `1` | The scheduling weight of this scope, between 0 and 1 (inclusive). Higher is higher priority: it multiplies into the weight of every task in the scope, so a task in a 1.0 scope is scheduled ahead of an otherwise-equal task in a 0.5 scope. |
 | `status_id` | `UUID` | — | The status assigned to this scope. This is not an EntityLinkProperty because this type is in FSCore, and ScopeStatusEntity is in CoreServices. |
 | `currency_id` | `UUID` | — | The currency used for this scope's monetary values. This is not an EntityLinkProperty because this type is in FSCore, and CurrencyEntity is in CoreServices. |
 
@@ -2048,7 +2050,7 @@ Represents a connection between a scope task type and an office location.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `priority` | `int` | `1` | What is the priority order of offices that this task can be assigned to. |
+| `priority_order` | `int` | `1` | The rank of this office among the offices this task type's tasks can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 
 ### Scope Template Item Service
 
@@ -2225,6 +2227,7 @@ _Extends:_ `ReferenceEntityBase`
 | `name` | `str` | `''` | The given name for this milestone. |
 | `description` | `str` | `''` | The description of this milestone |
 | `mode` | `TaskMilestoneModeEnum` | `TaskMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
+| `priority_order` | `float` | `1` | The rank of this milestone among `Priority` milestones. Lower is higher priority: the scheduler's pull strength is the priority-milestone weight divided by PriorityOrder, so order 1 pulls twice as hard as order 2, and a value of zero or less applies no pull. Copied from `PriorityOrder` on a milestone generated from a scope milestone. Has no effect in the other modes. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone is due. If the Instant is null, the milestone is flexible and can be moved |
 | `direction` | `TaskMilestoneDirectionEnum` | `TaskMilestoneDirectionEnum.EndBefore` | Should tasks start after this milestone, or end before it? |
 | `warnings_data` | `Optional[str]` | `None` | JSON-serialized list of warnings raised while processing this milestone - each is a `TaskMilestoneWarning` describing an issue, such as an assignment that attached to no tasks. Null when there are no warnings. |
@@ -2276,7 +2279,7 @@ _Extends:_ `ReferenceEntityBase`
 | `deliverables` | `list[str]` | — | Deliverables expected for this task to be complete, taken from the `ScopeTaskTypeStepEntity` this task was created from. |
 | `requires_review` | `bool` | `False` | If this task needs to go into reviews once it is done. |
 | `default_processing_duration` | `datetime.timedelta` | — | The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions. This will be used as the default processing duration to be filled in on `TaskStatusEntity`. |
-| `priority` | `float` | `1` | The priority of this task, derived from the scope and scope item priorities. |
+| `priority_weight` | `float` | `1` | The scheduling weight of this task, derived from the scope and scope item PriorityWeights and their statuses' priority multipliers. Higher is higher priority: it feeds the scheduler's task-priority score, which ranks higher weights first. |
 | `ancestor_group_ids` | `list[UUID]` | — | Identifies the IDs of all ancestor task groups in the hierarchy that are related to this instance of `TaskEntity`. |
 | `ancestor_groups` | `Optional[list[TaskGroupEntity]]` | `None` | Contains the collection of ancestor task groups that are hierarchically above the current task. This property is used to establish relationships between task groups in a hierarchical structure, identifying all ancestor groups for the current entity. |
 | `chargeable` | `float` | `0` | The calculated chargeable amount for this task, derived from the task type's chargeable per hour, the task duration, and the scope/item chargeable multipliers, with currency conversion applied. |
@@ -2341,7 +2344,7 @@ Represents a connection between a task and an office location within the system,
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `priority` | `int` | `1` | Represents the priority of the task-office location connection. This value determines the priority level associated with the connection between a task and an office location. |
+| `priority_order` | `int` | `1` | The rank of this office among the offices the task can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 | `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this office location link during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ### Task Status Service

@@ -83,7 +83,7 @@ def _errors(output: str) -> list[str]:
 _AVAILABILITY_CASES = [
     # Declared directly on AvailabilityEntity.
     pytest.param("name", f"{_CB}.DbConditionComparableProperty[str]", id="own-str"),
-    pytest.param("priority", f"{_CB}.DbConditionComparableProperty[int]", id="own-int"),
+    pytest.param("priority_weight", f"{_CB}.DbConditionComparableProperty[int]", id="own-int"),
     # Non-comparable scalar (an enum) -> plain property, not comparable.
     pytest.param(
         "availability_mode",
