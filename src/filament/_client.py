@@ -1347,7 +1347,18 @@ class FilamentClient:
             self._user_defined_subscription_types = desired
             self._user_defined_subscription_failures = 0
             self._user_defined_subscription_retry_at = 0.0
-            if old_id is not None and old_id != new_id:
+            # A user subscription may share the superseded backend ID (the backend
+            # dedupes identical subscriptions); unsubscribe() sends the backend
+            # Unsubscribe once its last client is removed, so leave it alone here.
+            # Known gap: subscribe() doesn't hold _user_defined_subscription_lock and
+            # only registers in _backend_to_client after its Subscribe returns, so a
+            # concurrent identical user subscribe can still be deduped onto old_id
+            # and then cancelled by the Unsubscribe below.
+            if (
+                old_id is not None
+                and old_id != new_id
+                and old_id not in self._backend_to_client
+            ):
                 response_dict = await self._invoke(
                     "Unsubscribe", to_dict(SubscriptionId(id=old_id)),
                 )
@@ -2208,7 +2219,8 @@ class FilamentClient:
                         # _reconcile_user_defined_property_subscription would
                         # then early-return and never restore it.  Leave the
                         # backend subscription — and its in-flight buffers —
-                        # alone.
+                        # alone; once reconcile moves off this ID it sends the
+                        # deferred Unsubscribe itself.
                         return SuccessOrErrorPublic(
                             success=True,
                             message="",
