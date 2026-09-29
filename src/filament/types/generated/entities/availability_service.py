@@ -18,12 +18,16 @@ __all__ = [
 class AvailabilityEntity(ReferenceEntityBase):
     """
     For storing availability information for a user. Multiple Availability entities can be stacked, using the
-    <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.Priority" /> property to determine the relative priorities.
+    <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.PriorityWeight" /> property to determine which takes precedence (higher wins).
     
     :param reference: Represents a linked entity instance.
     :param name: A human-readable name for this Availability entity.
     :param description: An optional description providing additional detail about this Availability entity.
-    :param priority: The priority of this Availability entity. The higher the priority, the more this entity takes precedence.
+    :param priority_weight: The precedence of this Availability entity. <b>Higher is higher priority</b>: where availabilities
+                            overlap, the one with the larger <c>PriorityWeight</c> takes precedence. Between equal weights the
+                            most restrictive <see cref="P:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity.AvailabilityMode" /> wins (<see cref="F:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityModeEnum.Unavailable" />,
+                            then <see cref="F:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityModeEnum.AvailableIfRequired" />, then
+                            <see cref="F:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityModeEnum.Available" />), then the lowest <see cref="P:Filament.FSCore.Entities.EntityBase.Id" />.
     :param availability_mode: Whether this Availability entity sets the availability to be Available, Unavailable or AvailableIfRequired.
     :param start_date_time: The start time (in local time) of this Availability block.
     :param end_date_time: The end time (in local time) of this Availability block.
@@ -39,7 +43,7 @@ class AvailabilityEntity(ReferenceEntityBase):
     reference: Optional[Union[OfficeLocationEntity, UserEntity]] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
-    priority: int = field(default=0)
+    priority_weight: int = field(default=0)
     availability_mode: AvailabilityModeEnum = field(default=AvailabilityModeEnum.Unknown)
     start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)

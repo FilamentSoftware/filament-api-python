@@ -98,10 +98,11 @@ class EventAgendaItemEntity(Entity):
     :param event: A helper property for setting EventId. Pass in an EventEntity type.
     :param title: The agenda item title
     :param description: A more detailed description of the agenda item.
-    :param priority: The priority of this item in the agenda.
+    :param priority_order: The position of this item in the agenda. <b>Lower is higher priority</b>: items run in ascending
+                           <c>PriorityOrder</c>, so 1 comes first.
     """
     event_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     event: Optional[EventEntity] = field(default=None)
     title: str = field(default='')
     description: str = field(default='')
-    priority: int = field(default=1)
+    priority_order: int = field(default=1)

@@ -24,6 +24,11 @@ class ScopeMilestoneEntity(Entity):
     :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Fixed" /> anchors
                  to a concrete instant, <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Priority" /> promotes upstream tasks,
                  and <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Report" /> is observational only.
+    :param priority_order: The rank of this milestone among <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Priority" /> milestones.
+                           <b>Lower is higher priority</b>: the scheduler's pull strength is the priority-milestone weight
+                           divided by <c>PriorityOrder</c>, so order 1 pulls twice as hard as order 2, and a value of zero or
+                           less applies no pull. Copied to the derived <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity" />. Has no effect
+                           in the other modes.
     :param instant: The moment in time this milestone begins or ends (depending on its Direction)
                     If the Instant is null, then it if flexible and can be moved
     :param direction: Is this a start milestone or a delivery milestone.  StartAfter means connected tasks must start
@@ -36,6 +41,7 @@ class ScopeMilestoneEntity(Entity):
     name: str = field(default='')
     description: str = field(default='')
     mode: ScopeMilestoneModeEnum = field(default=ScopeMilestoneModeEnum.Fixed)
+    priority_order: float = field(default=1)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: ScopeMilestoneDirectionEnum = field(default=ScopeMilestoneDirectionEnum.StartAfter)
     scope_task_type_step_ids: list[UUID] = field(default_factory=list)

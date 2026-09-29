@@ -201,8 +201,9 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param parent_ids: The identifier of the parent segments associated with the current schedule segment entity.
                        Used to establish hierarchical relationships between segments.
     :param parents: The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment.
-    :param priority: The priority of this schedule segment, derived from the associated task's priority.
-                     Meeting segments have a priority of 1.0.
+    :param priority_weight: The scheduling weight of this schedule segment, copied from the associated task's
+                            <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.PriorityWeight" />. <b>Higher is higher priority.</b> Meeting segments
+                            have a weight of 1.0.
     :param time_log_id: The identifier of the time log entry associated with this schedule segment.
                         This is used to link logged work time segments back to their source time log.
     :param duration_multiplier: Snapshot of the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> for the user who
@@ -232,7 +233,7 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     mode: ScheduleSegmentModeEnum = field(default=ScheduleSegmentModeEnum.Unknown)
     parent_ids: list[UUID] = field(default_factory=list)
     parents: Optional[list[ScheduleSegmentEntity]] = field(default=None)
-    priority: float = field(default=1)
+    priority_weight: float = field(default=1)
     time_log_id: Optional[UUID] = field(default=None)
     duration_multiplier: Optional[float] = field(default=None)
     time_log: Optional[TimeLogEntity] = field(default=None)
