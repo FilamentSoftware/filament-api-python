@@ -1,3 +1,10 @@
+## 0.7.4-dev.0.0.1 (2026-09-29 10:22)
+
+### Client
+
+#### FIX
+- Refreshing the private UDP definition-change subscription no longer cancels a user subscription the backend deduplicated onto the same ID
+
 ## 0.7.3-dev.0.0.1 (2026-09-26 11:32)
 
 ### Client
