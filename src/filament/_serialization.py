@@ -148,7 +148,8 @@ def camel_case_property_names(names: ABCSequence[str]) -> list[str]:
 # rather than the camelCase wire names. Keyed by field name because the generated
 # dataclasses carry no metadata to mark these fields. Conversion applies wherever
 # a list-valued field with one of these names appears — including the entity
-# field ``PermissionEntity.properties``, whose property names are normalised the
+# fields ``include_properties`` / ``exclude_properties`` on ``PermissionEntity``
+# and the permission delta entities, whose property names are normalised the
 # same way. The ``isinstance(value, list)`` guard in ``to_dict`` skips same-named
 # dict fields (e.g. the permission ``properties`` dicts on ``EntityTypePermissions``
 # / ``EntityPropertyPermissions``), which are not property-name lists.
@@ -157,6 +158,8 @@ _PROPERTY_NAME_LIST_FIELDS: frozenset[str] = frozenset({
     "update_properties",
     "connection_properties",
     "entity_properties",
+    "include_properties",
+    "exclude_properties",
 })
 
 
