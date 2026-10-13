@@ -258,13 +258,17 @@ class TestToDict:
         assert result["properties"] is None
 
     def test_permission_entity_converts_property_names(self) -> None:
-        # PermissionEntity.properties is an entity field (not a request filter)
-        # but shares the "properties" name, so its property names are normalised
-        # the same way — callers can pass snake_case here too.
-        entity = PermissionEntity(properties=["schedule_status", "owner_user_id"])
+        # PermissionEntity.include_properties / exclude_properties are entity
+        # fields (not request filters) holding property names, so they are
+        # normalised the same way — callers can pass snake_case here too.
+        entity = PermissionEntity(
+            include_properties=["schedule_status", "owner_user_id"],
+            exclude_properties=["start_date"],
+        )
         result = to_dict(entity)
         assert result is not None
-        assert result["properties"] == ["scheduleStatus", "ownerUserId"]
+        assert result["includeProperties"] == ["scheduleStatus", "ownerUserId"]
+        assert result["excludeProperties"] == ["startDate"]
 
 
 # ---------------------------------------------------------------------------
