@@ -40,6 +40,8 @@ class NoteEntity(Entity):
     :param on_id: The id of the entity this note is on.
     :param on_type: The type of the entity this note is on.
     :param on: The entity this note is on.
+    :param secondary_references: Further entities this note refers to, beyond the one it is on. Key is the entity id, value is the
+                                 entity class name (e.g. "MediaEntity").
     """
     from_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     from_user: Optional[UserEntity] = field(default=None)
@@ -55,3 +57,4 @@ class NoteEntity(Entity):
     on_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     on_type: str = field(default='')
     on: Optional[TaskEntity] = field(default=None)
+    secondary_references: dict[UUID, str] = field(default_factory=dict)

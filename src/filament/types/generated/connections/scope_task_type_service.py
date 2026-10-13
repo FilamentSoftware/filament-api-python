@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from uuid_utils import UUID, uuid7
+
 from ..base.base import EntityConnection
 from ..connections.generic import GenericTaskSkillConnection_1, TaskDependencyOverrideConnectionBase_2
 from ..entities.scope_task_type_service import ScopeTaskTypeEntity
@@ -28,6 +30,7 @@ class ScopeTaskTypeSpecialtyDependencyConnection(TaskDependencyOverrideConnectio
 @dataclass(kw_only=True)
 class ScopeTaskTypeSkillConnection(GenericTaskSkillConnection_1[ScopeTaskTypeEntity]):
     """Represents a connection between a scope task type and a skill."""
+    context_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass(kw_only=True)

@@ -202,6 +202,9 @@ class TaskEntity(ReferenceEntityBase):
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
+    :param orphaned: True when this task's scope configuration no longer requires it and the task is
+                     preserved only because TimeLogs protect it from deletion. Orphaned tasks are excluded
+                     from casting and scheduling, and are deleted once their protection is gone.
     """
     reference: Optional[Union[ScopeItemEntity, TaskEntity]] = field(default=None)
     contexts: dict[str, str] = field(default_factory=dict)
@@ -221,3 +224,4 @@ class TaskEntity(ReferenceEntityBase):
     specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     specialty: Optional[SpecialtyEntity] = field(default=None)
     auto_generated_by: Optional[str] = field(default=None)
+    orphaned: bool = field(default=False)

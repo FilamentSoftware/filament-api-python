@@ -55,6 +55,7 @@ __all__ = [
     "SuccessOrErrorPublic",
     "EntityPropertyPermission",
     "DataUpdateRejectedNotification",
+    "SubscriptionRemovedNotification",
     "WrappedEntity",
     "ModifyDataRequest",
     "ProcessingStatus",
@@ -779,6 +780,21 @@ class DataUpdateRejectedNotification:
     actual_bytes: int
     limit_bytes: int
     reason: str
+
+
+@dataclass(kw_only=True)
+class SubscriptionRemovedNotification:
+    """
+    Notifies a subscribed client that the hub has removed one of its subscriptions. Sent only when
+    the removal originates in the hub itself — for example a subscription dropped because its
+    condition can no longer be evaluated — never for a removal the client requested through
+    <c>Unsubscribe</c>. Carries no reason: the identifier alone tells the client the subscription
+    is dead, without disclosing why.
+    
+    :param subscription_id: The identifier of the removed subscription. No further pushes will be delivered for it,
+                            and an <c>Unsubscribe</c> for it is unnecessary.
+    """
+    subscription_id: SubscriptionId
 
 
 @dataclass(kw_only=True)

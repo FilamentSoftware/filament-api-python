@@ -25,7 +25,7 @@ class CastUserConnection(EntityConnection):
     :param ref_skill_distance: Represents the distance between the skill of the user and the reference skill of the cast.
     :param skill_proportion_used: The proportion of the user's skills that are used by the cast.
     """
-    duration_multiplier: float = field(default=0)
+    duration_multiplier: float = field(default=1)
     over_qualified: bool = field(default=False)
     ref_skill_distance: float = field(default=0)
     skill_proportion_used: float = field(default=0)

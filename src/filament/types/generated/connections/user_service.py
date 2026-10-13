@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from uuid_utils import UUID, uuid7
+
 from ..connections.generic import GenericUserSkillConnection_1, PermissionsRoleConnectionBase_1
 from ..entities.user_service import UserEntity
 
@@ -14,6 +16,7 @@ __all__ = [
 @dataclass(kw_only=True)
 class UserSkillConnection(GenericUserSkillConnection_1[UserEntity]):
     """Represents a connection between a user and a skill, including the user's proficiency level."""
+    context_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass(kw_only=True)

@@ -9,6 +9,7 @@ from .current_instant_service import *
 from .event_service import *
 from .file_settings_service import *
 from .generic import *
+from .media_service import *
 from .note_service import *
 from .organization_service import *
 from .permissions_service import *
