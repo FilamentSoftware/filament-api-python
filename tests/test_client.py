@@ -6,6 +6,8 @@ serialization, and subscription routing without a live server.
 from __future__ import annotations
 
 import asyncio
+import base64
+import gzip
 from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,6 +24,7 @@ from filament._exceptions import (
 )
 from filament._serialization import from_dict
 from filament.types.generated.entities.core import FileEntity
+from filament.types.generated.entities.schedule_service import ScheduleSegmentEntity
 from filament.types.generated.enums import (
     DataProcessingStatus,
     ErrorCodes,
@@ -229,6 +232,79 @@ class TestReadData:
         assert call_args is not None
         assert call_args[0][0] == "ReadData"
         assert result.success is True
+
+
+class TestReadDataCompressedProperties:
+    """Compressed property values in ``ReadData`` responses."""
+
+    @staticmethod
+    def _response(reasons_data: str) -> dict[str, Any]:
+        return {
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {
+                "typeName": "ScheduleSegmentEntity",
+                "data": [
+                    {
+                        "entity": {
+                            "$type": "ScheduleSegmentEntity",
+                            "id": str(uuid7()),
+                            "reasonsData": reasons_data,
+                        },
+                    },
+                ],
+                "entityCount": 0,
+                "moreData": False,
+            },
+        }
+
+    @staticmethod
+    def _request() -> ReadDataRequest:
+        return ReadDataRequest(
+            scenario_id=UUID(int=0),
+            request=ReadDataTypeRequest(type_name="ScheduleSegmentEntity"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_compressed_value_is_decoded(self) -> None:
+        client = _make_client()
+        client._user_defined_properties["ScheduleSegmentEntity"] = {}
+        payload = base64.b64encode(gzip.compress(b'{"r":1}')).decode("ascii")
+        client._invoke = AsyncMock(return_value=self._response(f"gzip+base64:{payload}"))
+
+        result = await client.read_data(self._request())
+
+        assert result.success is True
+        assert result.data is not None
+        entity = result.data.data[0].entity
+        assert isinstance(entity, ScheduleSegmentEntity)
+        assert entity.reasons_data == '{"r":1}'
+
+    @pytest.mark.asyncio
+    async def test_corrupt_value_returns_serialization_error(self) -> None:
+        client = _make_client()
+        client._user_defined_properties["ScheduleSegmentEntity"] = {}
+        client._invoke = AsyncMock(return_value=self._response("br+base64:!!!!"))
+
+        result = await client.read_data(self._request())
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.SerializationError
+        assert "ScheduleSegmentEntity.reasons_data" in result.message
+        assert "br+base64:" in result.message
+
+    @pytest.mark.asyncio
+    async def test_unknown_token_returns_serialization_error(self) -> None:
+        client = _make_client()
+        client._user_defined_properties["ScheduleSegmentEntity"] = {}
+        client._invoke = AsyncMock(return_value=self._response("zstd+base64:AAAA"))
+
+        result = await client.read_data(self._request())
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.SerializationError
+        assert "zstd" in result.message
 
 
 class TestSubscriptionRouting:
@@ -1466,6 +1542,38 @@ class TestPartReassembly:
 
         callback.assert_called_once()
         assert client._part_buffers == {}
+
+    @pytest.mark.asyncio
+    async def test_corrupt_compressed_value_drops_update(
+        self, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        _, callback = await _make_subscription(client, backend_id)
+        modified = {
+            "ScheduleSegmentEntity": {
+                "created": [
+                    {
+                        "$type": "ScheduleSegmentEntity",
+                        "id": str(uuid7()),
+                        "reasonsData": "br+base64:!!!!",
+                    },
+                ],
+            },
+        }
+
+        with caplog.at_level("ERROR", logger="filament._client"):
+            await _deliver(
+                client,
+                self._part_payload(backend_id=backend_id, modified_entities=modified),
+            )
+
+        callback.assert_not_called()
+        assert "Failed to deserialize DataUpdated payload" in caplog.text
+
+        # The handler keeps working for subsequent, valid updates.
+        await _deliver(client, self._part_payload(backend_id=backend_id, sequence_idx=1))
+        callback.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_updates_are_dispatched_off_the_handler_in_order(self) -> None:
