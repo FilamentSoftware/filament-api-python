@@ -1732,6 +1732,9 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[ServiceDataReadConnected]
             )
+        except CompressedPropertyError as exc:
+            # Name the field and header rather than the opaque generic error.
+            return _value_error(str(exc), ErrorCodes.SerializationError)
         except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
