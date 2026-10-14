@@ -39,6 +39,8 @@ from filament.types.generated.misc import (
     EntityServiceDataUpdate,
     FileUploadRequest,
     ProcessingStatus,
+    ReadConnectedDataRequest,
+    ReadConnectedDataTypeRequest,
     ReadDataRequest,
     ReadDataTypeRequest,
     RequestId,
@@ -305,6 +307,63 @@ class TestReadDataCompressedProperties:
         assert result.success is False
         assert result.error_code == ErrorCodes.SerializationError
         assert "zstd" in result.message
+
+
+class TestReadConnectedDataCompressedProperties:
+    """Compressed property values in ``ReadConnectedData`` responses."""
+
+    @staticmethod
+    def _response(reasons_data: str) -> dict[str, Any]:
+        return {
+            "success": True,
+            "message": "",
+            "errorCode": 0,
+            "data": {
+                "connectionTypeName": "CastUserConnection",
+                "entityTypeName": "ScheduleSegmentEntity",
+                "data": [
+                    {
+                        "connection": {
+                            "entity": {
+                                "$type": "CastUserConnection",
+                                "id": str(uuid7()),
+                            },
+                        },
+                        "entity": {
+                            "entity": {
+                                "$type": "ScheduleSegmentEntity",
+                                "id": str(uuid7()),
+                                "reasonsData": reasons_data,
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+    @staticmethod
+    def _request() -> ReadConnectedDataRequest:
+        return ReadConnectedDataRequest(
+            scenario_id=UUID(int=0),
+            request=ReadConnectedDataTypeRequest(
+                connection_type_name="CastUserConnection",
+                entity_type_name="ScheduleSegmentEntity",
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_corrupt_value_returns_serialization_error(self) -> None:
+        client = _make_client()
+        client._user_defined_properties["CastUserConnection"] = {}
+        client._user_defined_properties["ScheduleSegmentEntity"] = {}
+        client._invoke = AsyncMock(return_value=self._response("br+base64:!!!!"))
+
+        result = await client.read_connected_data(self._request())
+
+        assert result.success is False
+        assert result.error_code == ErrorCodes.SerializationError
+        assert "ScheduleSegmentEntity.reasons_data" in result.message
+        assert "br+base64:" in result.message
 
 
 class TestSubscriptionRouting:
