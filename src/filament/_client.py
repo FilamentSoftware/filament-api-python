@@ -22,6 +22,7 @@ from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
 
 from ._exceptions import (
+    CompressedPropertyError,
     FilamentAuthenticationError,
     FilamentConnectionError,
     FilamentError,
@@ -1511,6 +1512,9 @@ class FilamentClient:
         result_dict: Any = await self._invoke("ReadData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
+        except CompressedPropertyError as exc:
+            # Name the field and header rather than the opaque generic error.
+            return _value_error(str(exc), ErrorCodes.SerializationError)
         except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:

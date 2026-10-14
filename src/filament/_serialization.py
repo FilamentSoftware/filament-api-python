@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, 
 
 import uuid_utils
 
+from ._compression import decode_compressed_value, is_compressed_field
 from .types.generated.base.base import EntityBase
 
 if TYPE_CHECKING:
@@ -730,7 +731,15 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
 
         raw_value = data.get(camel_key, data.get(f.name))
         field_type = hints.get(f.name, f.type)
-        dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
+        value = _convert_from_dict_value(raw_value, field_type, type_arg)
+        # Fields marked with compression/encoding metadata may hold
+        # ``<compression>+<encoding>:<payload>``; decode before construction so
+        # the instance (and _populate_json_companion_fields) sees plain text.
+        if isinstance(value, str) and is_compressed_field(f.metadata):
+            value = decode_compressed_value(
+                value, owner=concrete_cls.__name__, field_name=f.name,
+            )
+        dataclass_data[f.name] = value
 
     result: T = concrete_cls(**dataclass_data)
     if isinstance(result, EntityBase):
