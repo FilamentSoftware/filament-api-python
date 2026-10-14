@@ -107,6 +107,15 @@ The status of a changed entity.
 | `Updated` | Entity was updated. |
 | `Deleted` | Entity was deleted. |
 
+### `CompressionMethod` (`Enum`)
+
+The compression codec a [CompressedProperty] value is written with. Each member maps to a header token in `PropertyCompression`, the only place that knows the tokens.
+
+| Member | Description |
+| ------ | ----------- |
+| `Brotli` | Brotli (RFC 7932). Header token br. |
+| `Gzip` | Gzip (RFC 1952). Header token gzip. Decodable everywhere without a dependency (browsers and the Python standard library included), which is why every reader supports it even where nothing writes it. |
+
 ### `ContactType` (`Enum`)
 
 Valid organization contact types.
@@ -372,6 +381,14 @@ The status of an overall processing run.
 | `Completed` | The processing run has completed successfully. |
 | `Failed` | The processing run failed. |
 | `Cancelled` | The processing run was cancelled. |
+
+### `PropertyEncoding` (`Enum`)
+
+The text encoding applied to the compressed bytes of a [CompressedProperty] value, so the value stays an ordinary string. Each member maps to a header token in `PropertyCompression`.
+
+| Member | Description |
+| ------ | ----------- |
+| `Base64` | Standard base64 with padding (RFC 4648 §4). Header token base64. |
 
 ### `ReadMode` (`Enum`)
 
@@ -1723,7 +1740,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[Union[EventEntity, ScopeEntity, TaskEntity, TaskGroupEntity]]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | The name of the schedule segment. Represents a descriptive or identifying title for the segment. |
 | `description` | `str` | `''` | A brief textual explanation or characterization of the schedule segment. Provides additional context or details about the segment. |
-| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as a serialized JSON string. Written once, at segment construction, via the set-only `Reasons` property; never read back as an object server-side (the user-facing audit view ships the raw JSON to the frontend). Marked `ExcludeFromEqualityAttribute`; reasons are an audit/diagnostic blob, not part of the segment's identity. |
+| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as JSON. New values are Brotli-compressed and base64-encoded behind a br+base64: header; a value with no header is plain JSON (rows written before compression). Written once, at segment construction, via the set-only `Reasons` property; never read back as an object server-side (the user-facing audit view decodes it in the frontend). Marked `ExcludeFromEqualityAttribute`; reasons are an audit/diagnostic blob, not part of the segment's identity. |
 | `start_instant` | `datetime.datetime` | — | Represents the starting point in time for the schedule segment as an instant. This property defines the exact timestamp from which the segment begins. |
 | `end_instant` | `datetime.datetime` | — | The end time of the schedule segment, represented as an instant in time. Defines the point at which this segment concludes. |
 | `user_type` | `str` | `''` | Specifies the type of user associated with the schedule segment. Represents a categorization or classification of the user, such as regular user, placeholder, etc. |
