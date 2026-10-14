@@ -1,3 +1,15 @@
+## 0.7.4-dev.0.0.3 (2026-10-14 08:25)
+
+### Serialization
+
+#### FIX
+- Snake_case names in include_properties / exclude_properties are converted to wire camelCase
+
+### Types
+
+#### OTHER
+- Adds media service and permission delta types; PermissionEntity.properties is replaced by all_properties / include_properties / exclude_properties
+
 ## 0.7.4-dev.0.0.2 (2026-09-29 14:42)
 
 ### Types
