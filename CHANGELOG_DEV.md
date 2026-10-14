@@ -1,3 +1,15 @@
+## 0.8.0-dev.0.0.1 (2026-10-14 11:30)
+
+### Serialization
+
+#### FEATURE
+- Fields carrying compression metadata (e.g. ScheduleSegmentEntity.reasons_data) are decoded from br+base64:/gzip+base64: to plain text; older clients will see encoded values once the backend starts compressing
+
+### Types
+
+#### OTHER
+- Adds CompressionMethod / PropertyEncoding enums and compression metadata on ScheduleSegmentEntity.reasons_data
+
 ## 0.7.4-dev.0.0.3 (2026-10-14 08:25)
 
 ### Serialization
