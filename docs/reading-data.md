@@ -208,9 +208,11 @@ so you always see plain text:
   touched, even if their text looks like a header.
 - An unknown header, or a payload that fails to decode (invalid base64, a
   truncated stream, trailing bytes, ...), is an error rather than a raw value:
-  `read_data` returns `success=False` with `ErrorCodes.SerializationError` and a
-  message naming the field, and `filament.from_dict` raises
-  `filament.CompressedPropertyError`.
+  `read_data` and `read_connected_data` return `success=False` with
+  `ErrorCodes.SerializationError` and a message naming the field, a
+  subscription update is dropped and the `filament.CompressedPropertyError` is
+  passed to the subscription's `on_error` callback, and `filament.from_dict`
+  raises it.
 - Writes are not re-compressed: sending an entity back sends the plain text,
   which the backend stores as valid uncompressed text.
 

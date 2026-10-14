@@ -205,9 +205,10 @@ FilamentError                     # base — catch this to handle any client err
 `filament.from_dict`) when a field marked as compressed holds an unknown
 `<compression>+<encoding>:` header or a payload that fails to decode. It carries
 `owner`, `field_name` and `header` attributes. Client methods do not let it
-escape: `read_data` returns a failed envelope with
+escape: `read_data` and `read_connected_data` return a failed envelope with
 `ErrorCodes.SerializationError` naming the field, and a subscription update
-that cannot be decoded is logged and dropped. See
+that cannot be decoded is dropped and the error passed to the subscription's
+`on_error` callback (logged at WARNING if there is none). See
 [Compressed properties](reading-data.md#compressed-properties).
 
 ```python
