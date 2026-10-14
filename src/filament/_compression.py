@@ -15,7 +15,8 @@ fails to decode, raises :class:`~filament.CompressedPropertyError`.
 
 Decoding is one-shot and strict: truncated streams and trailing bytes are
 rejected for every method, so a corrupt value can never be returned as if it
-were complete.
+were complete.  Decoded output is capped at ``_MAX_DECODED_BYTES`` to guard
+against decompression bombs; larger values are rejected, never truncated.
 
 Writes are not re-encoded: :func:`~filament._serialization.to_dict` sends the
 decoded plain text, which the backend stores as legal header-less plain text.
@@ -42,6 +43,13 @@ _HEADER_RE = re.compile(r"([a-z0-9]+)\+([a-z0-9]+):")
 #: Field metadata keys that mark a field as possibly compressed.
 _METADATA_KEYS = ("compression", "encoding")
 
+#: Largest decoded (decompressed) value accepted, in bytes.  Guards against
+#: decompression bombs; real values are typically a few hundred kilobytes.
+_MAX_DECODED_BYTES = 64 * 1024 * 1024
+
+#: Per-call output limit for streaming Brotli decompression.
+_BROTLI_CHUNK_BYTES = 1024 * 1024
+
 
 class _DecodeFailure(Exception):
     """Internal: a payload could not be decoded by a registered method."""
@@ -67,23 +75,61 @@ def _decode_base64(payload: str) -> bytes:
         raise _DecodeFailure(f"invalid base64 payload: {exc}") from exc
 
 
+def _too_large() -> _DecodeFailure:
+    return _DecodeFailure(
+        f"decoded value exceeds the {_MAX_DECODED_BYTES} byte limit"
+    )
+
+
 def _decompress_brotli(data: bytes) -> bytes:
-    # One-shot decompression rejects truncated streams and trailing bytes.
+    # Streaming decompression so the output can be bounded.  All input is fed
+    # in the first call; later calls pass empty input to drain pending output.
+    # Brotli itself rejects trailing bytes and concatenated streams with
+    # ``brotli.error``; a stream that never finishes is truncated.
+    decompressor = brotli.Decompressor()
+    chunks: list[bytes] = []
+    total = 0
+    pending = data
     try:
-        out: bytes = brotli.decompress(data)
+        while True:
+            limit = min(_BROTLI_CHUNK_BYTES, _MAX_DECODED_BYTES + 1 - total)
+            chunk: bytes = decompressor.process(
+                pending, output_buffer_limit=limit
+            )
+            pending = b""
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > _MAX_DECODED_BYTES:
+                raise _too_large()
+            if decompressor.is_finished():
+                break
+            if not chunk:
+                # No progress and not finished: the stream needs more input
+                # than it was given, so it is truncated.  (Also guarantees the
+                # loop cannot spin.)
+                raise _DecodeFailure("truncated Brotli stream")
     except brotli.error as exc:
         raise _DecodeFailure(f"invalid Brotli stream: {exc}") from exc
-    return out
+    if not decompressor.can_accept_more_data():
+        # Input still buffered after the end of the stream.
+        raise _DecodeFailure("trailing bytes after Brotli stream")
+    return b"".join(chunks)
 
 
 def _decompress_gzip(data: bytes) -> bytes:
     # ``gzip.decompress`` accepts trailing NUL padding, concatenated members and
     # empty input, so use a single zlib pass and require a complete, sole member.
+    # ``max_length`` bounds the output; hitting it means the value is too large.
     decompressor = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
     try:
-        out = decompressor.decompress(data)
+        out = decompressor.decompress(data, _MAX_DECODED_BYTES + 1)
     except zlib.error as exc:
         raise _DecodeFailure(f"invalid gzip stream: {exc}") from exc
+    if len(out) > _MAX_DECODED_BYTES:
+        raise _too_large()
+    if decompressor.unconsumed_tail:
+        # Unreachable below the limit, but never ignore unread input.
+        raise _DecodeFailure("gzip stream not fully consumed")
     if not decompressor.eof:
         raise _DecodeFailure("truncated gzip stream")
     if decompressor.unused_data:

@@ -1975,4 +1975,4 @@ crc32c = ["google-crc32c"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "ebf87ab50d61d6718a165861d65348a4317ef76d13360274f60d59f7c2ca20a2"
+content-hash = "36b5f249de5355cd860f30db72ce3b78f71646685f8da727d919be66a82d2c34"
