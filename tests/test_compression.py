@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import gzip
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any, Optional
 
 import brotli
@@ -22,6 +22,11 @@ from filament._compression import (
 from filament._exceptions import CompressedPropertyError, FilamentError
 from filament._serialization import from_dict
 from filament.types.generated.entities.schedule_service import ScheduleSegmentEntity
+from filament.types.generated.enums import (
+    COMPRESSION_METHOD_TOKENS,
+    CompressionMethod,
+    PropertyEncoding,
+)
 from filament.types.generated.misc import (
     ServiceDataRead,
     ServiceDataUpdate,
@@ -275,6 +280,30 @@ class TestIsCompressedField:
     def test_unmarked(self) -> None:
         assert not is_compressed_field({})
         assert not is_compressed_field({"ignore": True})
+
+    def test_generated_compressed_field_is_marked(self) -> None:
+        # Pins the generator contract: [CompressedProperty] fields carry the
+        # metadata keys that is_compressed_field recognises.
+        (reasons,) = [f for f in fields(ScheduleSegmentEntity) if f.name == "reasons_data"]
+        assert is_compressed_field(reasons.metadata)
+
+
+class TestDecoderRegistries:
+    """Every generated method/encoding must have a decoder, so a regen that adds
+    one fails here rather than at read time."""
+
+    @pytest.mark.parametrize("method", list(CompressionMethod))
+    def test_every_compression_method_has_decoder(self, method: CompressionMethod) -> None:
+        assert method in _compression._COMPRESSIONS
+
+    @pytest.mark.parametrize("encoding", list(PropertyEncoding))
+    def test_every_property_encoding_has_decoder(self, encoding: PropertyEncoding) -> None:
+        assert encoding in _compression._ENCODINGS
+
+    @pytest.mark.parametrize("method", list(CompressionMethod))
+    def test_generated_tokens_round_trip(self, method: CompressionMethod) -> None:
+        token = COMPRESSION_METHOD_TOKENS[method]
+        assert decode_compressed_value(_encode(TEXT, token)) == TEXT
 
 
 def test_compressed_property_error_is_exported() -> None:
