@@ -105,6 +105,7 @@ class ScopeItemTaskTypeOverrideConnection(GenericScopeTaskTypeConnection_2[Scope
     :param task_combine_key: The key used to combine tasks.
     :param remove: Gets a value indicating whether this override removes the task type.
     """
+    custom_complexity_id: Optional[UUID] = field(default=None)
     name: Optional[str] = field(default=None)
     description: Optional[str] = field(default=None)
     scope_item_context_id: Optional[UUID] = field(default=None)

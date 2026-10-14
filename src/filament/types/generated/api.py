@@ -4,7 +4,7 @@ from typing import Protocol
 from uuid_utils import UUID, uuid7
 
 from .entities.core import FileEntity
-from .misc import ClientHelloRequest, CreateUserDefinedPropertyRequest, DataUpdateRejectedNotification, EntityPermissions, EntityPropertyPermissions, FileUploadCompletion, FileUploadRequest, GetFileUrlsRequest, ModifyDataRequest, PreviewDataRequest, ProcessingStatus, ReadConnectedDataRequest, ReadDataRequest, RequestId, ServerCapabilities, ServiceDataPreview, ServiceDataRead, ServiceDataReadConnected, ServiceDataUpdate, StatusData, SubscriptionConfig, SubscriptionId, SuccessOrErrorPublic, UpdateUserDefinedPropertyRequest, UploadGrant, UserDefinedPropertyInfo, ValueOrErrorPublic_1
+from .misc import ClientHelloRequest, CreateUserDefinedPropertyRequest, DataUpdateRejectedNotification, EntityPermissions, EntityPropertyPermissions, FileUploadCompletion, FileUploadRequest, GetFileUrlsRequest, ModifyDataRequest, PreviewDataRequest, ProcessingStatus, ReadConnectedDataRequest, ReadDataRequest, RequestId, ServerCapabilities, ServiceDataPreview, ServiceDataRead, ServiceDataReadConnected, ServiceDataUpdate, StatusData, SubscriptionConfig, SubscriptionId, SubscriptionRemovedNotification, SuccessOrErrorPublic, UpdateUserDefinedPropertyRequest, UploadGrant, UserDefinedPropertyInfo, ValueOrErrorPublic_1
 from .shared import FileReference
 
 __all__ = [
@@ -193,6 +193,18 @@ class ServerEvents(Protocol):
         subscription's callback as an error path.
         
         :param notification: Details of the rejected update, including the subscription ID, actual and limit byte counts, and a human-readable reason.
+        """
+        ...
+
+    def subscription_removed(self, notification: SubscriptionRemovedNotification) -> None:
+        """
+        Notifies the client that the hub removed one of its subscriptions. Sent only when the removal
+        originates in the hub itself — for example a subscription dropped because its condition
+        references a user-defined property that was hidden — never for a removal the client requested
+        through <c>Unsubscribe</c>. No further <see cref="M:Filament.FilamentHub.Api.v0.IApiSignalRClient.DataUpdated(Filament.FSCore.ServiceDataTypes.ServiceDataUpdate)" /> pushes follow for the
+        subscription, and unsubscribing from it is unnecessary.
+        
+        :param notification: The notification identifying the removed subscription.
         """
         ...
 

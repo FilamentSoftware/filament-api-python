@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
+
+from uuid_utils import UUID, uuid7
 
 from ..connections.generic import GenericScopeTaskTypeConnection_2
 from ..entities.scope_template_item_service import ScopeTemplateItemCustomComplexityEntity, ScopeTemplateItemEntity
@@ -13,3 +16,4 @@ __all__ = [
 @dataclass(kw_only=True)
 class ScopeTemplateItemTaskTypeConnection(GenericScopeTaskTypeConnection_2[ScopeTemplateItemEntity, ScopeTemplateItemCustomComplexityEntity]):
     """Represents a connection between a scope template item and a scope task type."""
+    custom_complexity_id: Optional[UUID] = field(default=None)

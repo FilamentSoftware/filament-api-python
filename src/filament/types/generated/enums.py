@@ -19,11 +19,15 @@ __all__ = [
     "FileChecksumAlgorithm",
     "FileState",
     "Industry",
+    "MediaStatus",
+    "MediaType",
     "NameOrder",
     "NoteStatusEnum",
     "NoteUserConnectionType",
     "PermissionAction",
+    "PermissionDeltaMode",
     "PermissionType",
+    "PreviewType",
     "ProcessingRunStatus",
     "ReadMode",
     "RepeatDaysEnum",
@@ -290,11 +294,14 @@ class DataRequestAction(Enum):
                   Typically used to update specific properties or entities while retaining the rest of the data unchanged.
     :cvar Delete: Represents a request to delete data in a data modification action.
                   This action is used to remove specific entities or data records.
+    :cvar Refresh: Represents a request to run an entity type's owning service without changing any data, so that
+                   its processor or modules can run their own reconciliation for that type.
     """
     Unknown = 0
     Create = 1
     Update = 2
     Delete = 3
+    Refresh = 4
 
 
 class DbOrderDirection(Enum):
@@ -443,6 +450,33 @@ class Industry(Enum):
     Development = 1
 
 
+class MediaStatus(Enum):
+    """
+    Whether a media element's data can actually be fetched yet.
+    
+    :cvar Pending: The element's data is not fetchable yet. Either an upload or a render is in flight, or one failed and
+                   left the element behind — nothing on the backend distinguishes the two, and nothing tidies either.
+    :cvar Available: The element's data can be fetched.
+    """
+    Pending = 0
+    Available = 1
+
+
+class MediaType(Enum):
+    """
+    The kind of thing a piece of media data is.
+    
+    :cvar Image: A still image.
+    :cvar ImageSequence: A numbered sequence of still frames, such as an EXR render, held as one piece of data.
+    :cvar Movie: A moving image, with or without sound.
+    :cvar Document: A document, such as a PDF.
+    """
+    Image = 0
+    ImageSequence = 1
+    Movie = 2
+    Document = 3
+
+
 class NameOrder(Enum):
     """
     Specifies the order in which names should be displayed.
@@ -499,6 +533,24 @@ class PermissionAction(Flag):
     All = Create | Read | Update | Delete
 
 
+class PermissionDeltaMode(Enum):
+    """
+    How a delta combines with the role or permission it targets.
+    
+    :cvar None_: No mode. A delta in this mode is refused on write and skipped by composition.
+    :cvar Subtractive: Removes what the delta lists from the definition: its actions, the names in each property list, the roles
+                       it infers.
+    :cvar Additive: Adds what the delta lists to the definition.
+    :cvar Override: Replaces each field the delta states with the delta's value.
+    :cvar Suppress: Removes the definition entirely. Carries no payload.
+    """
+    None_ = 0
+    Subtractive = 1
+    Additive = 2
+    Override = 3
+    Suppress = 4
+
+
 class PermissionType(Enum):
     """
     The type of permission.
@@ -510,6 +562,15 @@ class PermissionType(Enum):
     None_ = 0
     Entity = 1
     Scenario = 2
+
+
+class PreviewType(Enum):
+    """
+    The kind of preview a piece of media can carry, and so the key its preview files are held under.
+    
+    :cvar Default: The preview to show when nothing more specific is asked for.
+    """
+    Default = 0
 
 
 class ProcessingRunStatus(Enum):
