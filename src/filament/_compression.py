@@ -33,6 +33,12 @@ from typing import Any, Optional
 import brotli
 
 from ._exceptions import CompressedPropertyError
+from .types.generated.enums import (
+    COMPRESSION_METHOD_BY_TOKEN,
+    PROPERTY_ENCODING_BY_TOKEN,
+    CompressionMethod,
+    PropertyEncoding,
+)
 
 #: The header must end within this many characters of the start of the value.
 _MAX_HEADER_LENGTH = 32
@@ -137,16 +143,30 @@ def _decompress_gzip(data: bytes) -> bytes:
     return out
 
 
-#: Encoding token -> decoder from payload text to bytes.
-_ENCODINGS: dict[str, Callable[[str], bytes]] = {
-    "base64": _decode_base64,
+# Decoders are keyed by the generated enums; header tokens are resolved through
+# the generated ``*_BY_TOKEN`` maps, so the token strings live only in
+# generated code.  Every enum member must have a decoder (enforced by tests).
+
+#: Encoding -> decoder from payload text to bytes.
+_ENCODINGS: dict[PropertyEncoding, Callable[[str], bytes]] = {
+    PropertyEncoding.Base64: _decode_base64,
 }
 
-#: Compression token -> one-shot strict decompressor.
-_COMPRESSIONS: dict[str, Callable[[bytes], bytes]] = {
-    "br": _decompress_brotli,
-    "gzip": _decompress_gzip,
+#: Compression method -> one-shot strict decompressor.
+_COMPRESSIONS: dict[CompressionMethod, Callable[[bytes], bytes]] = {
+    CompressionMethod.Brotli: _decompress_brotli,
+    CompressionMethod.Gzip: _decompress_gzip,
 }
+
+
+def _encoding_decoder(token: str) -> Optional[Callable[[str], bytes]]:
+    member = PROPERTY_ENCODING_BY_TOKEN.get(token)
+    return None if member is None else _ENCODINGS.get(member)
+
+
+def _compression_decoder(token: str) -> Optional[Callable[[bytes], bytes]]:
+    member = COMPRESSION_METHOD_BY_TOKEN.get(token)
+    return None if member is None else _COMPRESSIONS.get(member)
 
 
 def is_compressed_field(metadata: Mapping[str, Any]) -> bool:
@@ -184,14 +204,14 @@ def decode_compressed_value(
     header = value[:payload_start]
     where = _describe(owner, field_name)
 
-    decode = _ENCODINGS.get(encoding)
+    decode = _encoding_decoder(encoding)
     if decode is None:
         raise CompressedPropertyError(
             f"Cannot decode {where}: unsupported encoding {encoding!r} "
             f"in header {header!r}",
             owner=owner, field_name=field_name, header=header,
         )
-    decompress = _COMPRESSIONS.get(compression)
+    decompress = _compression_decoder(compression)
     if decompress is None:
         raise CompressedPropertyError(
             f"Cannot decode {where}: unsupported compression {compression!r} "
