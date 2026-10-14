@@ -20,7 +20,7 @@ from filament._compression import (
     parse_header,
 )
 from filament._exceptions import CompressedPropertyError, FilamentError
-from filament._serialization import from_dict
+from filament._serialization import from_dict, to_dict
 from filament.types.generated.entities.schedule_service import ScheduleSegmentEntity
 from filament.types.generated.enums import (
     COMPRESSION_METHOD_TOKENS,
@@ -394,6 +394,19 @@ class TestFromDictDecoding:
         )
         assert seg is not None
         assert seg.reasons_data == TEXT
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_to_dict_writes_plain_text(self, method: str) -> None:
+        # Writes are deliberately not re-encoded: the backend stores header-less
+        # plain text, so to_dict(from_dict(d)) must not restore the header.
+        seg = from_dict(
+            {"id": str(uuid7()), "reasonsData": _encode(TEXT, method)},
+            ScheduleSegmentEntity,
+        )
+        assert seg is not None
+        wire = to_dict(seg)
+        assert wire is not None
+        assert wire["reasonsData"] == TEXT
 
     def test_generated_entity_plain_value_unchanged(self) -> None:
         seg = from_dict({"id": str(uuid7()), "reasonsData": TEXT}, ScheduleSegmentEntity)
