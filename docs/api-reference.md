@@ -197,8 +197,19 @@ manager) — request-level failures use the envelope above instead.
 ```text
 FilamentError                     # base — catch this to handle any client error
 ├── FilamentAuthenticationError   # the server rejected the credentials
-└── FilamentConnectionError       # the SignalR connection failed or timed out
+├── FilamentConnectionError       # the SignalR connection failed or timed out
+└── CompressedPropertyError       # a compressed property value could not be decoded (also a ValueError)
 ```
+
+`CompressedPropertyError` is raised during deserialization (for example by
+`filament.from_dict`) when a field marked as compressed holds an unknown
+`<compression>+<encoding>:` header or a payload that fails to decode. It carries
+`owner`, `field_name` and `header` attributes. Client methods do not let it
+escape: `read_data` and `read_connected_data` return a failed envelope with
+`ErrorCodes.SerializationError` naming the field, and a subscription update
+that cannot be decoded is dropped and the error passed to the subscription's
+`on_error` callback (logged at WARNING if there is none). See
+[Compressed properties](reading-data.md#compressed-properties).
 
 ```python
 try:

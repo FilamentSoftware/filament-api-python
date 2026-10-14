@@ -7,6 +7,7 @@ from typing import Optional, Type, TypeVar
 from ._client import FilamentClient
 from ._condition_builder import Condition
 from ._exceptions import (
+    CompressedPropertyError,
     FilamentAuthenticationError,
     FilamentConnectionError,
     FilamentError,
@@ -65,6 +66,7 @@ __all__ = [
     "build_upload_request",
     "compute_checksum",
     "file_reference_from_json",
+    "CompressedPropertyError",
     "Condition",
     "FilamentClient",
     "FilamentAuthenticationError",

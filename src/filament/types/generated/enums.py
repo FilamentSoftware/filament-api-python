@@ -7,6 +7,7 @@ __all__ = [
     "BlockUserReasonEnum",
     "CalendarUserAccess",
     "ChangedEntityStatus",
+    "CompressionMethod",
     "ContactType",
     "CurrencyStatus",
     "CurrencySymbolPosition",
@@ -29,6 +30,7 @@ __all__ = [
     "PermissionType",
     "PreviewType",
     "ProcessingRunStatus",
+    "PropertyEncoding",
     "ReadMode",
     "RepeatDaysEnum",
     "RepeatModeEnum",
@@ -63,6 +65,10 @@ __all__ = [
     "UserPhoneType",
     "UserStatusEnum",
     "UserTypeEnum",
+    "COMPRESSION_METHOD_TOKENS",
+    "COMPRESSION_METHOD_BY_TOKEN",
+    "PROPERTY_ENCODING_TOKENS",
+    "PROPERTY_ENCODING_BY_TOKEN",
 ]
 
 class ActualStatusEnum(Enum):
@@ -156,6 +162,19 @@ class ChangedEntityStatus(Enum):
     Created = 1
     Updated = 2
     Deleted = 3
+
+
+class CompressionMethod(Enum):
+    """
+    The compression codec a <see cref="T:Filament.FSCore.Entities.Attributes.CompressedPropertyAttribute">[CompressedProperty]</see> value is written with.
+    Each member maps to a header token in <see cref="T:Filament.FSCore.Entities.PropertyCompression" />, the only place that knows the tokens.
+    
+    :cvar Brotli: Brotli (RFC 7932). Header token <c>br</c>.
+    :cvar Gzip: Gzip (RFC 1952). Header token <c>gzip</c>. Decodable everywhere without a dependency (browsers and the Python
+                standard library included), which is why every reader supports it even where nothing writes it.
+    """
+    Brotli = 0
+    Gzip = 1
 
 
 class ContactType(Enum):
@@ -590,6 +609,17 @@ class ProcessingRunStatus(Enum):
     Completed = 3
     Failed = 4
     Cancelled = 5
+
+
+class PropertyEncoding(Enum):
+    """
+    The text encoding applied to the compressed bytes of a
+    <see cref="T:Filament.FSCore.Entities.Attributes.CompressedPropertyAttribute">[CompressedProperty]</see> value, so the value stays an ordinary string.
+    Each member maps to a header token in <see cref="T:Filament.FSCore.Entities.PropertyCompression" />.
+    
+    :cvar Base64: Standard base64 with padding (RFC 4648 §4). Header token <c>base64</c>.
+    """
+    Base64 = 0
 
 
 class ReadMode(Enum):
@@ -1205,3 +1235,27 @@ class UserTypeEnum(Enum):
     """
     Internal = 0
     External = 1
+
+
+# Compression header tokens for [CompressedProperty] values. Maps each CompressionMethod value to its token.
+COMPRESSION_METHOD_TOKENS: dict[CompressionMethod, str] = {
+    CompressionMethod.Brotli: "br",
+    CompressionMethod.Gzip: "gzip",
+}
+
+# Compression header tokens for [CompressedProperty] values. Maps each token back to its CompressionMethod value.
+COMPRESSION_METHOD_BY_TOKEN: dict[str, CompressionMethod] = {
+    "br": CompressionMethod.Brotli,
+    "gzip": CompressionMethod.Gzip,
+}
+
+
+# Encoding header tokens for [CompressedProperty] values. Maps each PropertyEncoding value to its token.
+PROPERTY_ENCODING_TOKENS: dict[PropertyEncoding, str] = {
+    PropertyEncoding.Base64: "base64",
+}
+
+# Encoding header tokens for [CompressedProperty] values. Maps each token back to its PropertyEncoding value.
+PROPERTY_ENCODING_BY_TOKEN: dict[str, PropertyEncoding] = {
+    "base64": PropertyEncoding.Base64,
+}
