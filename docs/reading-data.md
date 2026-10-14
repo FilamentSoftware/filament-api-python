@@ -215,6 +215,10 @@ so you always see plain text:
   raises it.
 - Writes are not re-compressed: sending an entity back sends the plain text,
   which the backend stores as valid uncompressed text.
+- Conditions are evaluated by the backend against the *stored* value, which may
+  be compressed. Comparisons such as `equal_to` or `like` on a compressed field
+  will not match compressed rows; only `null()` / `not_null()` are meaningful.
+  Filter on other fields instead.
 
 ## Reading connected data
 
