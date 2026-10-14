@@ -13,6 +13,7 @@ import pytest
 from uuid_utils import uuid7
 
 import filament
+from filament import _compression
 from filament._compression import (
     decode_compressed_value,
     is_compressed_field,
@@ -199,6 +200,70 @@ class TestDecodeCompressedValue:
         raw = _gzip(TEXT.encode("utf-8"))
         with pytest.raises(CompressedPropertyError):
             decode_compressed_value(_encode_bytes(raw, "br"))
+
+
+def _pseudo_random_text(size: int) -> bytes:
+    # Deterministic, poorly compressible ASCII (so Brotli emits many chunks).
+    out = bytearray()
+    state = 0x12345678
+    while len(out) < size:
+        state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+        out.append(0x21 + (state >> 16) % 94)
+    return bytes(out)
+
+
+def test_default_decoded_size_limit_is_64_mib() -> None:
+    assert _compression._MAX_DECODED_BYTES == 64 * 1024 * 1024
+
+
+class TestDecodedSizeLimit:
+    LIMIT = 100_000
+
+    @pytest.fixture(autouse=True)
+    def _small_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(_compression, "_MAX_DECODED_BYTES", self.LIMIT)
+        # Small Brotli chunks so the multi-call draining path is exercised.
+        monkeypatch.setattr(_compression, "_BROTLI_CHUNK_BYTES", 4096)
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_compression_bomb_rejected(self, method: str) -> None:
+        raw = COMPRESSORS[method](b"a" * (self.LIMIT * 50))
+        assert len(raw) < self.LIMIT // 10  # small input, huge output
+        with pytest.raises(CompressedPropertyError, match="exceeds"):
+            decode_compressed_value(_encode_bytes(raw, method))
+
+    @pytest.mark.parametrize("method", METHODS)
+    @pytest.mark.parametrize("factory", [lambda n: b"a" * n, _pseudo_random_text])
+    def test_value_exactly_at_limit_accepted(
+        self, method: str, factory: Callable[[int], bytes]
+    ) -> None:
+        text = factory(self.LIMIT)
+        raw = COMPRESSORS[method](text)
+        assert decode_compressed_value(_encode_bytes(raw, method)) == text.decode()
+
+    @pytest.mark.parametrize("method", METHODS)
+    @pytest.mark.parametrize("factory", [lambda n: b"a" * n, _pseudo_random_text])
+    def test_value_one_byte_over_limit_rejected(
+        self, method: str, factory: Callable[[int], bytes]
+    ) -> None:
+        raw = COMPRESSORS[method](factory(self.LIMIT + 1))
+        with pytest.raises(CompressedPropertyError, match="exceeds"):
+            decode_compressed_value(_encode_bytes(raw, method))
+
+    @pytest.mark.parametrize("method", METHODS)
+    @pytest.mark.parametrize("trailing", [b"x", b"\0"])
+    def test_trailing_bytes_after_multi_chunk_stream_raise(
+        self, method: str, trailing: bytes
+    ) -> None:
+        raw = COMPRESSORS[method](_pseudo_random_text(self.LIMIT // 2))
+        with pytest.raises(CompressedPropertyError):
+            decode_compressed_value(_encode_bytes(raw + trailing, method))
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_truncated_multi_chunk_stream_raises(self, method: str) -> None:
+        raw = COMPRESSORS[method](_pseudo_random_text(self.LIMIT // 2))
+        with pytest.raises(CompressedPropertyError, match="truncated|invalid"):
+            decode_compressed_value(_encode_bytes(raw[:-3], method))
 
 
 class TestIsCompressedField:
