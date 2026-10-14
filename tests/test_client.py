@@ -18,6 +18,7 @@ from uuid_utils import UUID, uuid7
 
 from filament._client import FilamentClient
 from filament._exceptions import (
+    CompressedPropertyError,
     FilamentAuthenticationError,
     FilamentConnectionError,
     ResponseTooLargeError,
@@ -1609,7 +1610,26 @@ class TestPartReassembly:
         client = _make_client()
         backend_id = uuid7()
         _, callback = await _make_subscription(client, backend_id)
-        modified = {
+
+        with caplog.at_level("WARNING", logger="filament._client"):
+            await _deliver(
+                client,
+                self._part_payload(
+                    backend_id=backend_id, modified_entities=self._corrupt_segment(),
+                ),
+            )
+
+        callback.assert_not_called()
+        assert "no on_error callback registered" in caplog.text
+        assert "ScheduleSegmentEntity.reasons_data" in caplog.text
+
+        # The handler keeps working for subsequent, valid updates.
+        await _deliver(client, self._part_payload(backend_id=backend_id, sequence_idx=1))
+        callback.assert_called_once()
+
+    @staticmethod
+    def _corrupt_segment() -> dict[str, Any]:
+        return {
             "ScheduleSegmentEntity": {
                 "created": [
                     {
@@ -1621,18 +1641,71 @@ class TestPartReassembly:
             },
         }
 
-        with caplog.at_level("ERROR", logger="filament._client"):
-            await _deliver(
-                client,
-                self._part_payload(backend_id=backend_id, modified_entities=modified),
-            )
+    @pytest.mark.asyncio
+    async def test_corrupt_compressed_value_routes_to_on_error(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        on_error = MagicMock()
+        _, callback = await _make_subscription(client, backend_id, on_error=on_error)
+
+        await _deliver(
+            client,
+            self._part_payload(
+                backend_id=backend_id, modified_entities=self._corrupt_segment(),
+            ),
+        )
 
         callback.assert_not_called()
-        assert "Failed to deserialize DataUpdated payload" in caplog.text
+        on_error.assert_called_once()
+        (error,) = on_error.call_args.args
+        assert isinstance(error, CompressedPropertyError)
+        assert error.field_name == "reasons_data"
 
-        # The handler keeps working for subsequent, valid updates.
-        await _deliver(client, self._part_payload(backend_id=backend_id, sequence_idx=1))
-        callback.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_corrupt_compressed_part_poisons_multi_part_sequence(self) -> None:
+        client = _make_client()
+        backend_id = uuid7()
+        on_error = MagicMock()
+        _, callback = await _make_subscription(client, backend_id, on_error=on_error)
+
+        await _deliver(
+            client,
+            self._part_payload(backend_id=backend_id, part_idx=0, part_count=3),
+        )
+        assert (backend_id, 0) in client._part_buffers
+
+        await _deliver(
+            client,
+            self._part_payload(
+                backend_id=backend_id, part_idx=1, part_count=3,
+                modified_entities=self._corrupt_segment(),
+            ),
+        )
+
+        # Buffered parts are discarded immediately and the sequence is poisoned.
+        assert (backend_id, 0) not in client._part_buffers
+        assert (backend_id, 0) in client._poisoned_part_buffer_keys
+        on_error.assert_called_once()
+
+        # The remaining part is dropped rather than starting a new buffer.
+        await _deliver(
+            client,
+            self._part_payload(backend_id=backend_id, part_idx=2, part_count=3),
+        )
+        assert (backend_id, 0) not in client._part_buffers
+        callback.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_corrupt_compressed_value_for_unknown_subscription_ignored(self) -> None:
+        client = _make_client()
+        await _deliver(
+            client,
+            self._part_payload(
+                backend_id=uuid7(), part_count=2,
+                modified_entities=self._corrupt_segment(),
+            ),
+        )
+        assert not client._poisoned_part_buffer_keys
 
     @pytest.mark.asyncio
     async def test_updates_are_dispatched_off_the_handler_in_order(self) -> None:
