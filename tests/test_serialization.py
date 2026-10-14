@@ -1,16 +1,19 @@
 """Tests for the _serialization module."""
 from __future__ import annotations
 
+import base64
 import datetime
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any, Optional, Union
 
+import brotli
 import pytest
 from uuid_utils import UUID, uuid7
 
 from filament import _serialization
+from filament._exceptions import CompressedPropertyError
 from filament._serialization import (
     backend_camel_case,
     camel_case_from_snake_case,
@@ -635,6 +638,47 @@ class TestJsonCompanionFields:
         user = from_dict({"id": str(uuid7()), "imageData": payload}, UserEntity)
         assert user is not None
         assert user.image is None
+
+
+@dataclass(kw_only=True)
+class _CompressedInner:
+    body: Optional[str] = field(
+        default=None, metadata={"compression": "br", "encoding": "base64"},
+    )
+
+
+@dataclass(kw_only=True)
+class _CompressedOuter:
+    foo_data: Optional[str] = None
+    foo: Optional[_CompressedInner] = None
+
+
+class TestJsonCompanionCompressedFields:
+    """Compressed fields inside a ``<name>_data`` JSON projection.
+
+    A decode failure there must surface as ``CompressedPropertyError`` rather
+    than being swallowed as a malformed projection (leaving ``<name>`` None).
+    """
+
+    def test_valid_compressed_value_in_projection_decodes(self) -> None:
+        encoded = "br+base64:" + base64.b64encode(
+            brotli.compress("café ☃".encode("utf-8"))
+        ).decode("ascii")
+        outer = from_dict(
+            {"fooData": json.dumps({"body": encoded})}, _CompressedOuter,
+        )
+        assert outer is not None
+        assert outer.foo is not None
+        assert outer.foo.body == "café ☃"
+
+    def test_invalid_compressed_value_in_projection_raises(self) -> None:
+        with pytest.raises(
+            CompressedPropertyError, match=r"_CompressedInner\.body",
+        ):
+            from_dict(
+                {"fooData": json.dumps({"body": "br+base64:!!!not-base64"})},
+                _CompressedOuter,
+            )
 
 
 class TestInstantWireFormat:
