@@ -191,6 +191,29 @@ By default (`apply_pending_requests=True`), a read reflects modifications that
 have been submitted but not yet fully processed by the backend, so you see your
 own writes immediately. Set it to `False` to read only committed data.
 
+## Compressed properties
+
+Some large string properties are stored compressed by the backend (they carry
+`compression` / `encoding` metadata on the generated dataclass field, e.g.
+`ScheduleSegmentEntity.reasons_data`). Such a value is either plain text or
+`<compression>+<encoding>:<payload>`, e.g. `br+base64:...` (Brotli) or
+`gzip+base64:...` (gzip).
+
+The client decodes these automatically for every read and subscription update,
+so you always see plain text:
+
+- The value's header decides how it is decoded; values with no header (such as
+  rows written before compression was introduced) are returned unchanged.
+- Only fields marked with the metadata are decoded; other fields are never
+  touched, even if their text looks like a header.
+- An unknown header, or a payload that fails to decode (invalid base64, a
+  truncated stream, trailing bytes, ...), is an error rather than a raw value:
+  `read_data` returns `success=False` with `ErrorCodes.SerializationError` and a
+  message naming the field, and `filament.from_dict` raises
+  `filament.CompressedPropertyError`.
+- Writes are not re-compressed: sending an entity back sends the plain text,
+  which the backend stores as valid uncompressed text.
+
 ## Reading connected data
 
 The backend also exposes a *read-connected* operation that walks a connection
