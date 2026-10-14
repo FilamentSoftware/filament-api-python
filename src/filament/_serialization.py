@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, 
 import uuid_utils
 
 from ._compression import decode_compressed_value, is_compressed_field
+from ._exceptions import CompressedPropertyError
 from .types.generated.base.base import EntityBase
 
 if TYPE_CHECKING:
@@ -777,7 +778,8 @@ def _populate_json_companion_fields(
     A field pair qualifies when ``<name>`` is (optionally) a dataclass type and a
     sibling ``<name>_data`` field exists.  A missing, empty, non-string, or
     malformed ``<name>_data`` leaves ``<name>`` as ``None``; an explicitly set
-    ``<name>`` is never overwritten.
+    ``<name>`` is never overwritten.  A :class:`CompressedPropertyError` raised
+    while deserializing the projection propagates to the caller.
     """
     field_names = {f.name for f in fields(cls)}
     for f in fields(cls):
@@ -815,6 +817,10 @@ def _populate_json_companion_fields(
             continue
         try:
             parsed = from_dict(decoded, inner)
+        except CompressedPropertyError:
+            # A compressed field that fails to decode is a hard error, not a
+            # malformed projection: surface it rather than leaving <name> None.
+            raise
         except (AttributeError, ValueError, TypeError, KeyError):
             logger.warning(
                 "Failed to deserialize %s.%s from its %s JSON projection",
