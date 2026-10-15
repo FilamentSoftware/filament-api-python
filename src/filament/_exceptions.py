@@ -44,3 +44,34 @@ class ResponseTooLargeError(FilamentError):
             f"exceeds the client limit of {limit_bytes:,} bytes; the full request "
             f"would have been {full_request_bytes:,} bytes."
         )
+
+
+class CompressedPropertyError(FilamentError, ValueError):
+    """Raised when a compressed property value cannot be decoded.
+
+    Fields whose dataclass metadata carries ``compression`` / ``encoding``
+    keys hold either plain text or ``<compression>+<encoding>:<payload>``.
+    The value's header decides how it is decoded.  An unknown compression or
+    encoding token, or a known header whose payload fails to decode, raises
+    this error rather than returning the raw (still encoded) string.
+
+    It is also a :class:`ValueError`, so code that already guards
+    deserialization with ``except ValueError`` keeps handling it.
+
+    :ivar owner: Name of the class that owns the field (may be empty).
+    :ivar field_name: Name of the field being decoded (may be empty).
+    :ivar header: The value's header, e.g. ``"zstd+base64:"``.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        owner: str = "",
+        field_name: str = "",
+        header: str = "",
+    ) -> None:
+        self.owner = owner
+        self.field_name = field_name
+        self.header = header
+        super().__init__(message)

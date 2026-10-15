@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from uuid_utils import UUID, uuid7
+
 from ..base.base import EntityConnection
 from ..connections.generic import GenericTaskSkillConnection_1, TaskDependencyOverrideConnectionBase_2
 from ..entities.scope_task_type_service import ScopeTaskTypeEntity
@@ -28,6 +30,7 @@ class ScopeTaskTypeSpecialtyDependencyConnection(TaskDependencyOverrideConnectio
 @dataclass(kw_only=True)
 class ScopeTaskTypeSkillConnection(GenericTaskSkillConnection_1[ScopeTaskTypeEntity]):
     """Represents a connection between a scope task type and a skill."""
+    context_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass(kw_only=True)
@@ -35,6 +38,8 @@ class ScopeTaskTypeOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a scope task type and an office location.
     
-    :param priority: What is the priority order of offices that this task can be assigned to.
+    :param priority_order: The rank of this office among the offices this task type's tasks can be assigned to. <b>Lower is higher
+                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+                           the smallest value are equally preferred.
     """
-    priority: int = field(default=1)
+    priority_order: int = field(default=1)

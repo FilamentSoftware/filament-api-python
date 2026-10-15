@@ -22,6 +22,7 @@ from pysignalr.messages import CompletionMessage, Message
 from uuid_utils import UUID, uuid7
 
 from ._exceptions import (
+    CompressedPropertyError,
     FilamentAuthenticationError,
     FilamentConnectionError,
     FilamentError,
@@ -704,6 +705,9 @@ class FilamentClient:
         """
         try:
             update = from_dict(data, ServiceDataUpdate)
+        except CompressedPropertyError as exc:
+            await self._handle_undecodable_data_update(data, exc)
+            return
         except (AttributeError, TypeError, ValueError, KeyError):
             logger.exception("Failed to deserialize DataUpdated payload")
             return
@@ -754,6 +758,67 @@ class FilamentClient:
         merged = self._buffer_part(backend_id, update)
         if merged is not None:
             self._enqueue_data_update(backend_id, merged)
+
+    async def _handle_undecodable_data_update(
+        self, data: Any, error: CompressedPropertyError,
+    ) -> None:
+        """Report a ``DataUpdated`` frame whose compressed property failed to decode.
+
+        The update can never be delivered, so the subscription's ``on_error``
+        callbacks receive *error* (as :meth:`_handle_data_update_rejected` does for
+        oversized updates); without one it is logged at WARNING.  For a multi-part
+        update the sequence is poisoned so already-buffered parts are discarded
+        rather than waiting forever for a part that will never arrive.
+        """
+        try:
+            backend_id = UUID(data["subscriptionId"]["id"])
+            sequence_idx = int(data["sequenceIdx"])
+            part_count = int(data.get("partCount", 1))
+        except (AttributeError, TypeError, ValueError, KeyError):
+            logger.exception("Failed to deserialize DataUpdated payload")
+            return
+
+        client_ids = self._backend_to_client.get(backend_id)
+        if not client_ids and backend_id != self._user_defined_subscription_id:
+            return
+
+        if part_count > 1:
+            key = (backend_id, sequence_idx)
+            discarded = self._part_buffers.pop(key, {})
+            self._poisoned_part_buffer_keys.add(key)
+            logger.warning(
+                "Undecodable compressed property in DataUpdated for subscription %s "
+                "seq %d — discarding %d/%d buffered parts and poisoning the sequence",
+                backend_id, sequence_idx, len(discarded), part_count,
+            )
+
+        if not client_ids:
+            logger.error(
+                "Dropping UDP definition update for subscription %s: %s",
+                backend_id, error,
+            )
+            return
+
+        for client_id in list(client_ids):
+            on_error = self._client_error_callbacks.get(client_id)
+            if on_error is not None:
+                try:
+                    await _invoke_callback(on_error, error)
+                except Exception:
+                    logger.exception(
+                        "Error in DataUpdated on_error callback for subscription %s"
+                        " (client %s)",
+                        backend_id,
+                        client_id,
+                    )
+            else:
+                logger.warning(
+                    "Dropping DataUpdated for subscription %s (client %s) — "
+                    "no on_error callback registered: %s",
+                    backend_id,
+                    client_id,
+                    error,
+                )
 
     def _enqueue_data_update(self, backend_id: UUID, update: ServiceDataUpdate) -> None:
         """Queue a complete update for dispatch, starting the worker if it is idle.
@@ -1347,7 +1412,18 @@ class FilamentClient:
             self._user_defined_subscription_types = desired
             self._user_defined_subscription_failures = 0
             self._user_defined_subscription_retry_at = 0.0
-            if old_id is not None and old_id != new_id:
+            # A user subscription may share the superseded backend ID (the backend
+            # dedupes identical subscriptions); unsubscribe() sends the backend
+            # Unsubscribe once its last client is removed, so leave it alone here.
+            # Known gap: subscribe() doesn't hold _user_defined_subscription_lock and
+            # only registers in _backend_to_client after its Subscribe returns, so a
+            # concurrent identical user subscribe can still be deduped onto old_id
+            # and then cancelled by the Unsubscribe below.
+            if (
+                old_id is not None
+                and old_id != new_id
+                and old_id not in self._backend_to_client
+            ):
                 response_dict = await self._invoke(
                     "Unsubscribe", to_dict(SubscriptionId(id=old_id)),
                 )
@@ -1500,6 +1576,9 @@ class FilamentClient:
         result_dict: Any = await self._invoke("ReadData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[ServiceDataRead])
+        except CompressedPropertyError as exc:
+            # Name the field and header rather than the opaque generic error.
+            return _value_error(str(exc), ErrorCodes.SerializationError)
         except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is not None:
@@ -1717,6 +1796,9 @@ class FilamentClient:
             result = from_dict(
                 result_dict, ValueOrErrorPublic_1[ServiceDataReadConnected]
             )
+        except CompressedPropertyError as exc:
+            # Name the field and header rather than the opaque generic error.
+            return _value_error(str(exc), ErrorCodes.SerializationError)
         except (AttributeError, TypeError, ValueError, KeyError):
             return _deserialization_error()
         if result is None:
@@ -2131,11 +2213,13 @@ class FilamentClient:
         whenever the server sends a ``DataUpdated`` event for this subscription.
         It may be a sync or async callable.
 
-        The optional *on_error* callback is called with a
-        :class:`DataUpdateRejectedNotification` when the server drops an
-        update for this subscription because it would exceed the
-        client's negotiated ``max_size``.  If omitted, rejections are
-        logged at WARNING level.
+        The optional *on_error* callback is called when an update for this
+        subscription cannot be delivered: with a
+        :class:`DataUpdateRejectedNotification` when the server drops it
+        because it would exceed the client's negotiated ``max_size``, or with
+        a :class:`~filament.CompressedPropertyError` when a compressed
+        property in it fails to decode.  If omitted, these are logged at
+        WARNING level.
 
         Returns a client-generated :class:`SubscriptionId`.  Use this ID with
         :meth:`unsubscribe` to remove the callback.  The backend is always
@@ -2208,7 +2292,8 @@ class FilamentClient:
                         # _reconcile_user_defined_property_subscription would
                         # then early-return and never restore it.  Leave the
                         # backend subscription — and its in-flight buffers —
-                        # alone.
+                        # alone; once reconcile moves off this ID it sends the
+                        # deferred Unsubscribe itself.
                         return SuccessOrErrorPublic(
                             success=True,
                             message="",

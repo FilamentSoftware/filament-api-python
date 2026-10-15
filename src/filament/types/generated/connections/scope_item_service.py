@@ -64,7 +64,9 @@ class ScopeItemOfficeLocationConnection(EntityConnection):
                                This property establishes a link to a specific task type within the scope, allowing
                                for detailed categorization and context for the connection.
     :param scope_task_type: A helper property for setting the scope task type ID.
-    :param priority: What is the priority order of offices that this task can be assigned to.
+    :param priority_order: The rank of this office among the offices this scope item's tasks can be assigned to. <b>Lower is higher
+                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+                           the smallest value are equally preferred.
     :param scope_item_context_id: A link to another scope item to use as scope context for the office connection.
     :param scope_item_context: A helper property for setting the scope item context ID.
     :param scope_template_item_context_id: A link to a template item to use as scope context for the office connection.
@@ -72,7 +74,7 @@ class ScopeItemOfficeLocationConnection(EntityConnection):
     """
     scope_task_type_id: Optional[UUID] = field(default=None)
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
-    priority: int = field(default=1)
+    priority_order: int = field(default=1)
     scope_item_context_id: Optional[UUID] = field(default=None)
     scope_item_context: Optional[ScopeItemEntity] = field(default=None)
     scope_template_item_context_id: Optional[UUID] = field(default=None)
@@ -103,6 +105,7 @@ class ScopeItemTaskTypeOverrideConnection(GenericScopeTaskTypeConnection_2[Scope
     :param task_combine_key: The key used to combine tasks.
     :param remove: Gets a value indicating whether this override removes the task type.
     """
+    custom_complexity_id: Optional[UUID] = field(default=None)
     name: Optional[str] = field(default=None)
     description: Optional[str] = field(default=None)
     scope_item_context_id: Optional[UUID] = field(default=None)

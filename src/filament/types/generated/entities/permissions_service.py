@@ -7,10 +7,13 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import PermissionAction, PermissionType
+from ..enums import PermissionAction, PermissionDeltaMode, PermissionType
 
 __all__ = [
     "PermissionsRoleEntity",
+    "PermissionsRoleDeltaEntity",
+    "PermissionDeltaEntity",
+    "PermissionPropertyDeltaEntity",
     "PermissionEntity",
 ]
 
@@ -24,12 +27,107 @@ class PermissionsRoleEntity(Entity):
     :param context_type: The type of the context entity that this role should be associated with.
     :param level: The level of this role, which can be used to determine whether a user has permission to assign it
     :param inferred_role_ids: A list of role identifiers that are inferred based on the context or hierarchy of the current role.
+    :param restrict_deltas: Whether no delta may modify this definition — the guard against an organisation customising away its own
+                            administration.
     """
     name: str = field(default='')
     description: str = field(default='')
     context_type: Optional[str] = field(default=None)
     level: int = field(default=0)
     inferred_role_ids: list[UUID] = field(default_factory=list)
+    restrict_deltas: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class PermissionsRoleDeltaEntity(Entity):
+    """
+    One change an organisation makes to a role — a core role or one of its own — applied when its permissions are
+    composed. The role itself is never altered.
+    
+    :param permissions_role_id: The id of the role this delta changes — a core role's derived id or an organisation role's row id.
+    :param mode: How this delta combines with the role.
+    :param apply_order: Where this delta sits among the deltas on the same role. Lowest applies first.
+    :param name: The role's new name, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param description: The role's new description, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param level: The role's new level, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param inferred_role_ids: The inferred roles to add, remove or replace, by mode. Null or empty leaves them alone.
+    """
+    permissions_role_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    mode: PermissionDeltaMode = field(default=PermissionDeltaMode.None_)
+    apply_order: int = field(default=0)
+    name: Optional[str] = field(default=None)
+    description: Optional[str] = field(default=None)
+    level: Optional[int] = field(default=None)
+    inferred_role_ids: Optional[list[UUID]] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class PermissionDeltaEntity(Entity):
+    """
+    One change an organisation makes to a permission — a core permission or one of its own — applied when its
+    permissions are composed. The permission itself is never altered.
+    
+    :param permission_id: The id of the permission this delta changes — a core permission's derived id or an organisation
+                          permission's row id.
+    :param mode: How this delta combines with the permission.
+    :param apply_order: Where this delta sits among the deltas on the same permission. Lowest applies first.
+    :param action: The actions to add, remove or replace, by mode. <see cref="F:Filament.FSCore.Permissions.Attributes.PermissionAction.None" /> leaves them alone.
+    :param all_properties: The blanket property flag. Null leaves it alone; <see langword="true" /> turns it on
+                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Additive" />), off (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Subtractive" />) or sets it
+                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" />); <see langword="false" /> is
+                           <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param include_properties: The names to add to, remove from or replace the permission's include list with, by mode. Null or empty
+                               leaves the list alone.
+    :param exclude_properties: The names to add to, remove from or replace the permission's exclude list with, by mode. Null or empty
+                               leaves the list alone.
+    :param condition_data: The permission's new condition, in the form <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.ConditionData" /> stores. Null leaves
+                           the condition alone; an empty string clears it. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param description: The permission's new description, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" />
+                        only.
+    """
+    permission_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    mode: PermissionDeltaMode = field(default=PermissionDeltaMode.None_)
+    apply_order: int = field(default=0)
+    action: PermissionAction = field(default=PermissionAction.None_)
+    all_properties: Optional[bool] = field(default=None)
+    include_properties: Optional[list[str]] = field(default=None)
+    exclude_properties: Optional[list[str]] = field(default=None)
+    condition_data: Optional[str] = field(default=None)
+    description: Optional[str] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class PermissionPropertyDeltaEntity(Entity):
+    """
+    One change an organisation makes to property scope only — the one delta that can reach more than a single
+    permission. Applied when permissions are composed, after each permission has been split into one row per action.
+    
+    :param permission_id: The id of the one permission this delta changes, or null when the target is a role and entity type.
+    :param type_name: The entity type whose grants this delta changes, with <see cref="P:Filament.FSCore.CoreEntities.PermissionPropertyDeltaEntity.PermissionsRoleId" />; null or empty when
+                      the target is one permission.
+    :param permissions_role_id: The id of the role whose grants on <see cref="P:Filament.FSCore.CoreEntities.PermissionPropertyDeltaEntity.TypeName" /> this delta changes, or null when the target is one
+                                permission.
+    :param mode: How this delta combines with the scope of each row it targets.
+    :param apply_order: Where this delta sits among the deltas on the same row. Lowest applies first.
+    :param actions: The actions whose rows this delta changes. <see cref="F:Filament.FSCore.Permissions.Attributes.PermissionAction.None" /> means every action.
+    :param all_properties: The blanket property flag. Null leaves it alone; <see langword="true" /> turns it on
+                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Additive" />), off (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Subtractive" />) or sets it
+                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" />); <see langword="false" /> is
+                           <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param include_properties: The names to add to, remove from or replace each row's include list with, by mode. Null or empty leaves the
+                               list alone.
+    :param exclude_properties: The names to add to, remove from or replace each row's exclude list with, by mode. Null or empty leaves the
+                               list alone.
+    """
+    permission_id: Optional[UUID] = field(default=None)
+    type_name: Optional[str] = field(default=None)
+    permissions_role_id: Optional[UUID] = field(default=None)
+    mode: PermissionDeltaMode = field(default=PermissionDeltaMode.None_)
+    apply_order: int = field(default=0)
+    actions: PermissionAction = field(default=PermissionAction.None_)
+    all_properties: Optional[bool] = field(default=None)
+    include_properties: Optional[list[str]] = field(default=None)
+    exclude_properties: Optional[list[str]] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -42,19 +140,30 @@ class PermissionEntity(Entity):
     :param permission_type: The type of permission.
     :param type_name: The type name this permission applies to.
     :param action: The permission actions allowed.
-    :param properties: The list of properties this permission applies to.
-    :param user_defined_properties: The list of user-defined properties this permission applies to.
+    :param all_properties: Whether every ordinary property of <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.TypeName" /> is in this permission's property scope.
+    :param include_properties: The properties named into this permission's scope — ordinary and user-defined properties in one list.
+    :param exclude_properties: The properties named out of this permission's scope. Exclusion wins over both
+                               <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.AllProperties" /> and <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.IncludeProperties" />.
     :param condition_data: Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic.
     :param super_admin: Whether this permission grants super admin access.
     :param organization_admin: Whether this permission grants organization admin access.
+    :param restrict_deltas: Whether no delta may modify this definition — the guard against an organisation customising away its own
+                            administration.
+    :param description: What the grant is for, or null when nobody has said.
+    :param source_permission_id: On a composed row, the id of the definition the row was split from — a core permission's derived id or an
+                                 organisation permission's row id. Null on a definition itself.
     """
     permissions_role_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     permissions_role: Optional[PermissionsRoleEntity] = field(default=None)
     permission_type: PermissionType = field(default=PermissionType.None_)
     type_name: str = field(default='')
     action: PermissionAction = field(default=PermissionAction.None_)
-    properties: Optional[list[str]] = field(default=None)
-    user_defined_properties: Optional[list[str]] = field(default=None)
+    all_properties: bool = field(default=False)
+    include_properties: Optional[list[str]] = field(default=None)
+    exclude_properties: Optional[list[str]] = field(default=None)
     condition_data: Optional[str] = field(default=None)
     super_admin: bool = field(default=False)
     organization_admin: bool = field(default=False)
+    restrict_deltas: bool = field(default=False)
+    description: Optional[str] = field(default=None)
+    source_permission_id: Optional[UUID] = field(default=None)

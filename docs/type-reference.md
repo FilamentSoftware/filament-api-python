@@ -21,6 +21,7 @@ An auto-generated catalogue of every entity, connection, and enum exported from 
   - [Event Service](#event-service)
   - [File Settings Service](#file-settings-service)
   - [Generic](#generic)
+  - [Media Service](#media-service)
   - [Note Service](#note-service)
   - [Organization Service](#organization-service)
   - [Permissions Service](#permissions-service)
@@ -105,6 +106,15 @@ The status of a changed entity.
 | `Created` | Entity was created. |
 | `Updated` | Entity was updated. |
 | `Deleted` | Entity was deleted. |
+
+### `CompressionMethod` (`Enum`)
+
+The compression codec a [CompressedProperty] value is written with. Each member maps to a header token in `PropertyCompression`, the only place that knows the tokens.
+
+| Member | Description |
+| ------ | ----------- |
+| `Brotli` | Brotli (RFC 7932). Header token br. |
+| `Gzip` | Gzip (RFC 1952). Header token gzip. Decodable everywhere without a dependency (browsers and the Python standard library included), which is why every reader supports it even where nothing writes it. |
 
 ### `ContactType` (`Enum`)
 
@@ -191,6 +201,7 @@ Represents the actions that can be performed in a data request.
 | `Create` | Represents the action to create new data within a data request. This action is used to define that the request intends to add new entries to a data repository or system. |
 | `Update` | Represents an action to modify existing data in a data request. Typically used to update specific properties or entities while retaining the rest of the data unchanged. |
 | `Delete` | Represents a request to delete data in a data modification action. This action is used to remove specific entities or data records. |
+| `Refresh` | Represents a request to run an entity type's owning service without changing any data, so that its processor or modules can run their own reconciliation for that type. |
 
 ### `DbOrderDirection` (`Enum`)
 
@@ -267,6 +278,26 @@ An enum that defines valid training methods
 | `VisualEffects` | Visual Effects industry. This is the default. |
 | `Development` | Software development industry. |
 
+### `MediaStatus` (`Enum`)
+
+Whether a media element's data can actually be fetched yet.
+
+| Member | Description |
+| ------ | ----------- |
+| `Pending` | The element's data is not fetchable yet. Either an upload or a render is in flight, or one failed and left the element behind — nothing on the backend distinguishes the two, and nothing tidies either. |
+| `Available` | The element's data can be fetched. |
+
+### `MediaType` (`Enum`)
+
+The kind of thing a piece of media data is.
+
+| Member | Description |
+| ------ | ----------- |
+| `Image` | A still image. |
+| `ImageSequence` | A numbered sequence of still frames, such as an EXR render, held as one piece of data. |
+| `Movie` | A moving image, with or without sound. |
+| `Document` | A document, such as a PDF. |
+
 ### `NameOrder` (`Enum`)
 
 Specifies the order in which names should be displayed.
@@ -308,6 +339,18 @@ An enum (supporting flags) for the action that is allowed by each Permission ent
 | `Delete` | Permission to delete entities. |
 | `All` | All permission actions (Create, Read, Update, Delete). |
 
+### `PermissionDeltaMode` (`Enum`)
+
+How a delta combines with the role or permission it targets.
+
+| Member | Description |
+| ------ | ----------- |
+| `None_` | No mode. A delta in this mode is refused on write and skipped by composition. |
+| `Subtractive` | Removes what the delta lists from the definition: its actions, the names in each property list, the roles it infers. |
+| `Additive` | Adds what the delta lists to the definition. |
+| `Override` | Replaces each field the delta states with the delta's value. |
+| `Suppress` | Removes the definition entirely. Carries no payload. |
+
 ### `PermissionType` (`Enum`)
 
 The type of permission.
@@ -317,6 +360,14 @@ The type of permission.
 | `None_` | No permission type. |
 | `Entity` | Entity permission. |
 | `Scenario` | Scenario permission. |
+
+### `PreviewType` (`Enum`)
+
+The kind of preview a piece of media can carry, and so the key its preview files are held under.
+
+| Member | Description |
+| ------ | ----------- |
+| `Default` | The preview to show when nothing more specific is asked for. |
 
 ### `ProcessingRunStatus` (`Enum`)
 
@@ -330,6 +381,14 @@ The status of an overall processing run.
 | `Completed` | The processing run has completed successfully. |
 | `Failed` | The processing run failed. |
 | `Cancelled` | The processing run was cancelled. |
+
+### `PropertyEncoding` (`Enum`)
+
+The text encoding applied to the compressed bytes of a [CompressedProperty] value, so the value stays an ordinary string. Each member maps to a header token in `PropertyCompression`.
+
+| Member | Description |
+| ------ | ----------- |
+| `Base64` | Standard base64 with padding (RFC 4648 §4). Header token base64. |
 
 ### `ReadMode` (`Enum`)
 
@@ -881,6 +940,8 @@ Tracks entity protection relationships. When a downstream entity depends on an u
 | `protection_source_property` | `Optional[str]` | `None` | For property-based protections: the property name that created this protection (e.g., "UserId"). Null for connection-based protections. |
 | `protection_source_connection_type` | `Optional[str]` | `None` | For connection-based protections: the connection type name (e.g., "CastUserConnection"). Null for property-based protections. |
 | `protection_source_connection_id` | `Optional[UUID]` | `None` | For connection-based protections: the ID of the specific connection instance. Null for property-based protections. |
+| `released_by_request_id` | `Optional[UUID]` | `None` | When non-null, a pending/processing delete request with this id covers the downstream entity (or the source connection), so this record no longer blocks deletion of its upstream entity. Cleared if that request terminally fails; removed with the record when the downstream deletion commits. |
+| `pending_request_id` | `Optional[UUID]` | `None` | When non-null, this is a provisional record: a pending create (or re-linking update) request with this id will establish this protection. It blocks upstream deletion like a real record, but no committed downstream data exists yet. Superseded by the real record when the request commits; deleted if the request terminally fails. |
 
 ##### `UserDefinedTableEntity`
 
@@ -977,7 +1038,7 @@ _Extends:_ `PermissionsRoleConnectionBase_1`
 
 ##### `AvailabilityEntity`
 
-For storing availability information for a user. Multiple Availability entities can be stacked, using the `Priority` property to determine the relative priorities.
+For storing availability information for a user. Multiple Availability entities can be stacked, using the `PriorityWeight` property to determine which takes precedence (higher wins).
 
 _Extends:_ `ReferenceEntityBase`
 
@@ -988,7 +1049,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[Union[OfficeLocationEntity, UserEntity]]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | A human-readable name for this Availability entity. |
 | `description` | `str` | `''` | An optional description providing additional detail about this Availability entity. |
-| `priority` | `int` | `0` | The priority of this Availability entity. The higher the priority, the more this entity takes precedence. |
+| `priority_weight` | `int` | `0` | The precedence of this Availability entity. Higher is higher priority: where availabilities overlap, the one with the larger PriorityWeight takes precedence. Between equal weights the most restrictive `AvailabilityMode` wins (`Unavailable`, then `AvailableIfRequired`, then `Available`), then the lowest `Id`. |
 | `availability_mode` | `AvailabilityModeEnum` | `AvailabilityModeEnum.Unknown` | Whether this Availability entity sets the availability to be Available, Unavailable or AvailableIfRequired. |
 | `start_date_time` | `datetime.datetime` | — | The start time (in local time) of this Availability block. |
 | `end_date_time` | `datetime.datetime` | — | The end time (in local time) of this Availability block. |
@@ -1021,7 +1082,7 @@ Represents a connection between a cast and a user with additional properties to 
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `duration_multiplier` | `float` | `0` | The multiplier applied to the duration of tasks assigned to this user. |
+| `duration_multiplier` | `float` | `1` | The multiplier applied to the duration of tasks assigned to this user. |
 | `over_qualified` | `bool` | `False` | Indicates whether the user is considered overqualified for the associated cast entity. |
 | `ref_skill_distance` | `float` | `0` | Represents the distance between the skill of the user and the reference skill of the cast. |
 | `skill_proportion_used` | `float` | `0` | The proportion of the user's skills that are used by the cast. |
@@ -1048,11 +1109,11 @@ _Extends:_ `GenericTaskSkillConnection_1`
 
 ##### `CastOfficeLocationConnection`
 
-Represents the relationship between a cast entity and an office location entity. This connection may include additional metadata such as priority to determine the importance or ranking of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
+Represents the relationship between a cast entity and an office location entity. `PriorityOrder` ranks the office among the cast's offices. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `priority` | `int` | `0` | Represents the priority level assigned to the connection between a CastEntity and an OfficeLocationEntity. |
+| `priority_order` | `int` | `0` | The rank of this office among the offices the cast's tasks can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 
 ### Currency Service
 
@@ -1151,7 +1212,7 @@ Represents an agenda item within an event.
 | `event` | `Optional[EventEntity]` | `None` | A helper property for setting EventId. Pass in an EventEntity type. |
 | `title` | `str` | `''` | The agenda item title |
 | `description` | `str` | `''` | A more detailed description of the agenda item. |
-| `priority` | `int` | `1` | The priority of this item in the agenda. |
+| `priority_order` | `int` | `1` | The position of this item in the agenda. Lower is higher priority: items run in ascending PriorityOrder, so 1 comes first. |
 
 #### Connections
 
@@ -1355,6 +1416,57 @@ _Extends:_ `GenericSkillConnection_1`, `Generic`
 | `max_skill_level` | `int` | `0` | The maximum skill level allowed for the task. |
 | `primary_skill` | `bool` | — | Is this the primary skill used for the task? Used to determine what skills are being fed back on by the machine learning system. |
 
+### Media Service
+
+#### Entities
+
+##### `MediaEntity`
+
+One piece of media, owned by a user and associated with a primary connection context.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `name` | `str` | `''` | The name of this media. |
+| `description` | `str` | `''` | An optional description of this media: what it shows, where it came from, what to look at. Empty when there is none. |
+| `owner_user_id` | `UUID` | — | The unique identifier of the user who owns this media. |
+| `owner_user` | `Optional[UserEntity]` | `None` | The user who owns this media. |
+| `primary_connection_type` | `str` | `''` | The entity class name of the primary connection (e.g. "TaskEntity", "ScopeEntity"). |
+| `primary_connection_id` | `UUID` | — | The unique identifier of the primary entity this media is connected to. |
+| `secondary_connections` | `dict[UUID, str]` | — | Secondary connections for this media. Key is the entity id, value is the entity class name. |
+| `original_element_id` | `Optional[UUID]` | `None` | The element that holds this media's authoritative data, or null when it has none. |
+| `uploaded_element_id` | `Optional[UUID]` | `None` | The element Filament transcodes this media's thumbnails and previews from, or null when it has none. |
+| `media_type` | `Optional[MediaType]` | `None` | The calculated kind of this media: its original element's type, else its uploaded element's, else null. |
+| `first_frame` | `Optional[int]` | `None` | The first frame this media represents, such as the start of a shot's cut range, or null when it has no frame range. |
+| `last_frame` | `Optional[int]` | `None` | The last frame this media represents, or null when it has no frame range. |
+| `transcode_progress` | `Optional[float]` | `None` | How far through transcoding this media is, between 0.0 and 1.0, or null when no transcode has started. |
+| `thumbnail_file_id` | `Optional[UUID]` | `None` | A still thumbnail of this media, held in Filament's own store. Null when there is none. |
+| `thumbnail_file_data` | `Optional[str]` | `None` | The hub-populated read projection of `ThumbnailFileId`, carrying a FileReference. |
+| `thumbnail_file` | `Optional[FileReference]` | `None` | The thumbnail as a FileReference. Arrives unset — populate it from ThumbnailFileData. |
+| `animated_thumbnail_file_id` | `Optional[UUID]` | `None` | An animated thumbnail of this media, held in Filament's own store. Null when there is none. |
+| `animated_thumbnail_file_data` | `Optional[str]` | `None` | The hub-populated read projection of `AnimatedThumbnailFileId`, carrying a FileReference. |
+| `animated_thumbnail_file` | `Optional[FileReference]` | `None` | The animated thumbnail as a FileReference. Arrives unset — populate it from AnimatedThumbnailFileData. |
+| `preview_file_ids` | `dict[PreviewType, UUID]` | — | The previews of this media, held in Filament's own store: the file id of each, keyed by the kind of preview it is. Empty when there are none. |
+| `preview_files_data` | `Optional[dict[PreviewType, str]]` | `None` | The hub-populated read projection of `PreviewFileIds`: the JSON of a FileReference for each preview, under the same keys. |
+| `preview_files` | `Optional[dict[PreviewType, FileReference]]` | `None` | The previews as FileReferences, keyed by the kind of preview. Arrives unset — populate it from PreviewFilesData. |
+
+##### `MediaElementEntity`
+
+One piece of source data belonging to a `MediaEntity`: an EXR sequence, a movie uploaded for review, a matte, a project file.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `media_id` | `UUID` | — | The media this element belongs to. |
+| `media` | `Optional[MediaEntity]` | `None` | The media this element belongs to. |
+| `kind` | `str` | `''` | What sort of data this is, in the organisation's own words: "exr", "matte", "aov". Required. |
+| `label` | `Optional[str]` | `None` | Names this element, so two of the same kind can be told apart: "roto_fg". Optional. |
+| `description` | `str` | `''` | An optional description of this element: what the data is, how it was made, anything a label is too short for. Empty when there is none. |
+| `media_type` | `MediaType` | `MediaType.Image` | The kind of thing this element's data is. |
+| `status` | `MediaStatus` | `MediaStatus.Pending` | Whether this element's data can be fetched yet. |
+| `local_file_path` | `Optional[str]` | `None` | The path to this element's data on the customer's filesystem or network share, or a pattern for a sequence such as shot010_v003.%04d.exr. Null when there is no local copy. |
+| `file_id` | `Optional[UUID]` | `None` | This element's data, held in Filament's own store. Null when there is no uploaded copy, and null until an upload has completed. |
+| `file_data` | `Optional[str]` | `None` | The hub-populated read projection of `FileId`, carrying a FileReference. |
+| `file` | `Optional[FileReference]` | `None` | The uploaded copy as a FileReference. Arrives unset — populate it from FileData. |
+
 ### Note Service
 
 #### Entities
@@ -1379,6 +1491,7 @@ A note entity that can be attached to any other entity.
 | `on_id` | `UUID` | — | The id of the entity this note is on. |
 | `on_type` | `str` | `''` | The type of the entity this note is on. |
 | `on` | `Optional[TaskEntity]` | `None` | The entity this note is on. |
+| `secondary_references` | `dict[UUID, str]` | — | Further entities this note refers to, beyond the one it is on. Key is the entity id, value is the entity class name (e.g. "MediaEntity"). |
 
 #### Connections
 
@@ -1472,6 +1585,53 @@ Represents a role that defines permissions within the system.
 | `context_type` | `Optional[str]` | `None` | The type of the context entity that this role should be associated with. |
 | `level` | `int` | `0` | The level of this role, which can be used to determine whether a user has permission to assign it |
 | `inferred_role_ids` | `list[UUID]` | — | A list of role identifiers that are inferred based on the context or hierarchy of the current role. |
+| `restrict_deltas` | `bool` | `False` | Whether no delta may modify this definition — the guard against an organisation customising away its own administration. |
+
+##### `PermissionsRoleDeltaEntity`
+
+One change an organisation makes to a role — a core role or one of its own — applied when its permissions are composed. The role itself is never altered.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `permissions_role_id` | `UUID` | — | The id of the role this delta changes — a core role's derived id or an organisation role's row id. |
+| `mode` | `PermissionDeltaMode` | `PermissionDeltaMode.None_` | How this delta combines with the role. |
+| `apply_order` | `int` | `0` | Where this delta sits among the deltas on the same role. Lowest applies first. |
+| `name` | `Optional[str]` | `None` | The role's new name, or null to leave it alone. `Override` only. |
+| `description` | `Optional[str]` | `None` | The role's new description, or null to leave it alone. `Override` only. |
+| `level` | `Optional[int]` | `None` | The role's new level, or null to leave it alone. `Override` only. |
+| `inferred_role_ids` | `Optional[list[UUID]]` | `None` | The inferred roles to add, remove or replace, by mode. Null or empty leaves them alone. |
+
+##### `PermissionDeltaEntity`
+
+One change an organisation makes to a permission — a core permission or one of its own — applied when its permissions are composed. The permission itself is never altered.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `permission_id` | `UUID` | — | The id of the permission this delta changes — a core permission's derived id or an organisation permission's row id. |
+| `mode` | `PermissionDeltaMode` | `PermissionDeltaMode.None_` | How this delta combines with the permission. |
+| `apply_order` | `int` | `0` | Where this delta sits among the deltas on the same permission. Lowest applies first. |
+| `action` | `PermissionAction` | `PermissionAction.None_` | The actions to add, remove or replace, by mode. `None` leaves them alone. |
+| `all_properties` | `Optional[bool]` | `None` | The blanket property flag. Null leaves it alone; turns it on (`Additive`), off (`Subtractive`) or sets it (`Override`); is `Override` only. |
+| `include_properties` | `Optional[list[str]]` | `None` | The names to add to, remove from or replace the permission's include list with, by mode. Null or empty leaves the list alone. |
+| `exclude_properties` | `Optional[list[str]]` | `None` | The names to add to, remove from or replace the permission's exclude list with, by mode. Null or empty leaves the list alone. |
+| `condition_data` | `Optional[str]` | `None` | The permission's new condition, in the form `ConditionData` stores. Null leaves the condition alone; an empty string clears it. `Override` only. |
+| `description` | `Optional[str]` | `None` | The permission's new description, or null to leave it alone. `Override` only. |
+
+##### `PermissionPropertyDeltaEntity`
+
+One change an organisation makes to property scope only — the one delta that can reach more than a single permission. Applied when permissions are composed, after each permission has been split into one row per action.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `permission_id` | `Optional[UUID]` | `None` | The id of the one permission this delta changes, or null when the target is a role and entity type. |
+| `type_name` | `Optional[str]` | `None` | The entity type whose grants this delta changes, with `PermissionsRoleId`; null or empty when the target is one permission. |
+| `permissions_role_id` | `Optional[UUID]` | `None` | The id of the role whose grants on `TypeName` this delta changes, or null when the target is one permission. |
+| `mode` | `PermissionDeltaMode` | `PermissionDeltaMode.None_` | How this delta combines with the scope of each row it targets. |
+| `apply_order` | `int` | `0` | Where this delta sits among the deltas on the same row. Lowest applies first. |
+| `actions` | `PermissionAction` | `PermissionAction.None_` | The actions whose rows this delta changes. `None` means every action. |
+| `all_properties` | `Optional[bool]` | `None` | The blanket property flag. Null leaves it alone; turns it on (`Additive`), off (`Subtractive`) or sets it (`Override`); is `Override` only. |
+| `include_properties` | `Optional[list[str]]` | `None` | The names to add to, remove from or replace each row's include list with, by mode. Null or empty leaves the list alone. |
+| `exclude_properties` | `Optional[list[str]]` | `None` | The names to add to, remove from or replace each row's exclude list with, by mode. Null or empty leaves the list alone. |
 
 ##### `PermissionEntity`
 
@@ -1484,11 +1644,15 @@ Represents a permission entity.
 | `permission_type` | `PermissionType` | `PermissionType.None_` | The type of permission. |
 | `type_name` | `str` | `''` | The type name this permission applies to. |
 | `action` | `PermissionAction` | `PermissionAction.None_` | The permission actions allowed. |
-| `properties` | `Optional[list[str]]` | `None` | The list of properties this permission applies to. |
-| `user_defined_properties` | `Optional[list[str]]` | `None` | The list of user-defined properties this permission applies to. |
+| `all_properties` | `bool` | `False` | Whether every ordinary property of `TypeName` is in this permission's property scope. |
+| `include_properties` | `Optional[list[str]]` | `None` | The properties named into this permission's scope — ordinary and user-defined properties in one list. |
+| `exclude_properties` | `Optional[list[str]]` | `None` | The properties named out of this permission's scope. Exclusion wins over both `AllProperties` and `IncludeProperties`. |
 | `condition_data` | `Optional[str]` | `None` | Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic. |
 | `super_admin` | `bool` | `False` | Whether this permission grants super admin access. |
 | `organization_admin` | `bool` | `False` | Whether this permission grants organization admin access. |
+| `restrict_deltas` | `bool` | `False` | Whether no delta may modify this definition — the guard against an organisation customising away its own administration. |
+| `description` | `Optional[str]` | `None` | What the grant is for, or null when nobody has said. |
+| `source_permission_id` | `Optional[UUID]` | `None` | On a composed row, the id of the definition the row was split from — a core permission's derived id or an organisation permission's row id. Null on a definition itself. |
 
 ### Review Group Service
 
@@ -1578,7 +1742,7 @@ _Extends:_ `ReferenceEntityBase`
 | `reference` | `Optional[Union[EventEntity, ScopeEntity, TaskEntity, TaskGroupEntity]]` | `None` | Represents a linked entity instance. |
 | `name` | `str` | `''` | The name of the schedule segment. Represents a descriptive or identifying title for the segment. |
 | `description` | `str` | `''` | A brief textual explanation or characterization of the schedule segment. Provides additional context or details about the segment. |
-| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as a serialized JSON string. Written once, at segment construction, via the set-only `Reasons` property; never read back as an object server-side (the user-facing audit view ships the raw JSON to the frontend). Marked `ExcludeFromEqualityAttribute`; reasons are an audit/diagnostic blob, not part of the segment's identity. |
+| `reasons_data` | `str` | `''` | A descriptive field that provides justification or explanation related to the schedule segment, stored as JSON. New values are Brotli-compressed and base64-encoded behind a br+base64: header; a value with no header is plain JSON (rows written before compression). Written once, at segment construction, via the set-only `Reasons` property; never read back as an object server-side (the user-facing audit view decodes it in the frontend). Marked `ExcludeFromEqualityAttribute`; reasons are an audit/diagnostic blob, not part of the segment's identity. |
 | `start_instant` | `datetime.datetime` | — | Represents the starting point in time for the schedule segment as an instant. This property defines the exact timestamp from which the segment begins. |
 | `end_instant` | `datetime.datetime` | — | The end time of the schedule segment, represented as an instant in time. Defines the point at which this segment concludes. |
 | `user_type` | `str` | `''` | Specifies the type of user associated with the schedule segment. Represents a categorization or classification of the user, such as regular user, placeholder, etc. |
@@ -1587,7 +1751,7 @@ _Extends:_ `ReferenceEntityBase`
 | `mode` | `ScheduleSegmentModeEnum` | `ScheduleSegmentModeEnum.Unknown` | The mode of the schedule segment, specifying its functional purpose within the schedule. Possible values include Unknown, Work, Buffer, Processing, Group, User, and Event. |
 | `parent_ids` | `list[UUID]` | — | The identifier of the parent segments associated with the current schedule segment entity. Used to establish hierarchical relationships between segments. |
 | `parents` | `Optional[list[ScheduleSegmentEntity]]` | `None` | The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment. |
-| `priority` | `float` | `1` | The priority of this schedule segment, derived from the associated task's priority. Meeting segments have a priority of 1.0. |
+| `priority_weight` | `float` | `1` | The scheduling weight of this schedule segment, copied from the associated task's `PriorityWeight`. Higher is higher priority. Meeting segments have a weight of 1.0. |
 | `time_log_id` | `Optional[UUID]` | `None` | The identifier of the time log entry associated with this schedule segment. This is used to link logged work time segments back to their source time log. |
 | `duration_multiplier` | `Optional[float]` | `None` | Snapshot of the `DurationMultiplier` for the user who performed the logged work, captured at the time the segment was first created. Only populated on segments with `Mode` = `TimeLog`; null for all other modes and when no matching `CastUserConnection` existed at creation time. The value is intentionally frozen — later changes to the underlying `DurationMultiplier` do not update this snapshot. |
 | `time_log` | `Optional[TimeLogEntity]` | `None` | The time log entry associated with this schedule segment. Used to conveniently link a segment to its source time log. |
@@ -1639,6 +1803,7 @@ Represents the settings for a schedule within the scheduling service.
 | `task_priority_task_priority_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority TaskPriority weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
 | `task_priority_siblings_scheduled_score_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority SiblingsScheduledScore weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the component; values above 1.0 amplify it. |
 | `task_priority_window_order_weight_multiplier` | `float` | `1` | Multiplier applied to the task-priority PreviousScheduleOrderInMaintainWindow weight from SchedulePrioritySettings. 1.0 leaves the default unchanged; 0.0 disables the in-window task-ordering boost; values above 1.0 amplify it. See the maintain-schedule feature for context. |
+| `priority_milestone_weight_multiplier` | `float` | `1` | Multiplier applied to the priority-milestone weight from SchedulePrioritySettings (SpringLayout.PriorityMilestone.Weight), which sets how hard a Priority milestone front-loads its upstream tasks. 1.0 leaves the default unchanged; 0.0 disables Priority milestones' pull; values above 1.0 amplify it. Does not affect Fixed milestones the scheduler demotes to Priority for a run. |
 | `max_event_repeat` | `datetime.timedelta` | — | Maximum horizon past CurrentInstant for which recurring events are materialised. Occurrences whose target start is beyond this horizon are not scheduled until a later run when CurrentInstant has advanced. Default: 365 days. |
 | `initial_repeating_event_alignment_lookahead` | `int` | `4` | Number of leading occurrences across which the planner attempts to align a recurring event's time-within-period. Until this many anchors have been persisted, the planner uses a lookahead pass to pick a single target time-within-period that the most of the first N occurrences can land at simultaneously. From the (N+1)th anchor onward, the mode-of-history calculation drives the target instead. Default: 4. |
 | `event_history_sample_size` | `int` | `20` | Number of historical occurrences of a recurring event the planner looks back over. It bounds two things at once: the history sample fed to the mode-of-history offset calculation — the newest N started anchors (plus any placements made earlier in the same pass) decide the time-within-period that future occurrences are aligned to, so recent cadence outweighs year-old placements; the occurrence walk-back on an ordinary (non-repair) pass — enumeration starts no earlier than the target of the Nth-newest started anchor, so retained history is not re-walked every cycle. Holes older than that are back-filled only on an operator FullSchedule pass. Both arms are additionally clamped by MaxEventRepeat. Default: 20. |
@@ -1797,7 +1962,7 @@ Represents a single item within a scope.
 | `count` | `int` | `1` | The total number of items in the collection. |
 | `task_duration_multiplier` | `float` | `1` | This allows fine-grained control over task durations on a per item basis. |
 | `chargeable_multiplier` | `float` | `1` | A multiplier on the chargeable cost for this item. Used for discounting (or adding surplus) to chargeable costs. |
-| `priority` | `float` | `1` | The priority of this scope item. Used to influence task scheduling priority. Must be between 0 and 1 (inclusive). |
+| `priority_weight` | `float` | `1` | The scheduling weight of this scope item, between 0 and 1 (inclusive). Higher is higher priority: it multiplies with the scope's `PriorityWeight` into the weight of every task generated from the item. |
 | `status_id` | `UUID` | — | The status assigned to this scope item. |
 | `status` | `Optional[ScopeStatusEntity]` | `None` | A helper method for setting the StatusId property. |
 | `internal_note_id` | `Optional[UUID]` | `None` | A link to the internal note for this ScopeItem. |
@@ -1845,7 +2010,7 @@ Represents a connection between a `ScopeItemEntity` and an `OfficeLocationEntity
 | ----- | ---- | ------- | ----------- |
 | `scope_task_type_id` | `Optional[UUID]` | `None` | The identifier for the associated `ScopeTaskTypeEntity`. This property establishes a link to a specific task type within the scope, allowing for detailed categorization and context for the connection. |
 | `scope_task_type` | `Optional[ScopeTaskTypeEntity]` | `None` | A helper property for setting the scope task type ID. |
-| `priority` | `int` | `1` | What is the priority order of offices that this task can be assigned to. |
+| `priority_order` | `int` | `1` | The rank of this office among the offices this scope item's tasks can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 | `scope_item_context_id` | `Optional[UUID]` | `None` | A link to another scope item to use as scope context for the office connection. |
 | `scope_item_context` | `Optional[ScopeItemEntity]` | `None` | A helper property for setting the scope item context ID. |
 | `scope_template_item_context_id` | `Optional[UUID]` | `None` | A link to a template item to use as scope context for the office connection. |
@@ -1895,6 +2060,7 @@ Represents a milestone within a scope.
 | `name` | `str` | `''` | The name of the milestone. |
 | `description` | `str` | `''` | A description of the milestone. |
 | `mode` | `ScopeMilestoneModeEnum` | `ScopeMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
+| `priority_order` | `float` | `1` | The rank of this milestone among `Priority` milestones. Lower is higher priority: the scheduler's pull strength is the priority-milestone weight divided by PriorityOrder, so order 1 pulls twice as hard as order 2, and a value of zero or less applies no pull. Copied to the derived `TaskMilestoneEntity`. Has no effect in the other modes. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone begins or ends (depending on its Direction) If the Instant is null, then it if flexible and can be moved |
 | `direction` | `ScopeMilestoneDirectionEnum` | `ScopeMilestoneDirectionEnum.StartAfter` | Is this a start milestone or a delivery milestone. StartAfter means connected tasks must start after the milestone. EndBefore means the tasks must be finished before this milestone. |
 | `scope_task_type_step_ids` | `list[UUID]` | — | The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to, used by item connections whose own ScopeTaskTypeStepIds is null. A connection's non-null list overrides this (an empty one suppressing it entirely); when neither yields a step id the milestone attaches to the item's leaf tasks instead. |
@@ -1917,7 +2083,7 @@ Represents a specific entity with associated metadata and behaviors, categorized
 | `image` | `Optional[FileReference]` | `None` | The image as a FileReference. Arrives unset — populate it from ImageData. |
 | `task_duration_multiplier` | `float` | `1` | An overall multiplier that applies to all task durations. This allows a project to effectively adjust the duration of all tasks in one place. |
 | `chargeable_multiplier` | `float` | `1` | An overall multiplier on chargeable costs. This is used to set global discounts for an entire project. |
-| `priority` | `float` | `1` | The priority of this scope. Used to influence task scheduling priority. Must be between 0 and 1 (inclusive). |
+| `priority_weight` | `float` | `1` | The scheduling weight of this scope, between 0 and 1 (inclusive). Higher is higher priority: it multiplies into the weight of every task in the scope, so a task in a 1.0 scope is scheduled ahead of an otherwise-equal task in a 0.5 scope. |
 | `status_id` | `UUID` | — | The status assigned to this scope. This is not an EntityLinkProperty because this type is in FSCore, and ScopeStatusEntity is in CoreServices. |
 | `currency_id` | `UUID` | — | The currency used for this scope's monetary values. This is not an EntityLinkProperty because this type is in FSCore, and CurrencyEntity is in CoreServices. |
 
@@ -1978,7 +2144,7 @@ Represents a step in a scope task type, defining specific attributes and behavio
 | `scope_task_type` | `Optional[ScopeTaskTypeEntity]` | `None` | Represents the associated ScopeTaskTypeEntity for a ScopeTaskTypeStepEntity, allowing the linkage between the entity and its corresponding identifier within the system. |
 | `name` | `str` | `''` | The given name this task type. |
 | `description` | `str` | `''` | A description that describes what this task is. |
-| `sort_order` | `int` | `0` | The order this stage will be created and scheduled. |
+| `sort_order` | `int` | `1` | The order this stage will be created and scheduled. |
 | `time_weight` | `float` | `1` | The weighted amount of the total time available for the task that this stage takes. |
 | `deliverables` | `list[str]` | — | Deliverables expected for this stage to be complete. |
 | `requires_review` | `bool` | `False` | If this tasks needs to go into reviews once it is done. |
@@ -2048,7 +2214,7 @@ Represents a connection between a scope task type and an office location.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `priority` | `int` | `1` | What is the priority order of offices that this task can be assigned to. |
+| `priority_order` | `int` | `1` | The rank of this office among the offices this task type's tasks can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 
 ### Scope Template Item Service
 
@@ -2225,6 +2391,7 @@ _Extends:_ `ReferenceEntityBase`
 | `name` | `str` | `''` | The given name for this milestone. |
 | `description` | `str` | `''` | The description of this milestone |
 | `mode` | `TaskMilestoneModeEnum` | `TaskMilestoneModeEnum.Fixed` | How this milestone constrains scheduling: `Fixed` anchors to a concrete instant, `Priority` promotes upstream tasks, and `Report` is observational only. |
+| `priority_order` | `float` | `1` | The rank of this milestone among `Priority` milestones. Lower is higher priority: the scheduler's pull strength is the priority-milestone weight divided by PriorityOrder, so order 1 pulls twice as hard as order 2, and a value of zero or less applies no pull. Copied from `PriorityOrder` on a milestone generated from a scope milestone. Has no effect in the other modes. |
 | `instant` | `Optional[datetime.datetime]` | `None` | The moment in time this milestone is due. If the Instant is null, the milestone is flexible and can be moved |
 | `direction` | `TaskMilestoneDirectionEnum` | `TaskMilestoneDirectionEnum.EndBefore` | Should tasks start after this milestone, or end before it? |
 | `warnings_data` | `Optional[str]` | `None` | JSON-serialized list of warnings raised while processing this milestone - each is a `TaskMilestoneWarning` describing an issue, such as an assignment that attached to no tasks. Null when there are no warnings. |
@@ -2276,7 +2443,7 @@ _Extends:_ `ReferenceEntityBase`
 | `deliverables` | `list[str]` | — | Deliverables expected for this task to be complete, taken from the `ScopeTaskTypeStepEntity` this task was created from. |
 | `requires_review` | `bool` | `False` | If this task needs to go into reviews once it is done. |
 | `default_processing_duration` | `datetime.timedelta` | — | The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions. This will be used as the default processing duration to be filled in on `TaskStatusEntity`. |
-| `priority` | `float` | `1` | The priority of this task, derived from the scope and scope item priorities. |
+| `priority_weight` | `float` | `1` | The scheduling weight of this task, derived from the scope and scope item PriorityWeights and their statuses' priority multipliers. Higher is higher priority: it feeds the scheduler's task-priority score, which ranks higher weights first. |
 | `ancestor_group_ids` | `list[UUID]` | — | Identifies the IDs of all ancestor task groups in the hierarchy that are related to this instance of `TaskEntity`. |
 | `ancestor_groups` | `Optional[list[TaskGroupEntity]]` | `None` | Contains the collection of ancestor task groups that are hierarchically above the current task. This property is used to establish relationships between task groups in a hierarchical structure, identifying all ancestor groups for the current entity. |
 | `chargeable` | `float` | `0` | The calculated chargeable amount for this task, derived from the task type's chargeable per hour, the task duration, and the scope/item chargeable multipliers, with currency conversion applied. |
@@ -2285,6 +2452,7 @@ _Extends:_ `ReferenceEntityBase`
 | `specialty_id` | `UUID` | — | The specialty this task falls under. Populated by TaskScopeModule from the owning `ScopeTaskTypeEntity` for a generated task, or supplied directly for a manually created task — deliberately not a calculated property, for the same reason as `Deliverables`. |
 | `specialty` | `Optional[SpecialtyEntity]` | `None` | A helper method for setting the SpecialtyId property. Pass in a SpecialtyEntity type. |
 | `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this task during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
+| `orphaned` | `bool` | `False` | True when this task's scope configuration no longer requires it and the task is preserved only because TimeLogs protect it from deletion. Orphaned tasks are excluded from casting and scheduling, and are deleted once their protection is gone. |
 
 #### Connections
 
@@ -2341,7 +2509,7 @@ Represents a connection between a task and an office location within the system,
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `priority` | `int` | `1` | Represents the priority of the task-office location connection. This value determines the priority level associated with the connection between a task and an office location. |
+| `priority_order` | `int` | `1` | The rank of this office among the offices the task can be assigned to. Lower is higher priority: the office with the smallest PriorityOrder is preferred, and offices sharing the smallest value are equally preferred. |
 | `auto_generated_by` | `Optional[str]` | `None` | The name of the task module that generated this office location link during propagation - TaskScopeModule or TaskNoteModule - or null when it was created by hand through data entry. The task service's data entry module refuses to create, update or delete anything a module generated, and refuses to set this. Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never touches it. |
 
 ### Task Status Service

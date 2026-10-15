@@ -29,8 +29,9 @@ class ScopeEntity(Entity):
     :param task_duration_multiplier: An overall multiplier that applies to all task durations. This allows a project to effectively
                                      adjust the duration of all tasks in one place.
     :param chargeable_multiplier: An overall multiplier on chargeable costs. This is used to set global discounts for an entire project.
-    :param priority: The priority of this scope. Used to influence task scheduling priority.
-                     Must be between 0 and 1 (inclusive).
+    :param priority_weight: The scheduling weight of this scope, between 0 and 1 (inclusive). <b>Higher is higher priority</b>:
+                            it multiplies into the weight of every task in the scope, so a task in a 1.0 scope is scheduled
+                            ahead of an otherwise-equal task in a 0.5 scope.
     :param status_id: The status assigned to this scope.
                       This is not an EntityLinkProperty because this type is in FSCore, and ScopeStatusEntity
                       is in CoreServices.
@@ -46,7 +47,7 @@ class ScopeEntity(Entity):
     image: Optional[FileReference] = field(default=None)
     task_duration_multiplier: float = field(default=1)
     chargeable_multiplier: float = field(default=1)
-    priority: float = field(default=1)
+    priority_weight: float = field(default=1)
     status_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
 

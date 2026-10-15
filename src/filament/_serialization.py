@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, 
 
 import uuid_utils
 
+from ._compression import decode_compressed_value, is_compressed_field
+from ._exceptions import CompressedPropertyError
 from .types.generated.base.base import EntityBase
 
 if TYPE_CHECKING:
@@ -148,7 +150,8 @@ def camel_case_property_names(names: ABCSequence[str]) -> list[str]:
 # rather than the camelCase wire names. Keyed by field name because the generated
 # dataclasses carry no metadata to mark these fields. Conversion applies wherever
 # a list-valued field with one of these names appears — including the entity
-# field ``PermissionEntity.properties``, whose property names are normalised the
+# fields ``include_properties`` / ``exclude_properties`` on ``PermissionEntity``
+# and the permission delta entities, whose property names are normalised the
 # same way. The ``isinstance(value, list)`` guard in ``to_dict`` skips same-named
 # dict fields (e.g. the permission ``properties`` dicts on ``EntityTypePermissions``
 # / ``EntityPropertyPermissions``), which are not property-name lists.
@@ -157,6 +160,8 @@ _PROPERTY_NAME_LIST_FIELDS: frozenset[str] = frozenset({
     "update_properties",
     "connection_properties",
     "entity_properties",
+    "include_properties",
+    "exclude_properties",
 })
 
 
@@ -727,7 +732,15 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
 
         raw_value = data.get(camel_key, data.get(f.name))
         field_type = hints.get(f.name, f.type)
-        dataclass_data[f.name] = _convert_from_dict_value(raw_value, field_type, type_arg)
+        value = _convert_from_dict_value(raw_value, field_type, type_arg)
+        # Fields marked with compression/encoding metadata may hold
+        # ``<compression>+<encoding>:<payload>``; decode before construction so
+        # the instance (and _populate_json_companion_fields) sees plain text.
+        if isinstance(value, str) and is_compressed_field(f.metadata):
+            value = decode_compressed_value(
+                value, owner=concrete_cls.__name__, field_name=f.name,
+            )
+        dataclass_data[f.name] = value
 
     result: T = concrete_cls(**dataclass_data)
     if isinstance(result, EntityBase):
@@ -765,7 +778,8 @@ def _populate_json_companion_fields(
     A field pair qualifies when ``<name>`` is (optionally) a dataclass type and a
     sibling ``<name>_data`` field exists.  A missing, empty, non-string, or
     malformed ``<name>_data`` leaves ``<name>`` as ``None``; an explicitly set
-    ``<name>`` is never overwritten.
+    ``<name>`` is never overwritten.  A :class:`CompressedPropertyError` raised
+    while deserializing the projection propagates to the caller.
     """
     field_names = {f.name for f in fields(cls)}
     for f in fields(cls):
@@ -803,6 +817,10 @@ def _populate_json_companion_fields(
             continue
         try:
             parsed = from_dict(decoded, inner)
+        except CompressedPropertyError:
+            # A compressed field that fails to decode is a hard error, not a
+            # malformed projection: surface it rather than leaving <name> None.
+            raise
         except (AttributeError, ValueError, TypeError, KeyError):
             logger.warning(
                 "Failed to deserialize %s.%s from its %s JSON projection",

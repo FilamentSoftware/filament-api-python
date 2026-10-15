@@ -76,7 +76,7 @@ class ScopeTaskTypeStepEntity(Entity):
     scope_task_type: Optional[ScopeTaskTypeEntity] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
-    sort_order: int = field(default=0)
+    sort_order: int = field(default=1)
     time_weight: float = field(default=1)
     deliverables: list[str] = field(default_factory=list)
     requires_review: bool = field(default=False)

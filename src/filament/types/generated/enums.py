@@ -7,6 +7,7 @@ __all__ = [
     "BlockUserReasonEnum",
     "CalendarUserAccess",
     "ChangedEntityStatus",
+    "CompressionMethod",
     "ContactType",
     "CurrencyStatus",
     "CurrencySymbolPosition",
@@ -19,12 +20,17 @@ __all__ = [
     "FileChecksumAlgorithm",
     "FileState",
     "Industry",
+    "MediaStatus",
+    "MediaType",
     "NameOrder",
     "NoteStatusEnum",
     "NoteUserConnectionType",
     "PermissionAction",
+    "PermissionDeltaMode",
     "PermissionType",
+    "PreviewType",
     "ProcessingRunStatus",
+    "PropertyEncoding",
     "ReadMode",
     "RepeatDaysEnum",
     "RepeatModeEnum",
@@ -59,6 +65,10 @@ __all__ = [
     "UserPhoneType",
     "UserStatusEnum",
     "UserTypeEnum",
+    "COMPRESSION_METHOD_TOKENS",
+    "COMPRESSION_METHOD_BY_TOKEN",
+    "PROPERTY_ENCODING_TOKENS",
+    "PROPERTY_ENCODING_BY_TOKEN",
 ]
 
 class ActualStatusEnum(Enum):
@@ -152,6 +162,19 @@ class ChangedEntityStatus(Enum):
     Created = 1
     Updated = 2
     Deleted = 3
+
+
+class CompressionMethod(Enum):
+    """
+    The compression codec a <see cref="T:Filament.FSCore.Entities.Attributes.CompressedPropertyAttribute">[CompressedProperty]</see> value is written with.
+    Each member maps to a header token in <see cref="T:Filament.FSCore.Entities.PropertyCompression" />, the only place that knows the tokens.
+    
+    :cvar Brotli: Brotli (RFC 7932). Header token <c>br</c>.
+    :cvar Gzip: Gzip (RFC 1952). Header token <c>gzip</c>. Decodable everywhere without a dependency (browsers and the Python
+                standard library included), which is why every reader supports it even where nothing writes it.
+    """
+    Brotli = 0
+    Gzip = 1
 
 
 class ContactType(Enum):
@@ -290,11 +313,14 @@ class DataRequestAction(Enum):
                   Typically used to update specific properties or entities while retaining the rest of the data unchanged.
     :cvar Delete: Represents a request to delete data in a data modification action.
                   This action is used to remove specific entities or data records.
+    :cvar Refresh: Represents a request to run an entity type's owning service without changing any data, so that
+                   its processor or modules can run their own reconciliation for that type.
     """
     Unknown = 0
     Create = 1
     Update = 2
     Delete = 3
+    Refresh = 4
 
 
 class DbOrderDirection(Enum):
@@ -443,6 +469,33 @@ class Industry(Enum):
     Development = 1
 
 
+class MediaStatus(Enum):
+    """
+    Whether a media element's data can actually be fetched yet.
+    
+    :cvar Pending: The element's data is not fetchable yet. Either an upload or a render is in flight, or one failed and
+                   left the element behind — nothing on the backend distinguishes the two, and nothing tidies either.
+    :cvar Available: The element's data can be fetched.
+    """
+    Pending = 0
+    Available = 1
+
+
+class MediaType(Enum):
+    """
+    The kind of thing a piece of media data is.
+    
+    :cvar Image: A still image.
+    :cvar ImageSequence: A numbered sequence of still frames, such as an EXR render, held as one piece of data.
+    :cvar Movie: A moving image, with or without sound.
+    :cvar Document: A document, such as a PDF.
+    """
+    Image = 0
+    ImageSequence = 1
+    Movie = 2
+    Document = 3
+
+
 class NameOrder(Enum):
     """
     Specifies the order in which names should be displayed.
@@ -499,6 +552,24 @@ class PermissionAction(Flag):
     All = Create | Read | Update | Delete
 
 
+class PermissionDeltaMode(Enum):
+    """
+    How a delta combines with the role or permission it targets.
+    
+    :cvar None_: No mode. A delta in this mode is refused on write and skipped by composition.
+    :cvar Subtractive: Removes what the delta lists from the definition: its actions, the names in each property list, the roles
+                       it infers.
+    :cvar Additive: Adds what the delta lists to the definition.
+    :cvar Override: Replaces each field the delta states with the delta's value.
+    :cvar Suppress: Removes the definition entirely. Carries no payload.
+    """
+    None_ = 0
+    Subtractive = 1
+    Additive = 2
+    Override = 3
+    Suppress = 4
+
+
 class PermissionType(Enum):
     """
     The type of permission.
@@ -510,6 +581,15 @@ class PermissionType(Enum):
     None_ = 0
     Entity = 1
     Scenario = 2
+
+
+class PreviewType(Enum):
+    """
+    The kind of preview a piece of media can carry, and so the key its preview files are held under.
+    
+    :cvar Default: The preview to show when nothing more specific is asked for.
+    """
+    Default = 0
 
 
 class ProcessingRunStatus(Enum):
@@ -529,6 +609,17 @@ class ProcessingRunStatus(Enum):
     Completed = 3
     Failed = 4
     Cancelled = 5
+
+
+class PropertyEncoding(Enum):
+    """
+    The text encoding applied to the compressed bytes of a
+    <see cref="T:Filament.FSCore.Entities.Attributes.CompressedPropertyAttribute">[CompressedProperty]</see> value, so the value stays an ordinary string.
+    Each member maps to a header token in <see cref="T:Filament.FSCore.Entities.PropertyCompression" />.
+    
+    :cvar Base64: Standard base64 with padding (RFC 4648 §4). Header token <c>base64</c>.
+    """
+    Base64 = 0
 
 
 class ReadMode(Enum):
@@ -1144,3 +1235,27 @@ class UserTypeEnum(Enum):
     """
     Internal = 0
     External = 1
+
+
+# Compression header tokens for [CompressedProperty] values. Maps each CompressionMethod value to its token.
+COMPRESSION_METHOD_TOKENS: dict[CompressionMethod, str] = {
+    CompressionMethod.Brotli: "br",
+    CompressionMethod.Gzip: "gzip",
+}
+
+# Compression header tokens for [CompressedProperty] values. Maps each token back to its CompressionMethod value.
+COMPRESSION_METHOD_BY_TOKEN: dict[str, CompressionMethod] = {
+    "br": CompressionMethod.Brotli,
+    "gzip": CompressionMethod.Gzip,
+}
+
+
+# Encoding header tokens for [CompressedProperty] values. Maps each PropertyEncoding value to its token.
+PROPERTY_ENCODING_TOKENS: dict[PropertyEncoding, str] = {
+    PropertyEncoding.Base64: "base64",
+}
+
+# Encoding header tokens for [CompressedProperty] values. Maps each token back to its PropertyEncoding value.
+PROPERTY_ENCODING_BY_TOKEN: dict[str, PropertyEncoding] = {
+    "base64": PropertyEncoding.Base64,
+}

@@ -75,6 +75,11 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Fixed" /> anchors
                  to a concrete instant, <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Priority" /> promotes upstream tasks,
                  and <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Report" /> is observational only.
+    :param priority_order: The rank of this milestone among <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Priority" /> milestones.
+                           <b>Lower is higher priority</b>: the scheduler's pull strength is the priority-milestone weight
+                           divided by <c>PriorityOrder</c>, so order 1 pulls twice as hard as order 2, and a value of zero or
+                           less applies no pull. Copied from <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.PriorityOrder" /> on a milestone
+                           generated from a scope milestone. Has no effect in the other modes.
     :param instant: The moment in time this milestone is due.
                     If the Instant is null, the milestone is flexible and can be moved
     :param direction: Should tasks start after this milestone, or end before it?
@@ -91,6 +96,7 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     name: str = field(default='')
     description: str = field(default='')
     mode: TaskMilestoneModeEnum = field(default=TaskMilestoneModeEnum.Fixed)
+    priority_order: float = field(default=1)
     instant: Optional[datetime.datetime] = field(default=None)
     direction: TaskMilestoneDirectionEnum = field(default=TaskMilestoneDirectionEnum.EndBefore)
     warnings_data: Optional[str] = field(default=None)
@@ -174,7 +180,9 @@ class TaskEntity(ReferenceEntityBase):
     :param requires_review: If this task needs to go into reviews once it is done.
     :param default_processing_duration: The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions.
                                         This will be used as the default processing duration to be filled in on <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity" />.
-    :param priority: The priority of this task, derived from the scope and scope item priorities.
+    :param priority_weight: The scheduling weight of this task, derived from the scope and scope item
+                            <c>PriorityWeight</c>s and their statuses' priority multipliers. <b>Higher is higher priority</b>:
+                            it feeds the scheduler's task-priority score, which ranks higher weights first.
     :param ancestor_group_ids: Identifies the IDs of all ancestor task groups in the hierarchy that are related to this
                                instance of <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
     :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task.
@@ -194,6 +202,9 @@ class TaskEntity(ReferenceEntityBase):
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
+    :param orphaned: True when this task's scope configuration no longer requires it and the task is
+                     preserved only because TimeLogs protect it from deletion. Orphaned tasks are excluded
+                     from casting and scheduling, and are deleted once their protection is gone.
     """
     reference: Optional[Union[ScopeItemEntity, TaskEntity]] = field(default=None)
     contexts: dict[str, str] = field(default_factory=dict)
@@ -204,7 +215,7 @@ class TaskEntity(ReferenceEntityBase):
     deliverables: list[str] = field(default_factory=list)
     requires_review: bool = field(default=False)
     default_processing_duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
-    priority: float = field(default=1)
+    priority_weight: float = field(default=1)
     ancestor_group_ids: list[UUID] = field(default_factory=list)
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)
     chargeable: float = field(default=0)
@@ -213,3 +224,4 @@ class TaskEntity(ReferenceEntityBase):
     specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     specialty: Optional[SpecialtyEntity] = field(default=None)
     auto_generated_by: Optional[str] = field(default=None)
+    orphaned: bool = field(default=False)

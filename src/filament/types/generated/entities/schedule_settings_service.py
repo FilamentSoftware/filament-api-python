@@ -58,6 +58,11 @@ class ScheduleSettingsEntity(Entity):
                                                          from <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
                                                          disables the in-window task-ordering boost; values above <c>1.0</c> amplify it. See the
                                                          maintain-schedule feature for context.
+    :param priority_milestone_weight_multiplier: Multiplier applied to the priority-milestone weight from <c>SchedulePrioritySettings</c>
+                                                 (<c>SpringLayout.PriorityMilestone.Weight</c>), which sets how hard a Priority milestone
+                                                 front-loads its upstream tasks. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
+                                                 disables Priority milestones' pull; values above <c>1.0</c> amplify it. Does not affect
+                                                 Fixed milestones the scheduler demotes to Priority for a run.
     :param max_event_repeat: Maximum horizon past <c>CurrentInstant</c> for which recurring events are materialised.
                              Occurrences whose target start is beyond this horizon are not scheduled until a later
                              run when <c>CurrentInstant</c> has advanced. Default: 365 days.
@@ -94,6 +99,7 @@ class ScheduleSettingsEntity(Entity):
     task_priority_task_priority_weight_multiplier: float = field(default=1)
     task_priority_siblings_scheduled_score_weight_multiplier: float = field(default=1)
     task_priority_window_order_weight_multiplier: float = field(default=1)
+    priority_milestone_weight_multiplier: float = field(default=1)
     max_event_repeat: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     initial_repeating_event_alignment_lookahead: int = field(default=4)
     event_history_sample_size: int = field(default=20)

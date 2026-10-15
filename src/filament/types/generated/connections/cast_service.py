@@ -25,7 +25,7 @@ class CastUserConnection(EntityConnection):
     :param ref_skill_distance: Represents the distance between the skill of the user and the reference skill of the cast.
     :param skill_proportion_used: The proportion of the user's skills that are used by the cast.
     """
-    duration_multiplier: float = field(default=0)
+    duration_multiplier: float = field(default=1)
     over_qualified: bool = field(default=False)
     ref_skill_distance: float = field(default=0)
     skill_proportion_used: float = field(default=0)
@@ -51,9 +51,10 @@ class CastSkillConnection(GenericTaskSkillConnection_1[CastEntity]):
 class CastOfficeLocationConnection(EntityConnection):
     """
     Represents the relationship between a cast entity and an office location entity.
-    This connection may include additional metadata such as priority to determine
-    the importance or ranking of the connection. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
+    <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastOfficeLocationConnection.PriorityOrder" /> ranks the office among the cast's offices. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
-    :param priority: Represents the priority level assigned to the connection between a CastEntity and an OfficeLocationEntity.
+    :param priority_order: The rank of this office among the offices the cast's tasks can be assigned to. <b>Lower is higher
+                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+                           the smallest value are equally preferred.
     """
-    priority: int = field(default=0)
+    priority_order: int = field(default=0)

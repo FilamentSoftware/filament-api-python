@@ -182,10 +182,11 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param description: A brief textual explanation or characterization of the schedule segment.
                         Provides additional context or details about the segment.
     :param reasons_data: A descriptive field that provides justification or explanation related to the schedule segment,
-                         stored as a serialized JSON string. Written once, at segment construction, via the set-only
-                         <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Reasons" /> property; never read back as an object server-side (the user-facing audit
-                         view ships the raw JSON to the frontend). Marked <see cref="T:Filament.FSCore.Entities.Attributes.ExcludeFromEqualityAttribute" />;
-                         reasons are an audit/diagnostic blob, not part of the segment's identity.
+                         stored as JSON. New values are Brotli-compressed and base64-encoded behind a <c>br+base64:</c> header; a value
+                         with no header is plain JSON (rows written before compression). Written once, at segment construction, via the
+                         set-only <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Reasons" /> property; never read back as an object server-side (the user-facing audit view
+                         decodes it in the frontend). Marked <see cref="T:Filament.FSCore.Entities.Attributes.ExcludeFromEqualityAttribute" />; reasons are an audit/diagnostic
+                         blob, not part of the segment's identity.
     :param start_instant: Represents the starting point in time for the schedule segment as an instant.
                           This property defines the exact timestamp from which the segment begins.
     :param end_instant: The end time of the schedule segment, represented as an instant in time.
@@ -201,8 +202,9 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param parent_ids: The identifier of the parent segments associated with the current schedule segment entity.
                        Used to establish hierarchical relationships between segments.
     :param parents: The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment.
-    :param priority: The priority of this schedule segment, derived from the associated task's priority.
-                     Meeting segments have a priority of 1.0.
+    :param priority_weight: The scheduling weight of this schedule segment, copied from the associated task's
+                            <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.PriorityWeight" />. <b>Higher is higher priority.</b> Meeting segments
+                            have a weight of 1.0.
     :param time_log_id: The identifier of the time log entry associated with this schedule segment.
                         This is used to link logged work time segments back to their source time log.
     :param duration_multiplier: Snapshot of the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> for the user who
@@ -223,7 +225,7 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     reference: Optional[Union[EventEntity, ScopeEntity, TaskEntity, TaskGroupEntity]] = field(default=None)
     name: str = field(default='')
     description: str = field(default='')
-    reasons_data: str = field(default='')
+    reasons_data: str = field(default='', metadata={"compression": "br", "encoding": "base64"})
     start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     user_type: str = field(default='')
@@ -232,7 +234,7 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     mode: ScheduleSegmentModeEnum = field(default=ScheduleSegmentModeEnum.Unknown)
     parent_ids: list[UUID] = field(default_factory=list)
     parents: Optional[list[ScheduleSegmentEntity]] = field(default=None)
-    priority: float = field(default=1)
+    priority_weight: float = field(default=1)
     time_log_id: Optional[UUID] = field(default=None)
     duration_multiplier: Optional[float] = field(default=None)
     time_log: Optional[TimeLogEntity] = field(default=None)

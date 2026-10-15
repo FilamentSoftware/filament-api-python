@@ -316,6 +316,14 @@ class EntityProtectionEntity(Entity):
                                               Null for property-based protections.
     :param protection_source_connection_id: For connection-based protections: the ID of the specific connection instance.
                                             Null for property-based protections.
+    :param released_by_request_id: When non-null, a pending/processing delete request with this id covers the downstream
+                                   entity (or the source connection), so this record no longer blocks deletion of its
+                                   upstream entity. Cleared if that request terminally fails; removed with the record when
+                                   the downstream deletion commits.
+    :param pending_request_id: When non-null, this is a provisional record: a pending create (or re-linking update)
+                               request with this id will establish this protection. It blocks upstream deletion like a
+                               real record, but no committed downstream data exists yet. Superseded by the real record
+                               when the request commits; deleted if the request terminally fails.
     """
     upstream_entity_type: str = field(default='')
     upstream_entity_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
@@ -324,6 +332,8 @@ class EntityProtectionEntity(Entity):
     protection_source_property: Optional[str] = field(default=None)
     protection_source_connection_type: Optional[str] = field(default=None)
     protection_source_connection_id: Optional[UUID] = field(default=None)
+    released_by_request_id: Optional[UUID] = field(default=None)
+    pending_request_id: Optional[UUID] = field(default=None)
 
 
 @dataclass(kw_only=True)
