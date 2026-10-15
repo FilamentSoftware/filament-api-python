@@ -22,6 +22,8 @@ class MediaEntity(Entity):
     One piece of media, owned by a user and associated with a primary connection context.
     
     :param name: The name of this media.
+    :param description: An optional description of this media: what it shows, where it came from, what to look at. Empty when
+                        there is none.
     :param owner_user_id: The unique identifier of the user who owns this media.
     :param owner_user: The user who owns this media.
     :param primary_connection_type: The entity class name of the primary connection (e.g. "TaskEntity", "ScopeEntity").
@@ -51,6 +53,7 @@ class MediaEntity(Entity):
                           from <c>PreviewFilesData</c>.</b>
     """
     name: str = field(default='')
+    description: str = field(default='')
     owner_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     owner_user: Optional[UserEntity] = field(default=None)
     primary_connection_type: str = field(default='')
@@ -83,6 +86,8 @@ class MediaElementEntity(Entity):
     :param media: The media this element belongs to.
     :param kind: What sort of data this is, in the organisation's own words: "exr", "matte", "aov". Required.
     :param label: Names this element, so two of the same kind can be told apart: "roto_fg". Optional.
+    :param description: An optional description of this element: what the data is, how it was made, anything a label is too
+                        short for. Empty when there is none.
     :param media_type: The kind of thing this element's data is.
     :param status: Whether this element's data can be fetched yet.
     :param local_file_path: The path to this element's data on the <b>customer's</b> filesystem or network share, or a pattern for a
@@ -96,6 +101,7 @@ class MediaElementEntity(Entity):
     media: Optional[MediaEntity] = field(default=None)
     kind: str = field(default='')
     label: Optional[str] = field(default=None)
+    description: str = field(default='')
     media_type: MediaType = field(default=MediaType.Image)
     status: MediaStatus = field(default=MediaStatus.Pending)
     local_file_path: Optional[str] = field(default=None)

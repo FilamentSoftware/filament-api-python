@@ -1427,6 +1427,7 @@ One piece of media, owned by a user and associated with a primary connection con
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `name` | `str` | `''` | The name of this media. |
+| `description` | `str` | `''` | An optional description of this media: what it shows, where it came from, what to look at. Empty when there is none. |
 | `owner_user_id` | `UUID` | — | The unique identifier of the user who owns this media. |
 | `owner_user` | `Optional[UserEntity]` | `None` | The user who owns this media. |
 | `primary_connection_type` | `str` | `''` | The entity class name of the primary connection (e.g. "TaskEntity", "ScopeEntity"). |
@@ -1458,6 +1459,7 @@ One piece of source data belonging to a `MediaEntity`: an EXR sequence, a movie 
 | `media` | `Optional[MediaEntity]` | `None` | The media this element belongs to. |
 | `kind` | `str` | `''` | What sort of data this is, in the organisation's own words: "exr", "matte", "aov". Required. |
 | `label` | `Optional[str]` | `None` | Names this element, so two of the same kind can be told apart: "roto_fg". Optional. |
+| `description` | `str` | `''` | An optional description of this element: what the data is, how it was made, anything a label is too short for. Empty when there is none. |
 | `media_type` | `MediaType` | `MediaType.Image` | The kind of thing this element's data is. |
 | `status` | `MediaStatus` | `MediaStatus.Pending` | Whether this element's data can be fetched yet. |
 | `local_file_path` | `Optional[str]` | `None` | The path to this element's data on the customer's filesystem or network share, or a pattern for a sequence such as shot010_v003.%04d.exr. Null when there is no local copy. |
