@@ -1,3 +1,26 @@
+## 0.8.0 (2026-10-15 22:13)
+
+### Client
+
+#### FIX
+- Refreshing the private UDP definition-change subscription no longer cancels a user subscription the backend deduplicated onto the same ID
+
+### Serialization
+
+#### FIX
+- Snake_case names in include_properties / exclude_properties are converted to wire camelCase
+
+#### FEATURE
+- Fields carrying compression metadata (e.g. ScheduleSegmentEntity.reasons_data) are decoded from br+base64:/gzip+base64: to plain text; older clients will see encoded values once the backend starts compressing
+
+### Types
+
+#### OTHER
+- Adds an optional description field to MediaEntity and MediaElementEntity
+- Adds CompressionMethod / PropertyEncoding enums and compression metadata on ScheduleSegmentEntity.reasons_data
+- Adds media service and permission delta types; PermissionEntity.properties is replaced by all_properties / include_properties / exclude_properties
+- Split entity `priority` fields into `priority_weight` (higher wins) and `priority_order` (lower wins), and added milestone priority ordering and a priority-milestone weight multiplier
+
 ## 0.7.3 (2026-09-26 20:07)
 
 ### Client
