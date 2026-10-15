@@ -1,3 +1,10 @@
+## 0.8.0-dev.0.0.2 (2026-10-15 22:10)
+
+### Types
+
+#### OTHER
+- Adds an optional description field to MediaEntity and MediaElementEntity
+
 ## 0.8.0-dev.0.0.1 (2026-10-14 11:30)
 
 ### Serialization
