@@ -1438,6 +1438,7 @@ One piece of media, owned by a user and associated with a primary connection con
 | `media_type` | `Optional[MediaType]` | `None` | The calculated kind of this media: its original element's type, else its uploaded element's, else null. |
 | `first_frame` | `Optional[int]` | `None` | The first frame this media represents, such as the start of a shot's cut range, or null when it has no frame range. |
 | `last_frame` | `Optional[int]` | `None` | The last frame this media represents, or null when it has no frame range. |
+| `review` | `bool` | `False` | Whether this media should be included in any review of the task it is attached to. |
 | `transcode_progress` | `Optional[float]` | `None` | How far through transcoding this media is, between 0.0 and 1.0, or null when no transcode has started. |
 | `thumbnail_file_id` | `Optional[UUID]` | `None` | A still thumbnail of this media, held in Filament's own store. Null when there is none. |
 | `thumbnail_file_data` | `Optional[str]` | `None` | The hub-populated read projection of `ThumbnailFileId`, carrying a FileReference. |
