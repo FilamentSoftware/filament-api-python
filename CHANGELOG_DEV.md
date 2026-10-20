@@ -1,3 +1,10 @@
+## 0.8.1-dev.0.0.1 (2026-10-20 14:36)
+
+### Types
+
+#### OTHER
+- Adds a review flag to MediaEntity marking whether media is included in its task's review
+
 ## 0.8.0-dev.0.0.2 (2026-10-15 22:10)
 
 ### Types
