@@ -35,6 +35,7 @@ class MediaEntity(Entity):
     :param first_frame: The first frame this media represents, such as the start of a shot's cut range, or null when it has no
                         frame range.
     :param last_frame: The last frame this media represents, or null when it has no frame range.
+    :param review: Whether this media should be included in any review of the task it is attached to.
     :param transcode_progress: How far through transcoding this media is, between 0.0 and 1.0, or null when no transcode has started.
     :param thumbnail_file_id: A still thumbnail of this media, held in Filament's own store. Null when there is none.
     :param thumbnail_file_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.MediaService.MediaEntity.ThumbnailFileId" />, carrying a <c>FileReference</c>.
@@ -64,6 +65,7 @@ class MediaEntity(Entity):
     media_type: Optional[MediaType] = field(default=None)
     first_frame: Optional[int] = field(default=None)
     last_frame: Optional[int] = field(default=None)
+    review: bool = field(default=False)
     transcode_progress: Optional[float] = field(default=None)
     thumbnail_file_id: Optional[UUID] = field(default=None)
     thumbnail_file_data: Optional[str] = field(default=None)
