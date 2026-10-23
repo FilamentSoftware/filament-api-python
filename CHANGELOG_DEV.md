@@ -1,3 +1,10 @@
+## 0.8.1-dev.0.0.2 (2026-10-23 17:58)
+
+### Types
+
+#### OTHER
+- Dependent-task routing is now per category (add_to_dependent_category_ids, dependent_task_source_item_ids) and ProcessingSettingsEntity gains anonymise_snapshots
+
 ## 0.8.1-dev.0.0.1 (2026-10-20 14:36)
 
 ### Types
