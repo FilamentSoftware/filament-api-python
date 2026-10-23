@@ -72,7 +72,9 @@ class ScopeItemEntity(Entity):
     :param assumptions_calculated: This is a property that gets calculated using the connected task's complexity assumptions fields.
     :param assumptions_manual: If a user decides to override the calculated assumptions entirely.
     :param ignore_calculated_assumptions: Whether to ignore the calculated assumptions or use them
-    :param has_dependent: Whether this item has tasks that are to be applied to a dependent item
+    :param dependent_task_source_item_ids: The ids of the source items whose dependent tasks are routed onto this item (sorted, distinct). Derived
+                                           from the dependency graph, the sources' <c>AddToDependentCategoryIds</c> lists and this item's overrides, and only
+                                           as current as the item's last recalculation.
     :param currency_id: The currency used for this scope item's monetary values.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     :param lock_upstream: Gets or sets a value indicating whether to lock upstream dependencies.
@@ -99,7 +101,7 @@ class ScopeItemEntity(Entity):
     assumptions_calculated: list[str] = field(default_factory=list)
     assumptions_manual: list[str] = field(default_factory=list)
     ignore_calculated_assumptions: bool = field(default=False)
-    has_dependent: bool = field(default=False)
+    dependent_task_source_item_ids: list[UUID] = field(default_factory=list)
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
     lock_upstream: bool = field(default=False)

@@ -79,7 +79,6 @@ class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TC
     """
     Represents a connection between a generic scope entity and a task type entity.
     
-    :param add_to_dependent: If AddToDependent is true, this task should be added to any dependant item not to this item itself
     :param complexity_source: Where the duration of this task is determined.  It can be a custom amount or from the Complexity
                               linked to the task.
     :param complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to <see cref="F:Filament.Services.CoreServices.Entities.Other.ScopeTaskTypeComplexitySource.TaskTypeComplexity" />.
@@ -87,7 +86,7 @@ class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TC
     :param custom_complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to <see cref="F:Filament.Services.CoreServices.Entities.Other.ScopeTaskTypeComplexitySource.Custom" />.
     :param custom_complexity: A helper method for setting the custom complexity id.
     """
-    add_to_dependent: bool = field(default_factory=bool)
+    add_to_dependent_category_ids: Optional[list[UUID]] = field(default=None)
     complexity_source: ScopeTaskTypeComplexitySource = field(default=ScopeTaskTypeComplexitySource.None_)
     complexity_id: Optional[UUID] = field(default=None)
     complexity: Optional[ScopeTaskTypeComplexityEntity] = field(default=None)

@@ -828,6 +828,7 @@ Per-organisation processing configuration. This is a singleton per tenant: the s
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `success_snapshots` | `bool` | `False` | Whether processing-succeeded snapshots should be written for this organisation. Defaults to false. |
+| `anonymise_snapshots` | `bool` | `True` | Whether this organisation's processing snapshots (failed and succeeded) are anonymised: every `AnonymiseInSnapshotsAttribute` property and user-defined text value replaced by a pseudonym. Defaults to true; turn it off only for development organisations, whose snapshots may then carry the original values. |
 
 ##### `FileEntity`
 
@@ -1371,7 +1372,7 @@ _Extends:_ `Generic`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `add_to_dependent` | `bool` | — | If AddToDependent is true, this task should be added to any dependant item not to this item itself |
+| `add_to_dependent_category_ids` | `Optional[list[UUID]]` | `None` |  |
 | `complexity_source` | `ScopeTaskTypeComplexitySource` | `ScopeTaskTypeComplexitySource.None_` | Where the duration of this task is determined. It can be a custom amount or from the Complexity linked to the task. |
 | `complexity_id` | `Optional[UUID]` | `None` | A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to `TaskTypeComplexity`. |
 | `complexity` | `Optional[ScopeTaskTypeComplexityEntity]` | `None` | A helper method for setting the complexity id. |
@@ -1853,7 +1854,6 @@ Represents a category of items in the system.
 | `reference_size_units` | `str` | `''` | The units used to specify the size of the reference element. |
 | `allowed_upstream_category_ids` | `list[UUID]` | — | The categories that are allowed to be upstream of this category. |
 | `allowed_downstream_category_ids` | `list[UUID]` | — | The categories that are allowed to be downstream of this category. |
-| `allow_add_to_dependent` | `bool` | `True` | Whether this category allows tasks to be added to a dependent item. |
 
 ### Scope Cost Service
 
@@ -1973,7 +1973,7 @@ Represents a single item within a scope.
 | `assumptions_calculated` | `list[str]` | — | This is a property that gets calculated using the connected task's complexity assumptions fields. |
 | `assumptions_manual` | `list[str]` | — | If a user decides to override the calculated assumptions entirely. |
 | `ignore_calculated_assumptions` | `bool` | `False` | Whether to ignore the calculated assumptions or use them |
-| `has_dependent` | `bool` | `False` | Whether this item has tasks that are to be applied to a dependent item |
+| `dependent_task_source_item_ids` | `list[UUID]` | — | The ids of the source items whose dependent tasks are routed onto this item (sorted, distinct). Derived from the dependency graph, the sources' AddToDependentCategoryIds lists and this item's overrides, and only as current as the item's last recalculation. |
 | `currency_id` | `UUID` | — | The currency used for this scope item's monetary values. |
 | `currency` | `Optional[CurrencyEntity]` | `None` | A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type. |
 | `lock_upstream` | `bool` | `False` | Gets or sets a value indicating whether to lock upstream dependencies. |
@@ -2033,7 +2033,7 @@ _Extends:_ `GenericScopeTaskTypeConnection_2`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `add_to_dependent` | `bool` | — | If AddToDependent is true, this task should be added to any dependant item not to this item itself |
+| `add_to_dependent_category_ids` | `Optional[list[UUID]]` | `None` |  |
 | `complexity_source` | `ScopeTaskTypeComplexitySource` | `ScopeTaskTypeComplexitySource.None_` | Where the duration of this task is determined. It can be a custom amount or from the Complexity linked to the task. |
 | `complexity_id` | `Optional[UUID]` | `None` | A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to `TaskTypeComplexity`. |
 | `complexity` | `Optional[ScopeTaskTypeComplexityEntity]` | `None` | A helper method for setting the complexity id. |
@@ -2259,7 +2259,7 @@ _Extends:_ `GenericScopeTaskTypeConnection_2`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `add_to_dependent` | `bool` | — | If AddToDependent is true, this task should be added to any dependant item not to this item itself |
+| `add_to_dependent_category_ids` | `Optional[list[UUID]]` | `None` |  |
 | `complexity_source` | `ScopeTaskTypeComplexitySource` | `ScopeTaskTypeComplexitySource.None_` | Where the duration of this task is determined. It can be a custom amount or from the Complexity linked to the task. |
 | `complexity_id` | `Optional[UUID]` | `None` | A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to `TaskTypeComplexity`. |
 | `complexity` | `Optional[ScopeTaskTypeComplexityEntity]` | `None` | A helper method for setting the complexity id. |

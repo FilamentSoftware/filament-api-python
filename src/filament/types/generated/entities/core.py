@@ -118,8 +118,13 @@ class ProcessingSettingsEntity(Entity):
     
     :param success_snapshots: Whether processing-succeeded snapshots should be written for this organisation.
                               Defaults to false.
+    :param anonymise_snapshots: Whether this organisation's processing snapshots (failed and succeeded) are anonymised: every
+                                <see cref="T:Filament.FSCore.Entities.Attributes.AnonymiseInSnapshotsAttribute" /> property and user-defined
+                                text value replaced by a pseudonym. Defaults to true; turn it off only for development organisations,
+                                whose snapshots may then carry the original values.
     """
     success_snapshots: bool = field(default=False)
+    anonymise_snapshots: bool = field(default=True)
 
 
 @dataclass(kw_only=True)
