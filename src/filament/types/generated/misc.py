@@ -398,6 +398,8 @@ class UploadGrant:
     :param file_id: The id of the file entity this grant uploads for.
     :param url: The absolute URL to submit to. Always the storage endpoint, never the hub.
     :param method: The HTTP method to use. <c>POST</c> for every provider today.
+    :param issued_at: When the grant was minted. <see cref="P:Filament.FSCore.FileStore.UploadGrant.ExpiresAt" /> minus this is the lifetime the grant was signed
+                      with, which a client can measure against its own clock without trusting the server's.
     :param expires_at: When the grant stops being accepted. Evaluated when the request is <i>received</i>, not when
                        it completes, so a transfer that starts in time may finish afterwards.
     :param max_bytes: The ceiling the policy enforces, in bytes. Equal to the declared size.
@@ -413,6 +415,7 @@ class UploadGrant:
     file_id: UUID
     url: str
     method: str
+    issued_at: datetime.datetime
     expires_at: datetime.datetime
     max_bytes: int
     headers: Optional[dict[str, str]] = field(default=None)

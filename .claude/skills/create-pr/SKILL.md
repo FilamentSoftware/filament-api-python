@@ -6,7 +6,7 @@ allowed-tools: Bash, Skill
 
 # Create Draft Pull Request
 
-Create a draft pull request in `FilamentSoftware/filament-python-api` with changelog validation, automatic issue linking, and project board status update.
+Create a draft pull request in `FilamentSoftware/filament-api-python` with changelog validation, automatic issue linking, and project board status update.
 
 **Creates DRAFT PRs by default** — this allows code reviews to run before wasting CI minutes on action workflows. Exception: when `skip ci` is specified, creates a regular (non-draft) PR since CI won't run anyway.
 
@@ -57,9 +57,9 @@ Once the issue number is known, fetch the title immediately (reuse later for bod
 ```bash
 # Note: replace <number> with the actual issue number variable
 if [ "$PREFER_REST" = "true" ]; then
-  gh api repos/FilamentSoftware/filament-python-api/issues/<number> --jq '.title'
+  gh api repos/FilamentSoftware/filament-api-python/issues/<number> --jq '.title'
 else
-  gh issue view <number> --repo FilamentSoftware/filament-python-api --json title --jq '.title'
+  gh issue view <number> --repo FilamentSoftware/filament-api-python --json title --jq '.title'
 fi
 ```
 
@@ -162,7 +162,7 @@ If an issue was linked (Phase 1), set its project board status to "In Review":
 
    ```bash
    ITEM_ID=$(gh api graphql \
-     -f query='{ repository(owner: "FilamentSoftware", name: "filament-python-api") {
+     -f query='{ repository(owner: "FilamentSoftware", name: "filament-api-python") {
        issue(number: {ISSUE_NUMBER}) {
          projectItems(first: 20) {
            nodes { id project { id } }
@@ -197,7 +197,7 @@ Report:
 Example:
 
 ```text
-Draft PR: https://github.com/FilamentSoftware/filament-python-api/pull/XXX
+Draft PR: https://github.com/FilamentSoftware/filament-api-python/pull/XXX
 Issue #621 status: In Review
 ```
 
