@@ -22,7 +22,7 @@ Use a single Bash call with **timeout 600000** (10 minutes):
 
 ```bash
 PR_NUM="$ARGUMENTS"
-REPO="FilamentSoftware/filament-python-api"
+REPO="FilamentSoftware/filament-api-python"
 
 if [ -z "$PR_NUM" ] || ! [[ "$PR_NUM" =~ ^[0-9]+$ ]]; then
   echo "Error: PR number is required and must be numeric. Got: '$PR_NUM'"

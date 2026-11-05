@@ -6,11 +6,11 @@ allowed-tools: Bash
 
 # Setup Issue
 
-Set up an existing GitHub issue in `FilamentSoftware/filament-python-api` by adding it to the "Filament MVP" project board and configuring Type, Status, Priority, Size, and Section fields.
+Set up an existing GitHub issue in `FilamentSoftware/filament-api-python` by adding it to the "Filament MVP" project board and configuring Type, Status, Priority, Size, and Section fields.
 
 ## Arguments
 
-- `$ARGUMENTS` (required) - Issue number or GitHub issue URL (e.g., `12` or `https://github.com/FilamentSoftware/filament-python-api/issues/12`)
+- `$ARGUMENTS` (required) - Issue number or GitHub issue URL (e.g., `12` or `https://github.com/FilamentSoftware/filament-api-python/issues/12`)
 
 ## Defaults
 
@@ -56,7 +56,7 @@ Fetch all existing data in a **single GraphQL call**:
 
 ```bash
 gh api graphql -f query='{
-  repository(owner: "FilamentSoftware", name: "filament-python-api") {
+  repository(owner: "FilamentSoftware", name: "filament-api-python") {
     issue(number: {NUMBER}) {
       title
       body
@@ -141,14 +141,14 @@ Run whichever of these are needed in parallel:
 
 ```bash
 gh issue edit {number} \
-  --repo FilamentSoftware/filament-python-api \
+  --repo FilamentSoftware/filament-api-python \
   --title "{new title}"
 ```
 
 **Set type** (only if type is not already set or is changing):
 
 ```bash
-ISSUE_NODE_ID=$(gh api "repos/FilamentSoftware/filament-python-api/issues/{number}" --jq '.node_id') && \
+ISSUE_NODE_ID=$(gh api "repos/FilamentSoftware/filament-api-python/issues/{number}" --jq '.node_id') && \
 gh api graphql -f query="mutation {
   updateIssue(input: {
     id: \"$ISSUE_NODE_ID\",
@@ -162,7 +162,7 @@ gh api graphql -f query="mutation {
 ```bash
 ITEM_ID=$(gh project item-add 3 \
   --owner FilamentSoftware \
-  --url "https://github.com/FilamentSoftware/filament-python-api/issues/{number}" \
+  --url "https://github.com/FilamentSoftware/filament-api-python/issues/{number}" \
   --format json --jq '.id')
 echo "$ITEM_ID"
 ```
@@ -171,7 +171,7 @@ echo "$ITEM_ID"
 
 ```bash
 gh issue edit {number} \
-  --repo FilamentSoftware/filament-python-api \
+  --repo FilamentSoftware/filament-api-python \
   --add-label "{new_label1},{new_label2}"
 ```
 
@@ -179,7 +179,7 @@ gh issue edit {number} \
 
 ```bash
 gh issue edit {number} \
-  --repo FilamentSoftware/filament-python-api \
+  --repo FilamentSoftware/filament-api-python \
   --add-assignee "@me"
 ```
 
@@ -288,7 +288,7 @@ After all steps complete, report:
 Example:
 
 ```text
-Updated: https://github.com/FilamentSoftware/filament-python-api/issues/12
+Updated: https://github.com/FilamentSoftware/filament-api-python/issues/12
 Added to: Filament MVP
 Set: Type=Bug, Status=Backlog, Priority=P2, Size=XS, Assignee=@me
 Already set: Labels=bug

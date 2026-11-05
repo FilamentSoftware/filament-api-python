@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 # Create Ticket
 
-Create a GitHub issue in `FilamentSoftware/filament-python-api` and add it to the "Filament MVP" project board with Type, Status, Priority, Size, and Section fields.
+Create a GitHub issue in `FilamentSoftware/filament-api-python` and add it to the "Filament MVP" project board with Type, Status, Priority, Size, and Section fields.
 
 ## Arguments
 
@@ -115,7 +115,7 @@ Write body to `/tmp/issue-body.md` first, then create:
 
 ```bash
 gh issue create \
-  --repo FilamentSoftware/filament-python-api \
+  --repo FilamentSoftware/filament-api-python \
   --title "{title}" \
   --body-file /tmp/issue-body.md \
   --label "{label1},{label2}" \
@@ -131,7 +131,7 @@ Run these two in parallel — they are independent:
 **Set type** (get node_id then mutate):
 
 ```bash
-ISSUE_NODE_ID=$(gh api "repos/FilamentSoftware/filament-python-api/issues/{number}" --jq '.node_id') && \
+ISSUE_NODE_ID=$(gh api "repos/FilamentSoftware/filament-api-python/issues/{number}" --jq '.node_id') && \
 gh api graphql -f query="mutation {
   updateIssue(input: {
     id: \"$ISSUE_NODE_ID\",
@@ -235,7 +235,7 @@ After all steps complete, report:
 Example:
 
 ```text
-Created: https://github.com/FilamentSoftware/filament-python-api/issues/XXX
+Created: https://github.com/FilamentSoftware/filament-api-python/issues/XXX
 Type: Task | Project fields: Status=Backlog, Priority=P2, Size=XS, Section=API
 Branch linked via commit: chore: closes #XXX
 ```
