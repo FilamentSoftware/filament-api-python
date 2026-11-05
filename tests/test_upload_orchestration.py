@@ -45,6 +45,7 @@ def _grant(file_id: UUID, url: str = "https://storage.example.com/bucket") -> Up
         file_id=file_id,
         url=url,
         method="POST",
+        issued_at=datetime.datetime(2026, 8, 10, 16, 0, tzinfo=datetime.timezone.utc),
         expires_at=datetime.datetime(2026, 8, 10, 17, 0, tzinfo=datetime.timezone.utc),
         max_bytes=1024,
         fields={"key": "k", "Content-Type": "image/png"},
