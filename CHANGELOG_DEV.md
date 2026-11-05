@@ -1,3 +1,10 @@
+## 0.8.1-dev.0.0.3 (2026-11-05 17:45)
+
+### Types
+
+#### OTHER
+- MediaEntity gains frame_rate, and UploadGrant/FileReference gain issued_at so clients can measure grant lifetime against their own clock
+
 ## 0.8.1-dev.0.0.2 (2026-10-23 17:58)
 
 ### Types
