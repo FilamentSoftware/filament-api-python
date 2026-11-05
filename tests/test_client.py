@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import datetime
 import gzip
 from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1299,6 +1300,8 @@ class TestFileMethods:
         assert result.data.file_id == file_id
         assert result.data.url == "https://storage.example.com/bucket"
         assert result.data.checksum_algorithm == FileChecksumAlgorithm.Sha256Hex
+        assert result.data.issued_at == datetime.datetime(2026, 8, 10, 16, 0, tzinfo=datetime.timezone.utc)
+        assert result.data.expires_at == datetime.datetime(2026, 8, 10, 17, 0, tzinfo=datetime.timezone.utc)
 
     @pytest.mark.asyncio
     async def test_refresh_file_upload_grant_passes_uuid_string(self) -> None:
@@ -1325,6 +1328,8 @@ class TestFileMethods:
         assert method == "RefreshFileUploadGrant"
         assert payload == str(file_id)
         assert result.success is True
+        assert result.data is not None
+        assert result.data.issued_at == datetime.datetime(2026, 8, 10, 16, 0, tzinfo=datetime.timezone.utc)
 
     @pytest.mark.asyncio
     async def test_complete_file_upload_sends_completion(self) -> None:
