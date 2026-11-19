@@ -19,6 +19,7 @@ __all__ = [
     "ScopeItemOfficeLocationConnection",
     "ScopeItemTemplateItemConnection",
     "ScopeItemTaskTypeOverrideConnection",
+    "ScopeVersionItemVersionConnection",
 ]
 
 @dataclass(kw_only=True)
@@ -114,3 +115,11 @@ class ScopeItemTaskTypeOverrideConnection(GenericScopeTaskTypeConnection_2[Scope
     scope_template_item_context: Optional[ScopeTemplateItemEntity] = field(default=None)
     task_combine_key: str = field(default='')
     remove: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class ScopeVersionItemVersionConnection(EntityConnection):
+    """
+    Groups a scope item version (<see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity" />) under a scope version
+    (<see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeVersionEntity" />). No properties: the connection is the membership.
+    """

@@ -10,9 +10,18 @@ from uuid_utils import UUID, uuid7
 from ..conditions import DbConditionInstance
 from ..options import DataOption
 from .base.base import EntityBase
+from .connections.scope_item_service import ScopeItemDependencyConnection, ScopeItemGroupConnection, ScopeItemMilestoneConnection, ScopeItemOfficeLocationConnection, ScopeItemTaskTypeOverrideConnection, ScopeItemTemplateItemConnection
+from .connections.task_service import TaskOfficeLocationConnection, TaskSkillConnection
+from .entities.scope_item_service import ScopeItemCustomComplexityEntity, ScopeItemEntity, ScopeItemNoteEntity
+from .entities.task_service import TaskEntity
 from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType, UserDefinedPropertyStatus
 
 __all__ = [
+    "ScopeItemVersionSettings",
+    "ScopeItemTaskTypeDependencyRule",
+    "ScopeItemStepTask",
+    "ScopeItemTaskKey",
+    "CostFigures",
     "TaskMilestoneWarning",
     "PriorityComponent",
     "MilestoneReason",
@@ -36,6 +45,9 @@ __all__ = [
     "GetFileUrlsRequest",
     "EntityServiceDataUpdate",
     "ServiceProcessingInfo",
+    "ScopeItemCombinedTaskSet",
+    "ScopeItemTaskDependency",
+    "ScopeItemTaskTypeCost",
     "TaskPriorityReasons",
     "UserPriorityReasons",
     "ServerCapabilities",
@@ -49,6 +61,8 @@ __all__ = [
     "RequestId",
     "UpdatedEntityServiceData_1",
     "DbOrderInstance",
+    "ScopeItemTaskTypeTaskSet",
+    "ScopeItemCostSet",
     "TaskReasons",
     "UserOptionReason",
     "ValueOrErrorPublic_1",
@@ -62,18 +76,133 @@ __all__ = [
     "ServiceDataUpdate",
     "ReadDataTypeRequest",
     "ReadConnectedDataTypeRequest",
+    "ScopeItemInstanceTaskSet",
     "ScheduleSegmentReasons",
     "EntityPropertyPermissions",
     "ServiceDataRead",
     "WrappedConnectedEntityWithPermissions",
     "ReadDataRequest",
     "ReadConnectedDataRequest",
+    "ScopeItemTaskSet",
     "ServiceDataReadConnected",
 ]
 
 T = TypeVar("T")
 T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
+
+
+@dataclass(kw_only=True)
+class ScopeItemVersionSettings:
+    """
+    The settings record of a scope item version: the rows the scope item service owns for the item, as the entities
+    themselves, plus two scalars describing the item's standing at capture. Each section is a list of real entity or
+    connection objects, written with every schema property and read back with
+    <see cref="P:Filament.FSCore.Entities.EntityBase.SpecifiedProperties" /> naming what the record carried, so a property added to one of these
+    types later is captured without touching this class, and is left alone by a restore from an older record.
+    
+    :param schema_version: The schema version of this record's shape.
+    :param scheduled: Whether the item's status scheduled it at capture (its <c>Schedule</c> gate).
+    :param costed: Whether the item's status counted its costs at capture (its <c>Costs</c> gate).
+    :param item: The item, with its own link columns blanked: a version does not record its own link.
+    :param dependencies: The item's dependencies on other items (outbound only).
+    :param groups: The item's group memberships.
+    :param milestones: The item's milestone attachments.
+    :param office_locations: The item's office locations.
+    :param template_items: The item's templates.
+    :param task_type_overrides: The item's task type overrides.
+    :param custom_complexities: The custom complexities the item's overrides reference.
+    :param notes: The item's internal and client notes.
+    """
+    schema_version: int = field(default=1)
+    scheduled: bool = field(default=False)
+    costed: bool = field(default=False)
+    item: Optional[ScopeItemEntity] = field(default=None)
+    dependencies: list[ScopeItemDependencyConnection] = field(default_factory=list)
+    groups: list[ScopeItemGroupConnection] = field(default_factory=list)
+    milestones: list[ScopeItemMilestoneConnection] = field(default_factory=list)
+    office_locations: list[ScopeItemOfficeLocationConnection] = field(default_factory=list)
+    template_items: list[ScopeItemTemplateItemConnection] = field(default_factory=list)
+    task_type_overrides: list[ScopeItemTaskTypeOverrideConnection] = field(default_factory=list)
+    custom_complexities: list[ScopeItemCustomComplexityEntity] = field(default_factory=list)
+    notes: list[ScopeItemNoteEntity] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
+class ScopeItemTaskTypeDependencyRule:
+    """
+    One resolved upstream dependency rule of a task type.
+    
+    :param upstream_task_type_id: The upstream task type.
+    :param overlap: The overlap proportion, 0 to 1.
+    :param between_items_only: True when the rule applies between items only: the upstream task type shares the downstream type's specialty
+                               and no task-type-to-task-type row names it, so the rule came from a specialty's dependency on itself. Within one
+                               item such a rule would join a task type to itself, or two task types of one specialty to each other, in a cycle.
+                               False on a rule recorded before the flag existed, which leaves that version's rules as they were resolved.
+    """
+    upstream_task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    overlap: float = field(default=0)
+    between_items_only: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class ScopeItemStepTask:
+    """
+    One step task of a combined task.
+    
+    :param task: The task candidate. Its <c>Id</c>, <c>AncestorGroupIds</c> and the other live-row columns are the applying
+                 module's to set.
+    :param step_id: The task type step the task was built from.
+    :param step_sort_order: The step's sort order at build time.
+    :param start_proportion: Where the step starts within its task type, as a proportion of the task type's total time weight.
+    :param step_proportion: The step's own share of its task type's total time weight; the step ends at
+                            <see cref="P:Filament.Services.CoreServices.Services.ScopeItemStepTask.StartProportion" /> + this. Kept rather than the end itself because the overlap rule
+                            (<see cref="M:Filament.Services.CoreServices.Services.ScopeItemTaskBuilder.GetOverlapStepIndex(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Double,System.Double}},System.Double,System.Boolean)" />) sums shares, and a subtraction would not give them
+                            back exactly.
+    :param skills: The skill connection candidates. Their <c>FromId</c> is unset; the applying module sets it.
+    :param office_locations: The office-location connection candidates. Their <c>FromId</c> is unset; the applying module sets it.
+    """
+    task: TaskEntity
+    step_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    step_sort_order: int = field(default=0)
+    start_proportion: float = field(default=0)
+    step_proportion: float = field(default=0)
+    skills: list[TaskSkillConnection] = field(default_factory=list)
+    office_locations: list[TaskOfficeLocationConnection] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
+class ScopeItemTaskKey:
+    """
+    The natural key of one generated step task within one scope item: the instance it belongs to (empty for a
+    single-instance item), its task type, its combine key and its step. The same key the scope module matches
+    existing tasks by, and the one place it is defined.
+    
+    :param instance_key: The instance number as a string for a <c>Count &gt; 1</c> item; empty otherwise.
+    :param task_type_id: The task type the step belongs to.
+    :param combine_key: The combine key of the combined task.
+    :param step_id: The task type step the task was built from.
+    """
+    instance_key: str = field(default_factory=str)
+    task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    combine_key: str = field(default_factory=str)
+    step_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+
+
+@dataclass(kw_only=True)
+class CostFigures:
+    """
+    The four cost figures every cost row carries.
+    
+    :param chargeable_direct: Chargeable amount of the item's own tasks.
+    :param chargeable_dependent: Chargeable amount of the tasks the item adds to its dependents.
+    :param estimated_cost_direct: Estimated cost of the item's own tasks.
+    :param estimated_cost_dependent: Estimated cost of the tasks the item adds to its dependents.
+    """
+    chargeable_direct: float = field(default=0)
+    chargeable_dependent: float = field(default=0)
+    estimated_cost_direct: float = field(default=0)
+    estimated_cost_dependent: float = field(default=0)
 
 
 @dataclass(kw_only=True)
@@ -492,6 +621,49 @@ class ServiceProcessingInfo:
 
 
 @dataclass(kw_only=True)
+class ScopeItemCombinedTaskSet:
+    """
+    One combined task: the step tasks of one combine key.
+    
+    :param combine_key: The combine key.
+    :param source_item_ids: The items this combined task's routed dependent tasks came from.
+    :param steps: The step tasks, in step sort order.
+    """
+    combine_key: str = field(default='')
+    source_item_ids: list[UUID] = field(default_factory=list)
+    steps: list[ScopeItemStepTask] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
+class ScopeItemTaskDependency:
+    """
+    A dependency edge between two of one item's own tasks. <see cref="P:Filament.Services.CoreServices.Services.ScopeItemTaskDependency.From" /> is the downstream task, which depends on
+    <see cref="P:Filament.Services.CoreServices.Services.ScopeItemTaskDependency.To" /> - the same direction as a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskDependencyConnection" />.
+    
+    :param from_: The downstream task.
+    :param to: The upstream task.
+    :param type_dependency: True for an edge from a task-type dependency rule between two task types of the same instance; false for an
+                            edge that chains a combined task's steps. Only the former marks the combined tasks as internally linked, which
+                            decides where a milestone with no step targeting attaches.
+    """
+    from_: ScopeItemTaskKey = field(default_factory=ScopeItemTaskKey)
+    to: ScopeItemTaskKey = field(default_factory=ScopeItemTaskKey)
+    type_dependency: bool = field(default=False)
+
+
+@dataclass(kw_only=True)
+class ScopeItemTaskTypeCost:
+    """
+    One task type's figures within one scope item, in the item's currency.
+    
+    :param task_type_id: The task type.
+    :param figures: Its figures, summed over the item's tasks of that type.
+    """
+    task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    figures: CostFigures = field(default_factory=CostFigures)
+
+
+@dataclass(kw_only=True)
 class TaskPriorityReasons:
     """
     Structured priority reasons for a task, capturing each component of the priority calculation.
@@ -664,6 +836,43 @@ class DbOrderInstance:
     :param levels: The collection of database ordering levels, representing the sequence in which data is ordered.
     """
     levels: list[DbOrderLevel] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
+class ScopeItemTaskTypeTaskSet:
+    """
+    The tasks of one task type within one instance.
+    
+    :param task_type_id: The task type.
+    :param upstream_dependencies: The task type's resolved upstream dependency rules: which upstream task types it follows, and at what overlap.
+                                  Resolved whether or not any upstream item has such a task type.
+    :param combined_tasks: The combined tasks, in the order the gather produced them.
+    """
+    task_type_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    upstream_dependencies: list[ScopeItemTaskTypeDependencyRule] = field(default_factory=list)
+    combined_tasks: list[ScopeItemCombinedTaskSet] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
+class ScopeItemCostSet:
+    """
+    The costs one scope item's configuration produces, as computed by <see cref="T:Filament.Services.CoreServices.Services.ScopeItemCostCalculator" />: the item
+    total, the per-instance figure for a <c>Count &gt; 1</c> item, and the per-task-type figures, all in the item's
+    currency.
+    
+    :param schema_version: The schema version of this set's shape.
+    :param priced_at: The instant the rates were read at.
+    :param currency_id: The item's currency, which every figure is in.
+    :param item_total: The item total: every instance.
+    :param instance: One instance's figures, for a <c>Count &gt; 1</c> item; null otherwise.
+    :param task_types: The per-task-type figures, for one instance, in the order the task types were first met.
+    """
+    schema_version: int = field(default=1)
+    priced_at: datetime.datetime = field(default_factory=datetime.datetime.now)
+    currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+    item_total: CostFigures = field(default_factory=CostFigures)
+    instance: Optional[CostFigures] = field(default=None)
+    task_types: list[ScopeItemTaskTypeCost] = field(default_factory=list)
 
 
 @dataclass(kw_only=True)
@@ -979,6 +1188,20 @@ class ReadConnectedDataTypeRequest:
 
 
 @dataclass(kw_only=True)
+class ScopeItemInstanceTaskSet:
+    """
+    The tasks of one instance of a scope item.
+    
+    :param instance_key: The instance number as a string for a <c>Count &gt; 1</c> item; empty otherwise.
+    :param instance_num: The 1-based instance number.
+    :param task_types: The task types, in the order the gather produced them.
+    """
+    instance_key: str = field(default='')
+    instance_num: int = field(default=1)
+    task_types: list[ScopeItemTaskTypeTaskSet] = field(default_factory=list)
+
+
+@dataclass(kw_only=True)
 class ScheduleSegmentReasons:
     """
     The complete structured reasons for why a schedule segment was created, including task data,
@@ -1076,6 +1299,26 @@ class ReadConnectedDataRequest(StructBase):
     """
     request: ReadConnectedDataTypeRequest
     scenario_id: Optional[UUID] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class ScopeItemTaskSet:
+    """
+    The tasks one scope item's configuration produces, as computed by <see cref="T:Filament.Services.CoreServices.Services.ScopeItemTaskBuilder" />: per
+    instance, per task type, per combined task, the step tasks as <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" /> candidates, with their skill
+    and office-location connections, the internal dependency edges between them, and each task type's resolved upstream
+    dependency rules. It carries no task ids: the module that applies it matches candidates to existing tasks by
+    <see cref="T:Filament.Services.CoreServices.Services.ScopeItemTaskKey" />.
+    
+    :param schema_version: The schema version of this set's shape.
+    :param count: The item's <c>Count</c> the set was built for.
+    :param instances: One entry for a single-instance item (<c>InstanceKey</c> empty), else one per instance.
+    :param internal_dependencies: The edges between this item's own tasks.
+    """
+    schema_version: int = field(default=1)
+    count: int = field(default=1)
+    instances: list[ScopeItemInstanceTaskSet] = field(default_factory=list)
+    internal_dependencies: list[ScopeItemTaskDependency] = field(default_factory=list)
 
 
 @dataclass(kw_only=True)

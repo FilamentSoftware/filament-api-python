@@ -390,6 +390,8 @@ class ErrorCodes(Enum):
     :cvar ProtectionError: The operation was blocked because downstream entities have protection records
                            preventing deletion of the upstream entity.
     :cvar ChecksumMismatch: A completed upload's bytes did not match the checksum the client declared when it requested the grant.
+    :cvar Timeout: The operation did not finish within its deadline: a request to another service got no answer in time,
+                   or a database statement waited too long for a lock. The work may or may not have happened.
     """
     None_ = 0
     NotSupported = 1
@@ -409,6 +411,7 @@ class ErrorCodes(Enum):
     ResponseTooLarge = 25
     ProtectionError = 26
     ChecksumMismatch = 28
+    Timeout = 30
 
 
 class EventUserConnectionStatus(Enum):
