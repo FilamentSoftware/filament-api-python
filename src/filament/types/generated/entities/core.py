@@ -327,8 +327,11 @@ class EntityProtectionEntity(Entity):
                                    the downstream deletion commits.
     :param pending_request_id: When non-null, this is a provisional record: a pending create (or re-linking update)
                                request with this id will establish this protection. It blocks upstream deletion like a
-                               real record, but no committed downstream data exists yet. Superseded by the real record
-                               when the request commits; deleted if the request terminally fails.
+                               real record, but no committed downstream data exists yet. Owned by the hub: a service commit
+                               writes the real record beside it and never deletes it (it may belong to a request still queued
+                               behind the run), except when the downstream entity or connection itself is deleted. The hub
+                               deletes it once its request is terminal - right after the run commit for a completed request,
+                               with the rest of its intent cleanup for a failed or cancelled one.
     """
     upstream_entity_type: str = field(default='')
     upstream_entity_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
