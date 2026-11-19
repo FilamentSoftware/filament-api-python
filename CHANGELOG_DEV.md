@@ -1,3 +1,10 @@
+## 0.8.1-dev.0.0.4 (2026-11-19 11:59)
+
+### Types
+
+#### OTHER
+- Adds user settings and scope item versioning types, and the Timeout error code
+
 ## 0.8.1-dev.0.0.3 (2026-11-05 17:45)
 
 ### Types
