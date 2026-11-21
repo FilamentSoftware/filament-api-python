@@ -85,7 +85,9 @@ Do these before the publishing jobs first merge to `develop`:
 ## GCP Artifact Registry
 
 Run the setup script once, as someone with owner rights on the GCP project
-(it is idempotent, so re-running it is safe):
+(it is idempotent, so re-running it is safe). It is a bash script: on Windows,
+run it from [Cloud Shell](https://cloud.google.com/shell) (which already has
+`gcloud` and your credentials), WSL or Git Bash.
 
 ```bash
 GCP_PROJECT_ID=my-project GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh
