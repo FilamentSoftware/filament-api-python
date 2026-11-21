@@ -70,6 +70,24 @@ increment run. The triggering branch is only available as
   not the ref. The publish step must stay in `create-release.yml` itself:
   Trusted Publishing does not support reusable workflows.
 
+### Trusting the triggering run
+
+`workflow_run` matches the triggering workflow by **name** only, and the
+release workflow runs with this repository's permissions, OIDC included. A
+fork pull request could add its own workflow named
+`Increment Version (develop)` with a `pull_request` trigger, upload a crafted
+`version` artifact, and so start a release run. That run would have a version
+string the attacker controls (e.g. `refs/pull/<N>/head`, the PR's own code).
+To prevent this, `resolve-version` only proceeds when:
+
+- the triggering run was a `push` from this repository
+  (`workflow_run.head_repository`), on `develop` or `main`;
+- the version is exactly `vX.Y.Z` (stable) or `vX.Y.Z-dev.A.B.C` (dev), and its
+  channel matches the branch: dev from `develop`, stable from `main`.
+
+The `build` and `release` jobs then check out `refs/tags/<version>`, so a
+version that isn't an existing tag in this repository fails the run.
+
 ## Pre-publish checklist
 
 Do these before the publishing jobs first merge to `develop`:
@@ -81,6 +99,9 @@ Do these before the publishing jobs first merge to `develop`:
       ([below](#github)).
 - [ ] The GitHub repository is made **public** before the first stable
       release, so the README links and project URLs shown on PyPI resolve.
+- [ ] When the repository goes public, set **Settings → Actions → General →
+      Approval for running fork pull request workflows from contributors** to
+      *Require approval for all external contributors*.
 
 ## GCP Artifact Registry
 

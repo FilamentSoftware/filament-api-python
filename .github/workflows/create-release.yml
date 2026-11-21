@@ -12,8 +12,17 @@ on:
 permissions: {}
 
 jobs:
+  # workflow_run matches the triggering workflow by *name* only, and runs here
+  # with this repository's permissions. A fork PR could add its own workflow
+  # named "Increment Version (...)" with a pull_request trigger and a crafted
+  # version artifact. So only accept push runs of this repository's own
+  # develop/main branches.
   resolve-version:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.head_branch == 'develop' || github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -32,6 +41,8 @@ jobs:
 
       - name: Get version
         id: get_version
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           version="$(tr -d '[:space:]' < version.txt)"
@@ -40,11 +51,22 @@ jobs:
             exit 1
           fi
           # Single source of truth for the release channel: dev tags look like
-          # vX.Y.Z-dev.A.B.C, stable tags like vX.Y.Z.
-          if [[ "$version" == *dev* ]]; then
+          # vX.Y.Z-dev.A.B.C, stable tags like vX.Y.Z. Anything else (e.g. a
+          # refs/pull/... ref) is rejected, and the channel must match the
+          # branch the version was cut from.
+          if [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             is_dev=true
-          else
+            expected_branch=develop
+          elif [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             is_dev=false
+            expected_branch=main
+          else
+            echo "::error::version '$version' is not a vX.Y.Z or vX.Y.Z-dev.A.B.C tag"
+            exit 1
+          fi
+          if [[ "$HEAD_BRANCH" != "$expected_branch" ]]; then
+            echo "::error::version '$version' must come from $expected_branch, not $HEAD_BRANCH"
+            exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "is_dev=$is_dev" >> "$GITHUB_OUTPUT"
@@ -62,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.resolve-version.outputs.version }}
+          ref: refs/tags/${{ needs.resolve-version.outputs.version }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -117,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.resolve-version.outputs.version }}
+          ref: refs/tags/${{ needs.resolve-version.outputs.version }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v8
