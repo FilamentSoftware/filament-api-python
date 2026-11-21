@@ -93,6 +93,11 @@ GCP_PROJECT_ID=my-project GCP_REGION=europe-west2 bash scripts/setup_gcp_publish
 GCP_PROJECT_ID=my-project GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh --set-github-vars
 ```
 
+The script looks up the repository's numeric IDs with the `gh` CLI. Without
+`gh`, pass them as `GITHUB_REPO_ID` and `GITHUB_OWNER_ID` (from
+`https://api.github.com/repos/FilamentSoftware/filament-api-python`: `id` and
+`owner.id`).
+
 Resource names can be overridden with environment variables; see the header
 of [`scripts/setup_gcp_publishing.sh`](../scripts/setup_gcp_publishing.sh).
 With the defaults it creates:
@@ -103,8 +108,8 @@ With the defaults it creates:
 | Remote Python repository | `pypi-remote` | Cached mirror of public PyPI, for third-party dependencies. |
 | Virtual Python repository | `python` | Combines the two, with `python-internal` at higher priority (100 vs 10). Consumers install from this only. |
 | Workload Identity pool | `github` | Trusts GitHub Actions OIDC tokens. |
-| OIDC provider | `filament-api-python` | Issuer `https://token.actions.githubusercontent.com`. Attribute condition: `repository == FilamentSoftware/filament-api-python`, `workflow_ref == .../create-release.yml@refs/heads/develop` and `event_name == workflow_run`. |
-| Service account | `filament-api-publisher` | `roles/artifactregistry.writer` on `python-internal` only. The GitHub repository's principal set gets `roles/iam.workloadIdentityUser` on it. |
+| OIDC provider | `filament-api-python` | Issuer `https://token.actions.githubusercontent.com`. Attribute condition: `repository_id` and `repository_owner_id` equal this repository's numeric IDs (immutable, so a rename or transfer can't pass access to a repo that reuses the name), `workflow_ref == .../create-release.yml@refs/heads/develop` and `event_name == workflow_run`. |
+| Service account | `filament-api-publisher` | `roles/artifactregistry.writer` on `python-internal` only. The principal set for this repository's ID (`attribute.repository_id/<id>`) gets `roles/iam.workloadIdentityUser` on it. |
 
 It also grants the Artifact Registry service agent
 `roles/artifactregistry.reader` on both upstream repositories, which the

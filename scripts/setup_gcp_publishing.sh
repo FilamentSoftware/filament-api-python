@@ -27,6 +27,8 @@
 #   SA_NAME          default: filament-api-publisher
 #   GITHUB_REPO      default: FilamentSoftware/filament-api-python
 #   DEFAULT_BRANCH   default: develop (the branch workflow_run runs from)
+#   GITHUB_REPO_ID   numeric repository ID; default: looked up with `gh`
+#   GITHUB_OWNER_ID  numeric owner (organisation) ID; default: looked up with `gh`
 #
 # Options:
 #   --set-github-vars  set the GitHub repository variables with `gh` instead
@@ -41,7 +43,7 @@ for arg in "$@"; do
   case "$arg" in
     --set-github-vars) set_github_vars=true ;;
     -h|--help)
-      sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,/^$/p' "$0" | sed '$d; s/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -61,6 +63,25 @@ PROVIDER="${PROVIDER:-filament-api-python}"
 SA_NAME="${SA_NAME:-filament-api-publisher}"
 GITHUB_REPO="${GITHUB_REPO:-FilamentSoftware/filament-api-python}"
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-develop}"
+
+# The WIF condition and binding match on the immutable numeric IDs, not the
+# repository name, so a rename or transfer can't hand access to a new repo
+# that takes over the old name.
+if [[ -z "${GITHUB_REPO_ID:-}" || -z "${GITHUB_OWNER_ID:-}" ]]; then
+  if ! command -v gh > /dev/null 2>&1; then
+    echo "Set GITHUB_REPO_ID and GITHUB_OWNER_ID, or install the GitHub CLI (gh) to look them up" >&2
+    exit 1
+  fi
+  read -r looked_up_repo_id looked_up_owner_id < <(
+    gh api "repos/${GITHUB_REPO}" --jq '"\(.id) \(.owner.id)"'
+  )
+  GITHUB_REPO_ID="${GITHUB_REPO_ID:-$looked_up_repo_id}"
+  GITHUB_OWNER_ID="${GITHUB_OWNER_ID:-$looked_up_owner_id}"
+fi
+if [[ ! "$GITHUB_REPO_ID" =~ ^[0-9]+$ || ! "$GITHUB_OWNER_ID" =~ ^[0-9]+$ ]]; then
+  echo "GITHUB_REPO_ID and GITHUB_OWNER_ID must be numeric (got '$GITHUB_REPO_ID', '$GITHUB_OWNER_ID')" >&2
+  exit 1
+fi
 
 if ! command -v gcloud > /dev/null 2>&1; then
   echo "gcloud is not installed or not on PATH" >&2
@@ -169,8 +190,8 @@ fi
 # default branch's copy of the workflow. So workflow_ref is fixed for both dev
 # and stable releases, and can be pinned exactly.
 workflow_ref="${GITHUB_REPO}/.github/workflows/create-release.yml@refs/heads/${DEFAULT_BRANCH}"
-attribute_condition="assertion.repository == '${GITHUB_REPO}' && assertion.workflow_ref == '${workflow_ref}' && assertion.event_name == 'workflow_run'"
-attribute_mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.workflow_ref=assertion.workflow_ref"
+attribute_condition="assertion.repository_id == '${GITHUB_REPO_ID}' && assertion.repository_owner_id == '${GITHUB_OWNER_ID}' && assertion.workflow_ref == '${workflow_ref}' && assertion.event_name == 'workflow_run'"
+attribute_mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner_id=assertion.repository_owner_id,attribute.workflow_ref=assertion.workflow_ref"
 
 if gc iam workload-identity-pools providers describe "$PROVIDER" \
     --location=global --workload-identity-pool="$POOL" > /dev/null 2>&1; then
@@ -208,10 +229,10 @@ gc artifacts repositories add-iam-policy-binding "$INTERNAL_REPO" \
 
 # 8. Allow the GitHub repository's tokens (as filtered by the provider's
 #    attribute condition) to impersonate the publisher service account
-log "Allowing $GITHUB_REPO to impersonate $sa_email"
+log "Allowing $GITHUB_REPO (repository ID $GITHUB_REPO_ID) to impersonate $sa_email"
 gc iam service-accounts add-iam-policy-binding "$sa_email" \
   --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/${pool_resource}/attribute.repository/${GITHUB_REPO}" > /dev/null
+  --member="principalSet://iam.googleapis.com/${pool_resource}/attribute.repository_id/${GITHUB_REPO_ID}" > /dev/null
 
 # 9. GitHub repository variables
 declare -A github_vars=(
