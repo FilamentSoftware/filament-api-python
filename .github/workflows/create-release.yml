@@ -130,9 +130,10 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
+          IS_DEV: ${{ needs.resolve-version.outputs.is_dev }}
         run: |
-          # Determine which changelog to use based on version
-          if echo "$VERSION" | grep -q "dev"; then
+          # Determine which changelog to use based on the release channel
+          if [[ "$IS_DEV" == "true" ]]; then
             file="CHANGELOG_DEV.md"
           else
             file="CHANGELOG.md"
