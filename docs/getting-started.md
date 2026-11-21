@@ -6,19 +6,37 @@ data from the Filament backend.
 ## Requirements
 
 - Python 3.10, 3.11, 3.12, or 3.13
-- [Poetry](https://python-poetry.org/) for dependency management
 
-The client depends only on [`pysignalr`](https://pypi.org/project/pysignalr/)
-(the SignalR transport) and [`uuid-utils`](https://pypi.org/project/uuid-utils/)
-(fast UUIDv7 generation).
+The client depends on [`pysignalr`](https://pypi.org/project/pysignalr/)
+(the SignalR transport), [`uuid-utils`](https://pypi.org/project/uuid-utils/)
+(fast UUIDv7 generation), [`httpx`](https://pypi.org/project/httpx/) (file
+transfers) and [`brotli`](https://pypi.org/project/brotli/) (decoding
+compressed properties).
 
 ## Installation
 
+Install the published package from PyPI:
+
 ```bash
-poetry install
+pip install filament-api
+# or
+poetry add filament-api
 ```
 
-To also install the test and type-checking tool-chains:
+Add the `crc32c` extra (`pip install "filament-api[crc32c]"`) if your
+deployment's file store uses CRC32C checksums (GCS).
+
+Filament staff and anyone who needs development builds can install from the
+internal Artifact Registry index instead; see
+[Installing from the internal index](../README.md#installing-from-the-internal-index-filament-staff--dev-builds)
+in the README. Dev builds are PEP 440 pre-releases, so they need `--pre`, an
+exact pin, or Poetry's `allow-prereleases`.
+
+### Working on the client itself
+
+From a checkout of this repository, install with
+[Poetry](https://python-poetry.org/), including the test and type-checking
+tool-chains:
 
 ```bash
 poetry install --with test
