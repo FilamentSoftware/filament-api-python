@@ -120,9 +120,10 @@ GitHub Actions workflows in `.github/workflows/`:
 
 - `increment-version-develop.yml` / `increment-version-main.yml` — Semantic versioning
 - `mypy-check.yml` — Static type checking
+- `package-check.yml` — Build the sdist/wheel and validate metadata with `twine check --strict`
 - `run-unit-tests.yml` — Unit tests across Python 3.10–3.13
 - `validate-pull-request.yml` — PR validation (fixup commits, DO NOT MERGE, rebase check, CHANGELOG)
-- `create-release.yml` — Build and publish GitHub releases on version tags
+- `create-release.yml` — Build the package, create the GitHub release, publish every release to the internal GCP Artifact Registry and stable releases to PyPI (Trusted Publishing). Setup and runbook: `docs/publishing.md`, `scripts/setup_gcp_publishing.sh`
 
 ## Notes
 
