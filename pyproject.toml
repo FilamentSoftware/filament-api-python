@@ -44,6 +44,9 @@ requires = ["poetry-core>=2.2"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
+# Poetry builds with its bundled poetry-core, so build-system.requires alone
+# does not stop an older Poetry from mishandling the PEP 639 license fields.
+requires-poetry = ">=2.2"
 packages = [
     {include = "filament", from = "src"},
     {include = "filament_mypy_plugin.py", from = "src"},
