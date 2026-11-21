@@ -2486,7 +2486,8 @@ _Extends:_ `ReferenceEntityBase`
 | `ancestor_group_ids` | `list[UUID]` | — | Identifies the IDs of all ancestor task groups in the hierarchy that are related to this instance of `TaskEntity`. |
 | `ancestor_groups` | `Optional[list[TaskGroupEntity]]` | `None` | Contains the collection of ancestor task groups that are hierarchically above the current task. This property is used to establish relationships between task groups in a hierarchical structure, identifying all ancestor groups for the current entity. |
 | `chargeable` | `float` | `0` | The calculated chargeable amount for this task, derived from the task type's chargeable per hour, the task duration, and the scope/item chargeable multipliers, with currency conversion applied. |
-| `currency_id` | `UUID` | — | The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity. |
+| `estimated_cost` | `Optional[float]` | `None` | The task's total estimated cost at reference skill: what the work costs the studio, not what the client is charged. null means the task is not estimated (a task made by hand); 0 means it is genuinely free, and is used as it stands. |
+| `currency_id` | `UUID` | — | The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity. It describes `Chargeable` only, not `EstimatedCost`, which is in the organisation's currency. |
 | `currency` | `Optional[CurrencyEntity]` | `None` | A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type. |
 | `specialty_id` | `UUID` | — | The specialty this task falls under. Populated by TaskScopeModule from the owning `ScopeTaskTypeEntity` for a generated task, or supplied directly for a manually created task — deliberately not a calculated property, for the same reason as `Deliverables`. |
 | `specialty` | `Optional[SpecialtyEntity]` | `None` | A helper method for setting the SpecialtyId property. Pass in a SpecialtyEntity type. |
