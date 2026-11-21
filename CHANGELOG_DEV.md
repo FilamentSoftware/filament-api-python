@@ -1,3 +1,10 @@
+## 0.8.1-dev.0.0.5 (2026-11-21 22:16)
+
+### Types
+
+#### OTHER
+- Adds TaskEntity.estimated_cost, the task's estimated cost in the organisation's currency
+
 ## 0.8.1-dev.0.0.4 (2026-11-19 11:59)
 
 ### Types
