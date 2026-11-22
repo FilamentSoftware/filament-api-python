@@ -1,3 +1,14 @@
+## 0.8.1 (2026-11-22 12:20)
+
+### Types
+
+#### OTHER
+- Adds TaskEntity.estimated_cost, the task's estimated cost in the organisation's currency
+- Adds user settings and scope item versioning types, and the Timeout error code
+- MediaEntity gains frame_rate, and UploadGrant/FileReference gain issued_at so clients can measure grant lifetime against their own clock
+- Dependent-task routing is now per category (add_to_dependent_category_ids, dependent_task_source_item_ids) and ProcessingSettingsEntity gains anonymise_snapshots
+- Adds a review flag to MediaEntity marking whether media is included in its task's review
+
 ## 0.8.0 (2026-10-15 22:13)
 
 ### Client
