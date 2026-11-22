@@ -32,3 +32,4 @@ from .task_status_service import *
 from .time_log_service import *
 from .user_license_service import *
 from .user_service import *
+from .user_settings_service import *

@@ -190,7 +190,12 @@ class TaskEntity(ReferenceEntityBase):
                             identifying all ancestor groups for the current entity.
     :param chargeable: The calculated chargeable amount for this task, derived from the task type's chargeable per hour,
                        the task duration, and the scope/item chargeable multipliers, with currency conversion applied.
-    :param currency_id: The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity.
+    :param estimated_cost: The task's total estimated cost at reference skill: what the work costs the studio, not what the client
+                           is charged. <c>null</c> means the task is not estimated (a task made by hand); 0 means it is genuinely
+                           free, and is used as it stands.
+    :param currency_id: The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity. It
+                        describes <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.Chargeable" /> only, not <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.EstimatedCost" />, which is in the organisation's
+                        currency.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     :param specialty_id: The specialty this task falls under. Populated by TaskScopeModule from the owning
                          <see cref="T:Filament.Services.CoreServices.Entities.ScopeTaskTypeService.ScopeTaskTypeEntity" /> for a generated task, or supplied directly for a manually
@@ -219,6 +224,7 @@ class TaskEntity(ReferenceEntityBase):
     ancestor_group_ids: list[UUID] = field(default_factory=list)
     ancestor_groups: Optional[list[TaskGroupEntity]] = field(default=None)
     chargeable: float = field(default=0)
+    estimated_cost: Optional[float] = field(default=None)
     currency_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     currency: Optional[CurrencyEntity] = field(default=None)
     specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

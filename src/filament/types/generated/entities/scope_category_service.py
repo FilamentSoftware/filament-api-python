@@ -22,7 +22,6 @@ class ScopeCategoryEntity(Entity):
     :param reference_size_units: The units used to specify the size of the reference element.
     :param allowed_upstream_category_ids: The categories that are allowed to be upstream of this category.
     :param allowed_downstream_category_ids: The categories that are allowed to be downstream of this category.
-    :param allow_add_to_dependent: Whether this category allows tasks to be added to a dependent item.
     """
     name: str = field(default='')
     description: str = field(default='')
@@ -30,4 +29,3 @@ class ScopeCategoryEntity(Entity):
     reference_size_units: str = field(default='')
     allowed_upstream_category_ids: list[UUID] = field(default_factory=list)
     allowed_downstream_category_ids: list[UUID] = field(default_factory=list)
-    allow_add_to_dependent: bool = field(default=True)

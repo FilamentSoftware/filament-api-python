@@ -44,6 +44,7 @@ An auto-generated catalogue of every entity, connection, and enum exported from 
   - [Time Log Service](#time-log-service)
   - [User License Service](#user-license-service)
   - [User Service](#user-service)
+  - [User Settings Service](#user-settings-service)
 
 ## Enums
 
@@ -236,6 +237,7 @@ Represents a set of predefined error codes that can be used to indicate specific
 | `ResponseTooLarge` | Indicates that a response (an invocation result or a pushed event) would exceed the maximum message size the client negotiated via the connect-time capability handshake. The response is not sent; instead this error is returned (carrying the actual and limit byte counts) so the caller can narrow the query or raise the client's limit. |
 | `ProtectionError` | The operation was blocked because downstream entities have protection records preventing deletion of the upstream entity. |
 | `ChecksumMismatch` | A completed upload's bytes did not match the checksum the client declared when it requested the grant. |
+| `Timeout` | The operation did not finish within its deadline: a request to another service got no answer in time, or a database statement waited too long for a lock. The work may or may not have happened. |
 
 ### `EventUserConnectionStatus` (`Enum`)
 
@@ -828,6 +830,7 @@ Per-organisation processing configuration. This is a singleton per tenant: the s
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `success_snapshots` | `bool` | `False` | Whether processing-succeeded snapshots should be written for this organisation. Defaults to false. |
+| `anonymise_snapshots` | `bool` | `True` | Whether this organisation's processing snapshots (failed and succeeded) are anonymised: every `AnonymiseInSnapshotsAttribute` property and user-defined text value replaced by a pseudonym. Defaults to true; turn it off only for development organisations, whose snapshots may then carry the original values. |
 
 ##### `FileEntity`
 
@@ -941,7 +944,7 @@ Tracks entity protection relationships. When a downstream entity depends on an u
 | `protection_source_connection_type` | `Optional[str]` | `None` | For connection-based protections: the connection type name (e.g., "CastUserConnection"). Null for property-based protections. |
 | `protection_source_connection_id` | `Optional[UUID]` | `None` | For connection-based protections: the ID of the specific connection instance. Null for property-based protections. |
 | `released_by_request_id` | `Optional[UUID]` | `None` | When non-null, a pending/processing delete request with this id covers the downstream entity (or the source connection), so this record no longer blocks deletion of its upstream entity. Cleared if that request terminally fails; removed with the record when the downstream deletion commits. |
-| `pending_request_id` | `Optional[UUID]` | `None` | When non-null, this is a provisional record: a pending create (or re-linking update) request with this id will establish this protection. It blocks upstream deletion like a real record, but no committed downstream data exists yet. Superseded by the real record when the request commits; deleted if the request terminally fails. |
+| `pending_request_id` | `Optional[UUID]` | `None` | When non-null, this is a provisional record: a pending create (or re-linking update) request with this id will establish this protection. It blocks upstream deletion like a real record, but no committed downstream data exists yet. Owned by the hub: a service commit writes the real record beside it and never deletes it (it may belong to a request still queued behind the run), except when the downstream entity or connection itself is deleted. The hub deletes it once its request is terminal - right after the run commit for a completed request, with the rest of its intent cleanup for a failed or cancelled one. |
 
 ##### `UserDefinedTableEntity`
 
@@ -1371,7 +1374,7 @@ _Extends:_ `Generic`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `add_to_dependent` | `bool` | — | If AddToDependent is true, this task should be added to any dependant item not to this item itself |
+| `add_to_dependent_category_ids` | `Optional[list[UUID]]` | `None` |  |
 | `complexity_source` | `ScopeTaskTypeComplexitySource` | `ScopeTaskTypeComplexitySource.None_` | Where the duration of this task is determined. It can be a custom amount or from the Complexity linked to the task. |
 | `complexity_id` | `Optional[UUID]` | `None` | A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to `TaskTypeComplexity`. |
 | `complexity` | `Optional[ScopeTaskTypeComplexityEntity]` | `None` | A helper method for setting the complexity id. |
@@ -1438,6 +1441,8 @@ One piece of media, owned by a user and associated with a primary connection con
 | `media_type` | `Optional[MediaType]` | `None` | The calculated kind of this media: its original element's type, else its uploaded element's, else null. |
 | `first_frame` | `Optional[int]` | `None` | The first frame this media represents, such as the start of a shot's cut range, or null when it has no frame range. |
 | `last_frame` | `Optional[int]` | `None` | The last frame this media represents, or null when it has no frame range. |
+| `frame_rate` | `Optional[float]` | `None` | The frame rate of this media in frames per second, such as 24, 25 or 29.97, or null when it is not known. |
+| `review` | `bool` | `False` | Whether this media should be included in any review of the task it is attached to. |
 | `transcode_progress` | `Optional[float]` | `None` | How far through transcoding this media is, between 0.0 and 1.0, or null when no transcode has started. |
 | `thumbnail_file_id` | `Optional[UUID]` | `None` | A still thumbnail of this media, held in Filament's own store. Null when there is none. |
 | `thumbnail_file_data` | `Optional[str]` | `None` | The hub-populated read projection of `ThumbnailFileId`, carrying a FileReference. |
@@ -1852,7 +1857,6 @@ Represents a category of items in the system.
 | `reference_size_units` | `str` | `''` | The units used to specify the size of the reference element. |
 | `allowed_upstream_category_ids` | `list[UUID]` | — | The categories that are allowed to be upstream of this category. |
 | `allowed_downstream_category_ids` | `list[UUID]` | — | The categories that are allowed to be downstream of this category. |
-| `allow_add_to_dependent` | `bool` | `True` | Whether this category allows tasks to be added to a dependent item. |
 
 ### Scope Cost Service
 
@@ -1944,6 +1948,15 @@ _Extends:_ `GenericComplexityBase`
 | `max_skill_level_adjustment` | `int` | `0` | Adjustment to max skill levels for the particular complexity. This would be plus or minus the max from the ScopeTaskTypeSkillConnection table. |
 | `min_skill_level_adjustment` | `int` | `0` | Adjustment to min skill levels for the particular complexity. This would be plus or minus the min from the ScopeTaskTypeSkillConnection table. |
 
+##### `ScopeVersionEntity`
+
+A scope version: a named grouping of scope item versions (`ScopeItemVersionEntity`) - the record of a scope as it stood. A client creates one in its scope and groups item versions under it through `ScopeVersionItemVersionConnection`. It computes nothing: the item versions it groups carry the records, and they are captured, pinned and restored exactly as they are outside a grouping.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `name` | `str` | `''` | The client's name for this version of the scope. |
+| `description` | `str` | `''` | The client's description of this version of the scope. |
+
 ##### `ScopeItemEntity`
 
 Represents a single item within a scope.
@@ -1972,10 +1985,30 @@ Represents a single item within a scope.
 | `assumptions_calculated` | `list[str]` | — | This is a property that gets calculated using the connected task's complexity assumptions fields. |
 | `assumptions_manual` | `list[str]` | — | If a user decides to override the calculated assumptions entirely. |
 | `ignore_calculated_assumptions` | `bool` | `False` | Whether to ignore the calculated assumptions or use them |
-| `has_dependent` | `bool` | `False` | Whether this item has tasks that are to be applied to a dependent item |
+| `dependent_task_source_item_ids` | `list[UUID]` | — | The ids of the source items whose dependent tasks are routed onto this item (sorted, distinct). Derived from the dependency graph, the sources' AddToDependentCategoryIds lists and this item's overrides, and only as current as the item's last recalculation. |
 | `currency_id` | `UUID` | — | The currency used for this scope item's monetary values. |
 | `currency` | `Optional[CurrencyEntity]` | `None` | A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type. |
-| `lock_upstream` | `bool` | `False` | Gets or sets a value indicating whether to lock upstream dependencies. |
+| `version_id` | `Optional[UUID]` | `None` | The scope item version (`ScopeItemVersionEntity`) this item is pinned to, or null. While set, the item's tasks and costs are taken from the version rather than calculated from its configuration. Set and cleared only by clients; a version cannot be deleted while an item is pinned to it. Protection-only rather than a link: the version already links to its item, and the type registry refuses circular links. |
+| `restore_from_version_id` | `Optional[UUID]` | `None` | A one-shot command: set it to a version of this item and the processing run rewrites the item's settings and connections to that version's record, then clears this property. Reads back as null. A plain id rather than a link, because the version already links to its item and the type registry refuses circular links. |
+
+##### `ScopeItemVersionEntity`
+
+A scope item version: a stored, frozen record of one `ScopeItemEntity` at the moment it was taken - the item's settings and outbound connections, the tasks its configuration produced and the costs it produced. A client creates one by naming the item (and a name); the scope item service completes it in the same run, either with the full record or, when the outcome matches a version the item already has, as a duplicate that names that version (`DuplicateOfId`) and carries no record of its own.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `scope_item_id` | `UUID` | — | The scope item this is a version of. Set on create and never changed. Deleting the item deletes its versions. |
+| `scope_item` | `Optional[ScopeItemEntity]` | `None` | A helper method for setting `ScopeItemId`. |
+| `name` | `str` | `''` | The client's name for this version. |
+| `description` | `str` | `''` | The client's description of this version. |
+| `settings_data` | `str` | `''` | The item's settings and outbound connections when the version was taken, as a compressed `ScopeItemVersionSettings`. Empty on a duplicate, and until the version is captured. |
+| `tasks_data` | `str` | `''` | The tasks the item's configuration produced when the version was taken, as a compressed `ScopeItemTaskSet`. Empty on a duplicate, and until the version is captured. |
+| `costs_data` | `str` | `''` | The costs the item's configuration produced when the version was taken, as a compressed `ScopeItemCostSet`. Empty on a duplicate, and until the version is captured. |
+| `structure_hash` | `str` | `''` | Hex SHA-256 over the item's configuration and the tasks it produces, with ids and audit fields stripped (the costs are deliberately outside it). Two versions of one item with the same hash are the same version. Set on every captured version, duplicates included. |
+| `duplicate_of_id` | `Optional[UUID]` | `None` | The version of the same item this one duplicates, when the outcome matched it at capture; null otherwise. A duplicate stands for the version it names: every reader of a version's record resolves it first (`ResolveCanonicalAsync`). The named version cannot be deleted while a duplicate names it. |
+| `capture_warnings` | `list[str]` | — | What the capture could not record faithfully. Empty for a clean capture. |
+| `restore_warnings` | `list[str]` | — | What the last restore from this version could not put back. Rewritten by each restore. |
+| `last_restored_at` | `Optional[datetime.datetime]` | `None` | When an item was last restored from this version. |
 
 #### Connections
 
@@ -2032,7 +2065,7 @@ _Extends:_ `GenericScopeTaskTypeConnection_2`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `add_to_dependent` | `bool` | — | If AddToDependent is true, this task should be added to any dependant item not to this item itself |
+| `add_to_dependent_category_ids` | `Optional[list[UUID]]` | `None` |  |
 | `complexity_source` | `ScopeTaskTypeComplexitySource` | `ScopeTaskTypeComplexitySource.None_` | Where the duration of this task is determined. It can be a custom amount or from the Complexity linked to the task. |
 | `complexity_id` | `Optional[UUID]` | `None` | A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to `TaskTypeComplexity`. |
 | `complexity` | `Optional[ScopeTaskTypeComplexityEntity]` | `None` | A helper method for setting the complexity id. |
@@ -2046,6 +2079,12 @@ _Extends:_ `GenericScopeTaskTypeConnection_2`
 | `scope_template_item_context` | `Optional[ScopeTemplateItemEntity]` | `None` | A helper method for setting the scope id. |
 | `task_combine_key` | `str` | `''` | The key used to combine tasks. |
 | `remove` | `bool` | `False` | Gets a value indicating whether this override removes the task type. |
+
+##### `ScopeVersionItemVersionConnection`
+
+Groups a scope item version (`ScopeItemVersionEntity`) under a scope version (`ScopeVersionEntity`). No properties: the connection is the membership.
+
+_No type-specific fields beyond the common base fields._
 
 ### Scope Milestone Service
 
@@ -2258,7 +2297,7 @@ _Extends:_ `GenericScopeTaskTypeConnection_2`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `add_to_dependent` | `bool` | — | If AddToDependent is true, this task should be added to any dependant item not to this item itself |
+| `add_to_dependent_category_ids` | `Optional[list[UUID]]` | `None` |  |
 | `complexity_source` | `ScopeTaskTypeComplexitySource` | `ScopeTaskTypeComplexitySource.None_` | Where the duration of this task is determined. It can be a custom amount or from the Complexity linked to the task. |
 | `complexity_id` | `Optional[UUID]` | `None` | A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to `TaskTypeComplexity`. |
 | `complexity` | `Optional[ScopeTaskTypeComplexityEntity]` | `None` | A helper method for setting the complexity id. |
@@ -2447,7 +2486,8 @@ _Extends:_ `ReferenceEntityBase`
 | `ancestor_group_ids` | `list[UUID]` | — | Identifies the IDs of all ancestor task groups in the hierarchy that are related to this instance of `TaskEntity`. |
 | `ancestor_groups` | `Optional[list[TaskGroupEntity]]` | `None` | Contains the collection of ancestor task groups that are hierarchically above the current task. This property is used to establish relationships between task groups in a hierarchical structure, identifying all ancestor groups for the current entity. |
 | `chargeable` | `float` | `0` | The calculated chargeable amount for this task, derived from the task type's chargeable per hour, the task duration, and the scope/item chargeable multipliers, with currency conversion applied. |
-| `currency_id` | `UUID` | — | The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity. |
+| `estimated_cost` | `Optional[float]` | `None` | The task's total estimated cost at reference skill: what the work costs the studio, not what the client is charged. null means the task is not estimated (a task made by hand); 0 means it is genuinely free, and is used as it stands. |
+| `currency_id` | `UUID` | — | The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity. It describes `Chargeable` only, not `EstimatedCost`, which is in the organisation's currency. |
 | `currency` | `Optional[CurrencyEntity]` | `None` | A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type. |
 | `specialty_id` | `UUID` | — | The specialty this task falls under. Populated by TaskScopeModule from the owning `ScopeTaskTypeEntity` for a generated task, or supplied directly for a manually created task — deliberately not a calculated property, for the same reason as `Deliverables`. |
 | `specialty` | `Optional[SpecialtyEntity]` | `None` | A helper method for setting the SpecialtyId property. Pass in a SpecialtyEntity type. |
@@ -2691,3 +2731,21 @@ _Extends:_ `PermissionsRoleConnectionBase_1`
 | `context_type` | `Optional[str]` | `None` | Specifies the type of context in which the permissions role connection is applicable. |
 | `context_id` | `Optional[UUID]` | `None` | Represents the unique identifier for the specific context in which the permissions role connection is applicable. |
 | `context` | `Optional[ScopeEntity]` | `None` | Represents the context associated with the permissions role connection, defining the specific scope or domain where the connection is applicable. |
+
+### User Settings Service
+
+#### Entities
+
+##### `UserSettingsEntity`
+
+A set of settings for one context - a page, a widget, anything a client chooses to key on - owned by a user and optionally shared with every other user in the organisation.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner_user_id` | `Optional[UUID]` | `None` | The id of the user who owns these settings. Null or `Empty` when the row has no owner, which only a shared row may be. |
+| `owner_user` | `Optional[UserEntity]` | `None` | The user who owns these settings. Assigning a value populates `OwnerUserId`. |
+| `shared` | `bool` | `False` | Whether every user in the organisation may read these settings. Only the owner may write them either way. |
+| `context` | `str` | `''` | What these settings are for, as a key the client chooses. A user may hold several rows for one context. |
+| `name` | `str` | `''` | An optional display name, so a client can tell several rows for one context apart. Empty when there is none. |
+| `description` | `str` | `''` | An optional description of these settings. Empty when there is none. |
+| `settings` | `dict[str, str]` | — | The settings themselves, as key-value pairs. |

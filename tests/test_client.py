@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import datetime
 import gzip
 from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1270,6 +1271,7 @@ class TestFileMethods:
                 "fileId": str(file_id),
                 "url": "https://storage.example.com/bucket",
                 "method": "POST",
+                "issuedAt": "2026-08-10T16:00:00.00000000Z",
                 "expiresAt": "2026-08-10T17:00:00.00000000Z",
                 "maxBytes": 1024,
                 "fields": {"key": "k", "Content-Type": "image/png"},
@@ -1298,6 +1300,8 @@ class TestFileMethods:
         assert result.data.file_id == file_id
         assert result.data.url == "https://storage.example.com/bucket"
         assert result.data.checksum_algorithm == FileChecksumAlgorithm.Sha256Hex
+        assert result.data.issued_at == datetime.datetime(2026, 8, 10, 16, 0, tzinfo=datetime.timezone.utc)
+        assert result.data.expires_at == datetime.datetime(2026, 8, 10, 17, 0, tzinfo=datetime.timezone.utc)
 
     @pytest.mark.asyncio
     async def test_refresh_file_upload_grant_passes_uuid_string(self) -> None:
@@ -1312,6 +1316,7 @@ class TestFileMethods:
                 "fileId": str(file_id),
                 "url": "https://s/x",
                 "method": "POST",
+                "issuedAt": "2026-08-10T16:00:00.00000000Z",
                 "expiresAt": "2026-08-10T17:00:00.00000000Z",
                 "maxBytes": 10,
             },
@@ -1323,6 +1328,8 @@ class TestFileMethods:
         assert method == "RefreshFileUploadGrant"
         assert payload == str(file_id)
         assert result.success is True
+        assert result.data is not None
+        assert result.data.issued_at == datetime.datetime(2026, 8, 10, 16, 0, tzinfo=datetime.timezone.utc)
 
     @pytest.mark.asyncio
     async def test_complete_file_upload_sends_completion(self) -> None:
