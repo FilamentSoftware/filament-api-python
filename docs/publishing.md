@@ -110,6 +110,13 @@ Run the setup script once, as someone with owner rights on the GCP project
 run it from [Cloud Shell](https://cloud.google.com/shell) (which already has
 `gcloud` and your credentials), WSL or Git Bash.
 
+Prerequisites: the project is linked to a billing account (Artifact Registry
+can't be enabled without one), and `gcloud` is signed in as a project owner.
+The script uses `gcloud beta`, which Cloud Shell includes; elsewhere, install it
+with `gcloud components install beta` if prompted. On a fresh project, newly
+enabled APIs can take a minute or two to propagate, so if a later step fails
+right after "Enabling required APIs", wait and re-run the script.
+
 ```bash
 GCP_PROJECT_ID=filament-artifacts GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh
 # or, to also set the GitHub repository variables with the gh CLI:

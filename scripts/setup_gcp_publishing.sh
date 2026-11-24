@@ -110,6 +110,11 @@ gc services enable \
   iamcredentials.googleapis.com \
   sts.googleapis.com
 
+# On a fresh project the Artifact Registry service agent may not exist until
+# first use, and step 5 grants it access. Create it explicitly (idempotent).
+log "Ensuring the Artifact Registry service agent exists"
+gc beta services identity create --service=artifactregistry.googleapis.com > /dev/null
+
 repo_exists() {
   gc artifacts repositories describe "$1" --location="$GCP_REGION" > /dev/null 2>&1
 }
