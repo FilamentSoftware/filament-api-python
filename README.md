@@ -66,21 +66,21 @@ same-named package on PyPI compete with the internal one).
 
 Access requires the `roles/artifactregistry.reader` role on the repository and
 [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials)
-(e.g. `gcloud auth application-default login`). Replace `<REGION>`, `<PROJECT>`
-and `<VIRTUAL_REPO>` with the values from your Filament contact.
+(e.g. `gcloud auth application-default login`). Ask your Filament contact for
+access.
 
 With pip:
 
 ```bash
 pip install keyrings.google-artifactregistry-auth
-pip install --index-url https://<REGION>-python.pkg.dev/<PROJECT>/<VIRTUAL_REPO>/simple/ filament-api
+pip install --index-url https://europe-west2-python.pkg.dev/filament-artifacts/python/simple/ filament-api
 ```
 
 With Poetry:
 
 ```bash
 poetry self add keyrings.google-artifactregistry-auth
-poetry source add --priority=primary filament-internal https://<REGION>-python.pkg.dev/<PROJECT>/<VIRTUAL_REPO>/simple/
+poetry source add --priority=primary filament-internal https://europe-west2-python.pkg.dev/filament-artifacts/python/simple/
 poetry add filament-api
 ```
 

@@ -111,9 +111,9 @@ run it from [Cloud Shell](https://cloud.google.com/shell) (which already has
 `gcloud` and your credentials), WSL or Git Bash.
 
 ```bash
-GCP_PROJECT_ID=my-project GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh
+GCP_PROJECT_ID=filament-artifacts GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh
 # or, to also set the GitHub repository variables with the gh CLI:
-GCP_PROJECT_ID=my-project GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh --set-github-vars
+GCP_PROJECT_ID=filament-artifacts GCP_REGION=europe-west2 bash scripts/setup_gcp_publishing.sh --set-github-vars
 ```
 
 The script looks up the repository's numeric IDs with the `gh` CLI. Without
@@ -148,13 +148,13 @@ The workflow reads its GCP configuration from repository **variables** (not
 secrets: none of these values are sensitive). The script prints the
 `gh variable set` commands, or runs them with `--set-github-vars`.
 
-| Variable | Example |
+| Variable | Value |
 | -------- | ------- |
-| `GCP_PROJECT_ID` | `my-project` |
+| `GCP_PROJECT_ID` | `filament-artifacts` |
 | `GCP_REGION` | `europe-west2` |
 | `GCP_ARTIFACT_REPOSITORY` | `python-internal` |
-| `GCP_WIF_PROVIDER` | `projects/123456789/locations/global/workloadIdentityPools/github/providers/filament-api-python` |
-| `GCP_SERVICE_ACCOUNT` | `filament-api-publisher@my-project.iam.gserviceaccount.com` |
+| `GCP_WIF_PROVIDER` | `projects/<project-number>/locations/global/workloadIdentityPools/github/providers/filament-api-python` |
+| `GCP_SERVICE_ACCOUNT` | `filament-api-publisher@filament-artifacts.iam.gserviceaccount.com` |
 
 ## PyPI
 
@@ -191,13 +191,13 @@ The repository is expected to be public by then (see the
 ## Granting consumers access
 
 Internal workloads and people install from the **virtual** repository
-(`https://<REGION>-python.pkg.dev/<PROJECT>/python/simple/`) with
+(`https://europe-west2-python.pkg.dev/filament-artifacts/python/simple/`) with
 `keyrings.google-artifactregistry-auth`. Grant them reader access on that
 repository:
 
 ```bash
 gcloud artifacts repositories add-iam-policy-binding python \
-  --project=<PROJECT> --location=<REGION> \
+  --project=filament-artifacts --location=europe-west2 \
   --member="serviceAccount:<workload-sa>@<project>.iam.gserviceaccount.com" \
   --role=roles/artifactregistry.reader
 ```
