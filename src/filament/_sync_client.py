@@ -12,6 +12,7 @@ import asyncio
 import concurrent.futures
 import enum
 import functools
+import inspect
 import logging
 import threading
 from collections.abc import Callable, Coroutine, Mapping, Sequence
@@ -103,7 +104,7 @@ class _Attempt:
 
     ``loop``, ``stop_event`` and ``stop_requested`` are guarded by the client's
     lock.  ``client``, ``operations`` and ``shutting_down`` are written only on
-    the loop thread.
+    the loop thread.  ``finished`` is set by the worker thread as its last act.
     """
 
     def __init__(self) -> None:
@@ -114,6 +115,10 @@ class _Attempt:
         # Completed once by the loop thread: None for a successful connect,
         # otherwise the exception that ended the attempt.
         self.outcome: concurrent.futures.Future[None] = concurrent.futures.Future()
+        # Whether the worker is done is read from this, never from the thread's
+        # liveness: on CPython before 3.13 a Ctrl+C that lands inside
+        # Thread.join() or is_alive() can mark a still-running thread as stopped.
+        self.finished = threading.Event()
         self.client: Optional[FilamentClient] = None
         self.operations: set[_Operation[Any]] = set()
         self.shutting_down = False
@@ -126,14 +131,6 @@ class _Attempt:
             self.outcome.set_result(None)
         else:
             self.outcome.set_exception(exc)
-
-
-def _join(thread: Optional[threading.Thread]) -> None:
-    """Wait for *thread* to finish, staying interruptible by Ctrl+C."""
-    if thread is None:
-        return
-    while thread.is_alive():
-        thread.join(_POLL_SECONDS)
 
 
 class FilamentClientSync:
@@ -228,43 +225,40 @@ class FilamentClientSync:
         """
         attempt = _Attempt()
         thread = threading.Thread(
-            target=self._thread_main, args=(attempt,), name=_THREAD_NAME, daemon=True
+            target=self._run_thread, args=(attempt,), name=_THREAD_NAME, daemon=True
         )
         attempt.thread = thread
-        with self._lock:
-            if self._state is _State.CLOSING:
-                raise FilamentError("FilamentClientSync is still closing")
-            if self._state is not _State.CLOSED:
-                raise FilamentError("FilamentClientSync is already connected")
-            # Started under the lock so the reservation and the worker exist
-            # together: if start() raises, the state was never left CLOSED.  The
-            # worker's first act is to take this lock, so it simply queues behind us.
-            thread.start()
-            self._state = _State.CONNECTING
-            self._attempt = attempt
-
+        # Everything from registering the attempt to declaring it open sits in one
+        # try, so an error or a Ctrl+C at any point takes the same way out and a
+        # connect() that does not return normally leaves nothing running.
         try:
+            with self._lock:
+                if self._state is _State.CLOSING:
+                    raise FilamentError("FilamentClientSync is still closing")
+                if self._state is not _State.CLOSED:
+                    raise FilamentError("FilamentClientSync is already connected")
+                # Registered before the worker exists, and the attempt before the
+                # state, so there is no moment at which a worker is running that
+                # close() or the cleanup below cannot find.  The worker's first act
+                # is to take this lock, so it cannot get ahead of the registration.
+                self._attempt = attempt
+                self._state = _State.CONNECTING
+                thread.start()
+
             self._wait_for_outcome(attempt)
             attempt.outcome.result()
-        except BaseException:
-            # Failed, or this thread was interrupted while waiting.  Either way
-            # make sure the worker is gone before reporting it.
-            with self._lock:
-                self._request_stop_locked(attempt)
-            _join(thread)
-            self._release(attempt)
-            raise
 
-        with self._lock:
-            # Another thread may have closed the client between the worker
-            # publishing success and this thread reading it.
-            accepted = self._state is _State.CONNECTING and self._attempt is attempt
-            if accepted:
-                self._state = _State.OPEN
-        if not accepted:
-            _join(thread)
-            self._release(attempt)
-            raise FilamentConnectionError(_CLOSED_WHILE_CONNECTING)
+            with self._lock:
+                # Another thread may have closed the client between the worker
+                # publishing success and this thread reading it.
+                accepted = self._state is _State.CONNECTING and self._attempt is attempt
+                if accepted:
+                    self._state = _State.OPEN
+            if not accepted:
+                raise FilamentConnectionError(_CLOSED_WHILE_CONNECTING)
+        except BaseException:
+            self._abandon(attempt)
+            raise
 
     def close(self) -> None:
         """Close the connection and stop the background thread.
@@ -278,12 +272,14 @@ class FilamentClientSync:
         """
         with self._lock:
             attempt = self._attempt
-            if self._state is _State.CLOSED or attempt is None:
+            if attempt is None:
                 return
-            if self._state is not _State.CLOSING:
-                self._state = _State.CLOSING
-                self._request_stop_locked(attempt)
-        _join(attempt.thread)
+            self._state = _State.CLOSING
+            # Sent on every call, not only the one that moved the state: an
+            # earlier close() may have been interrupted (Ctrl+C) before it got
+            # this far, and the request is idempotent.
+            self._request_stop_locked(attempt)
+        self._wait_finished(attempt)
         self._release(attempt)
 
     def __enter__(self) -> FilamentClientSync:
@@ -299,6 +295,35 @@ class FilamentClientSync:
     ) -> None:
         """Close the connection.  See :meth:`close`."""
         self.close()
+
+    def _abandon(self, attempt: _Attempt) -> None:
+        """Stop *attempt*'s worker, wait for it, and return to CLOSED.
+
+        The one way out of a connect() that did not succeed.  Safe at any stage:
+        for an attempt that was never registered or whose thread never started
+        there is nothing to stop or wait for, and the identity check in
+        :meth:`_release` keeps it from touching a connection that is not its own.
+        """
+        with self._lock:
+            self._request_stop_locked(attempt)
+        self._wait_finished(attempt)
+        self._release(attempt)
+
+    def _wait_finished(self, attempt: _Attempt) -> None:
+        """Block until *attempt*'s worker thread has finished all its work."""
+        thread = attempt.thread
+        if thread is None or thread.ident is None:
+            # Never started.  (A thread interrupted in the instant between being
+            # spawned and recording its ident also lands here; the stop request
+            # already on the attempt makes it exit without connecting.)
+            return
+        # Polled so Ctrl+C stays deliverable on Windows.  If this is interrupted,
+        # a retry waits again: the event is only ever set by the worker itself.
+        while not attempt.finished.wait(_POLL_SECONDS):
+            pass
+        # The worker's work is done; this only waits out the thread's last few
+        # instructions so it is really gone when the caller returns.
+        thread.join()
 
     def _release(self, attempt: _Attempt) -> None:
         """Return to CLOSED, but only if *attempt* is still the current one."""
@@ -326,12 +351,11 @@ class FilamentClientSync:
     @staticmethod
     def _wait_for_outcome(attempt: _Attempt) -> None:
         """Block until the worker has reported how the connect went."""
-        thread = attempt.thread
         while True:
             done, _ = concurrent.futures.wait([attempt.outcome], timeout=_POLL_SECONDS)
             if done:
                 return
-            if thread is not None and not thread.is_alive():
+            if attempt.finished.is_set():
                 if attempt.outcome.done():
                     return
                 raise FilamentConnectionError(
@@ -342,13 +366,26 @@ class FilamentClientSync:
     # Loop thread
     # ------------------------------------------------------------------
 
-    def _thread_main(self, attempt: _Attempt) -> None:
+    def _run_thread(self, attempt: _Attempt) -> None:
+        """Thread target: run the loop, then signal completion whatever happened."""
         try:
-            asyncio.run(self._main(attempt))
+            self._thread_main(attempt)
+        finally:
+            attempt.finished.set()
+
+    def _thread_main(self, attempt: _Attempt) -> None:
+        main = self._main(attempt)
+        try:
+            asyncio.run(main)
         except BaseException as exc:
             attempt.publish(exc)
             logger.debug("FilamentClientSync loop thread ended with an error", exc_info=True)
         finally:
+            if inspect.getcoroutinestate(main) == inspect.CORO_CREATED:
+                # asyncio.run() failed before it could start the coroutine (the
+                # event loop could not be created).  Close it so it is not
+                # reported as "never awaited" when it is collected.
+                main.close()
             with self._lock:
                 attempt.loop = None
                 attempt.stop_event = None
