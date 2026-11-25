@@ -685,6 +685,51 @@ class TestClosingWithCallsInFlight:
 
         assert held.cancels == 1
 
+    def test_interrupt_as_the_call_is_queued_still_cancels_it(self, fakes: _Fakes) -> None:
+        """Ctrl+C lands after the call was handed to the loop but before the caller
+        began waiting for it; the call must not be left to run unattended."""
+        held = _Held()
+        with _make_sync() as sync:
+            fakes.last.read_data.side_effect = held.run
+            attempt = _attempt_of(sync)
+            loop = attempt.loop
+            assert loop is not None
+            real_call_soon = loop.call_soon_threadsafe
+            calls: list[Any] = []
+
+            def interrupt_after_queueing(callback: Any, *args: Any) -> Any:
+                calls.append(callback)
+                handle = real_call_soon(callback, *args)
+                if len(calls) == 1:
+                    raise KeyboardInterrupt
+                return handle
+
+            with patch.object(loop, "call_soon_threadsafe", interrupt_after_queueing):
+                with pytest.raises(KeyboardInterrupt):
+                    sync.read_data("request")  # type: ignore[arg-type]
+
+            # The cancellation was queued behind the start, and the call ended
+            # without ever being released.
+            assert len(calls) == 2
+            _wait_until(lambda: not attempt.operations)
+            assert not held.release.is_set()
+            assert held.cancels == (1 if held.started.is_set() else 0)
+            # The client is still usable.
+            assert sync.get_entity_permissions() == "get_entity_permissions:result"
+
+    def test_rejected_call_queues_nothing(self, fakes: _Fakes) -> None:
+        sync = _make_sync()
+        sync.connect()
+        loop = _attempt_of(sync).loop
+        assert loop is not None
+        sync.close()
+
+        with patch.object(loop, "call_soon_threadsafe") as call_soon:
+            with pytest.raises(FilamentConnectionError, match="not connected"):
+                sync.read_data("request")  # type: ignore[arg-type]
+
+        call_soon.assert_not_called()
+
     def test_close_does_not_cancel_an_interrupted_call_a_second_time(self, fakes: _Fakes) -> None:
         """A second cancel would cut the call's cleanup loose from the task that
         close() is waiting on."""
@@ -962,18 +1007,30 @@ class TestInterruptedLifecycleCalls:
                 sync.close()
         assert held.cancelled.wait(_TIMEOUT)
 
-        # The worker is still cleaning up, so the retry must not report it done or
-        # let the client be connected again.
-        retry = _Call(sync.close)
-        time.sleep(0.1)
-        assert retry.is_alive()
-        assert sync._state is _State.CLOSING
-        with pytest.raises(FilamentError, match="still closing"):
-            sync.connect()
-        fakes.last.close.assert_not_awaited()
+        # Signalled when the retry reaches its wait for the worker, so the test
+        # knows the retry is really waiting before it lets the worker finish.  A
+        # retry that skipped the wait would never signal.
+        retry_waiting = threading.Event()
+        real_wait = attempt.finished.wait
 
-        held.cleanup_release.set()
-        retry.finish()
+        def observed_wait(timeout: Optional[float] = None) -> bool:
+            retry_waiting.set()
+            return real_wait(timeout)
+
+        with patch.object(attempt.finished, "wait", observed_wait):
+            retry = _Call(sync.close)
+            assert retry_waiting.wait(_TIMEOUT)
+
+            # The worker is still cleaning up, so the retry must not report it done
+            # or let the client be connected again.
+            assert retry.is_alive()
+            assert sync._state is _State.CLOSING
+            with pytest.raises(FilamentError, match="still closing"):
+                sync.connect()
+            fakes.last.close.assert_not_awaited()
+
+            held.cleanup_release.set()
+            retry.finish()
         caller.finish()
 
         assert retry.error is None
