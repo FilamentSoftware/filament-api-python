@@ -501,25 +501,31 @@ class FilamentClientSync:
         client it runs on, and a rejected call never creates a coroutine at all.
         """
         operation: _Operation[_T] = _Operation()
-        with self._lock:
-            attempt = self._attempt
-            loop = attempt.loop if attempt is not None else None
-            if self._state is not _State.OPEN or attempt is None or loop is None:
-                raise FilamentConnectionError(_NOT_CONNECTED)
-            if threading.current_thread() is attempt.thread:
-                raise RuntimeError(
-                    "FilamentClientSync cannot be called from its own connection thread"
-                )
-            # Scheduled under the lock: close() flips the state and sends its stop
-            # signal under this same lock, so this call is either rejected above or
-            # queued on the loop strictly ahead of the stop signal.
-            try:
-                loop.call_soon_threadsafe(self._start_operation, attempt, operation, factory)
-            except RuntimeError:
-                raise FilamentConnectionError(_NOT_CONNECTED) from None
-
         future = operation.future
+        # The loop the call was (or was about to be) queued on.  Set immediately
+        # before queueing, so the handler below knows a cancellation is needed
+        # even if the interrupt lands as the queueing call returns.
+        submitted_to: Optional[asyncio.AbstractEventLoop] = None
         try:
+            with self._lock:
+                attempt = self._attempt
+                loop = attempt.loop if attempt is not None else None
+                if self._state is not _State.OPEN or attempt is None or loop is None:
+                    raise FilamentConnectionError(_NOT_CONNECTED)
+                if threading.current_thread() is attempt.thread:
+                    raise RuntimeError(
+                        "FilamentClientSync cannot be called from its own connection thread"
+                    )
+                # Scheduled under the lock: close() flips the state and sends its
+                # stop signal under this same lock, so this call is either rejected
+                # above or queued on the loop strictly ahead of the stop signal.
+                submitted_to = loop
+                try:
+                    loop.call_soon_threadsafe(self._start_operation, attempt, operation, factory)
+                except RuntimeError:
+                    submitted_to = None
+                    raise FilamentConnectionError(_NOT_CONNECTED) from None
+
             # Poll until done, then read the result once, outside the loop.  Never
             # catch TimeoutError around result(): on Python 3.11+ the polling
             # timeout and a call that itself raised TimeoutError are the same
@@ -527,12 +533,16 @@ class FilamentClientSync:
             while not future.done():
                 concurrent.futures.wait([future], timeout=_POLL_SECONDS)
         except BaseException:
-            # Interrupted (Ctrl+C).  Cancel the call and leave immediately; its
-            # cleanup carries on on the loop and close() will wait for it.
-            try:
-                loop.call_soon_threadsafe(self._cancel_operation, operation)
-            except RuntimeError:
-                pass
+            # Interrupted (Ctrl+C), at any point from queueing the call onwards.
+            # Cancel it and leave immediately; its cleanup carries on on the loop
+            # and close() will wait for it.  Without this a call the caller has
+            # stopped waiting for could still go on to run.  A call rejected
+            # before it was queued has nothing to cancel.
+            if submitted_to is not None:
+                try:
+                    submitted_to.call_soon_threadsafe(self._cancel_operation, operation)
+                except RuntimeError:
+                    pass
             raise
         return future.result()
 
@@ -551,6 +561,12 @@ class FilamentClientSync:
         client = attempt.client
         if attempt.shutting_down or client is None:
             operation.future.set_exception(FilamentConnectionError(_NOT_CONNECTED))
+            return
+        if operation.cancel_requested:
+            # Its caller was interrupted before this ran; never start it.
+            operation.future.set_exception(
+                FilamentConnectionError("The FilamentClientSync call was cancelled")
+            )
             return
         try:
             task = asyncio.get_running_loop().create_task(factory(client))
