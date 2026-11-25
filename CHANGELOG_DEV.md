@@ -1,3 +1,10 @@
+## 0.8.2-dev.0.0.1 (2026-11-25 10:00)
+
+### Other
+
+#### OTHER
+- Stable releases are published to PyPI (pip install filament-api) under the MIT license
+
 ## 0.8.1-dev.0.0.5 (2026-11-21 22:16)
 
 ### Types
