@@ -708,9 +708,15 @@ class TestClosingWithCallsInFlight:
                 with pytest.raises(KeyboardInterrupt):
                     sync.read_data("request")  # type: ignore[arg-type]
 
-            # The cancellation was queued behind the start, and the call ended
-            # without ever being released.
+            # The cancellation was queued behind the start.
             assert len(calls) == 2
+            # Loop callbacks run in the order they were queued, so once this
+            # marker has run, the start and the cancel have both run too.  Without
+            # it the check below could pass before the call was even registered.
+            processed = threading.Event()
+            real_call_soon(processed.set)
+            assert processed.wait(_TIMEOUT)
+            # The call ended without ever being released.
             _wait_until(lambda: not attempt.operations)
             assert not held.release.is_set()
             assert held.cancels == (1 if held.started.is_set() else 0)
