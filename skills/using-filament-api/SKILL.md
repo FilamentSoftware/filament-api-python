@@ -2,15 +2,16 @@
 name: using-filament-api
 description: >-
   Use when writing Python code that uses the `filament` package / FilamentClient
-  — connecting to the Filament backend, building typed query Conditions, reading
+  / FilamentClientSync — connecting to the Filament backend, building typed query Conditions, reading
   entity data, creating/updating/deleting entities, finding entity/connection/enum
   types, or setting up real-time subscriptions over SignalR.
 ---
 
 # Using the Filament Python API
 
-This skill helps write correct code against the `filament` Python package — an
-async client for the Filament platform over SignalR.
+This skill helps write correct code against the `filament` Python package — a
+client for the Filament platform over SignalR, with an async interface
+(`FilamentClient`) and a blocking one (`FilamentClientSync`).
 
 Detailed, authoritative reference documentation is bundled with this plugin under
 `${CLAUDE_PLUGIN_ROOT}/docs/`. **Read the relevant page(s) before answering** —
@@ -29,7 +30,7 @@ API shapes from memory.
 
 | Task | Read this |
 | ---- | --------- |
-| Install, connect, authenticate, async lifecycle, error handling | `${CLAUDE_PLUGIN_ROOT}/docs/getting-started.md` |
+| Install, connect (async or blocking), authenticate, connection lifecycle, error handling | `${CLAUDE_PLUGIN_ROOT}/docs/getting-started.md` |
 | Find an entity type, connection type, or enum; naming conventions; base classes | `${CLAUDE_PLUGIN_ROOT}/docs/finding-types.md` |
 | Look up a specific entity/connection/enum and its exact fields and types | `${CLAUDE_PLUGIN_ROOT}/docs/type-reference.md` (auto-generated, exhaustive) |
 | Read data: queries, ordering, paging, projections, counting, parsing results | `${CLAUDE_PLUGIN_ROOT}/docs/reading-data.md` |
@@ -37,7 +38,7 @@ API shapes from memory.
 | Create, update, or delete entities; partial updates / `specified_properties` | `${CLAUDE_PLUGIN_ROOT}/docs/modifying-data.md` |
 | Real-time subscriptions and processing-lifecycle events | `${CLAUDE_PLUGIN_ROOT}/docs/subscriptions.md` |
 | Typed `DataOption` key-value options | `${CLAUDE_PLUGIN_ROOT}/docs/data-options.md` |
-| `FilamentClient` method reference, the response envelope, exceptions | `${CLAUDE_PLUGIN_ROOT}/docs/api-reference.md` |
+| `FilamentClient` and `FilamentClientSync` method reference, the response envelope, exceptions | `${CLAUDE_PLUGIN_ROOT}/docs/api-reference.md` |
 
 Start from `${CLAUDE_PLUGIN_ROOT}/docs/README.md` for an index and a 60-second
 tour if you are unsure where to look.
@@ -48,6 +49,11 @@ These trip people up most often — confirm against the docs as you write:
 
 - **Every API method is a coroutine** on `FilamentClient` and must be `await`ed,
   inside an `async with filament.FilamentClient(...) as f:` block.
+- **Match the client to the user's code.** If their code is not async (a plain
+  script, a Flask/Django view, a worker thread), use
+  `with filament.FilamentClientSync(...) as f:` and call the same methods without
+  `await`, rather than wrapping `FilamentClient` in `asyncio.run`. Subscriptions
+  and `on_processing_*` callbacks exist only on the async `FilamentClient`.
 - **Calls return a success/error envelope, they do not raise** for request
   failures. Check `result.success` (and `result.data is not None`) before using
   the payload. Only connection/authentication failures raise exceptions.

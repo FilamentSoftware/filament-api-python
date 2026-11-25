@@ -267,37 +267,88 @@ class FilamentClient:
     # Context manager
     # ------------------------------------------------------------------
 
-    async def __aenter__(self) -> FilamentClient:
+    async def connect(self) -> None:
         """Open the SignalR connection.
 
+        The explicit counterpart of entering ``async with``; pair it with
+        :meth:`close`::
+
+            f = FilamentClient(organization_id="org-id", api_key_name="my-key", api_key="secret")
+            await f.connect()
+            try:
+                result = await f.read_data(request)
+            finally:
+                await f.close()
+
         Raises :class:`FilamentConnectionError` if the server cannot be
-        reached, and :class:`FilamentAuthenticationError` if the server
-        rejects the API key during the connection handshake.
+        reached, :class:`FilamentAuthenticationError` if the server
+        rejects the API key during the connection handshake, and
+        :class:`FilamentError` if the client is already connected.
+
+        However the attempt ends short of success — an error, the connection
+        timeout, or the caller being cancelled — the background run loop is
+        stopped before this returns, so a failed ``connect()`` needs no
+        matching :meth:`close`.
         """
+        if self._run_task is not None and not self._run_task.done():
+            raise FilamentError("FilamentClient is already connected")
+
         self._connected = asyncio.Event()
         self._signalr_client.on_open(self._on_open)
 
-        self._run_task = asyncio.create_task(self._signalr_client.run())
-        self._run_task.add_done_callback(self._handle_run_task_done)
-
-        # Wait for either: connection established, run() failing, or timeout
+        run_task = asyncio.create_task(self._signalr_client.run())
+        self._run_task = run_task
+        run_task.add_done_callback(self._handle_run_task_done)
         wait_connected = asyncio.ensure_future(self._connected.wait())
-        done, pending = await asyncio.wait(
-            {wait_connected, self._run_task},
+
+        try:
+            await self._await_connection(run_task, wait_connected)
+        except BaseException:
+            # One cleanup for every way out other than success.  Cancellation in
+            # particular can land on any await in the attempt; without this the run
+            # loop and the wait future would outlive the caller that gave up on them,
+            # orphaned with a "Task was destroyed but it is pending" warning.
+            wait_connected.cancel()
+            run_task.cancel()
+            try:
+                await run_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.debug(
+                    "SignalR run loop ended with an error during a failed connect",
+                    exc_info=True,
+                )
+            # Awaited as well as cancelled, so the wait is really gone (not merely
+            # asked to go) by the time the caller sees the failure.
+            with contextlib.suppress(asyncio.CancelledError):
+                await wait_connected
+            if self._run_task is run_task:
+                self._run_task = None
+            raise
+
+    async def _await_connection(
+        self,
+        run_task: asyncio.Task[None],
+        wait_connected: asyncio.Future[Any],
+    ) -> None:
+        """Wait for the connection to open, then complete the handshake.
+
+        Raises on any failure; :meth:`connect` owns stopping *run_task* and
+        *wait_connected* afterwards.
+        """
+        # Wait for either: connection established, run() failing, or timeout
+        done, _ = await asyncio.wait(
+            {wait_connected, run_task},
             timeout=self._connection_timeout,
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        # Cancel the wait future if still pending
-        for fut in pending:
-            if fut is wait_connected:
-                fut.cancel()
-
         if wait_connected not in done:
             # Either run_task failed or we timed out
-            self._run_task.cancel()
+            run_task.cancel()
             try:
-                await self._run_task
+                await run_task
             except Exception as exc:
                 raise FilamentConnectionError(
                     f"Failed to connect to {self._url}: {exc}"
@@ -310,32 +361,17 @@ class FilamentClient:
             ) from None
 
         if self._authentication_failed:
-            self._run_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._run_task
             raise FilamentAuthenticationError(
                 self._auth_message or "Authentication failed"
             )
 
-        try:
-            await self._send_client_hello()
-        except BaseException:
-            # Mirror the auth-failure / timeout exit paths: cancel the background
-            # run loop before propagating, otherwise __aexit__ never runs and the
-            # task is orphaned with a "Task was destroyed but pending" warning.
-            self._run_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._run_task
-            raise
-        return self
+        await self._send_client_hello()
 
-    async def __aexit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> None:
+    async def close(self) -> None:
         """Close the SignalR connection.
+
+        The explicit counterpart of leaving ``async with``.  Safe to call more
+        than once, and on a client that never connected.
 
         A transport already broken at close time can surface its own error from the
         cancelled run task (e.g. pysignalr's ``ConnectionError``). Closing must never
@@ -344,10 +380,12 @@ class FilamentClient:
         ``@contextmanager`` (assigning ``__traceback__`` hits the frozen guard). Log
         and swallow everything except the cancellation we requested.
         """
-        if self._run_task is not None:
-            self._run_task.cancel()
+        run_task = self._run_task
+        self._run_task = None
+        if run_task is not None:
+            run_task.cancel()
             try:
-                await self._run_task
+                await run_task
             except asyncio.CancelledError:
                 pass
             except Exception:
@@ -360,6 +398,20 @@ class FilamentClient:
             with contextlib.suppress(asyncio.CancelledError):
                 await worker
         self._clear_user_defined_property_state(cancel_tasks=True)
+
+    async def __aenter__(self) -> FilamentClient:
+        """Open the SignalR connection.  See :meth:`connect`."""
+        await self.connect()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Close the SignalR connection.  See :meth:`close`."""
+        await self.close()
 
     # ------------------------------------------------------------------
     # SignalR invoke helper
