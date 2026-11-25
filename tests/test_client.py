@@ -22,6 +22,7 @@ from filament._exceptions import (
     CompressedPropertyError,
     FilamentAuthenticationError,
     FilamentConnectionError,
+    FilamentError,
     ResponseTooLargeError,
 )
 from filament._serialization import from_dict
@@ -1026,6 +1027,221 @@ class TestConnectionClose:
 
         # Should not raise.
         await client.__aexit__(None, None, None)
+
+
+_HELLO_OK = {"success": True, "message": "", "errorCode": 0, "errorId": None}
+
+
+def _connectable_client(
+    *, opens: bool = True, auth_failure: Optional[str] = None, **kwargs: Any
+) -> FilamentClient:
+    """A client whose mocked transport behaves like a live one for connect()/close().
+
+    ``run()`` fires the open callback (unless *opens* is false) and then stays up
+    until cancelled, as pysignalr's does.  *auth_failure* makes the server reject
+    the API key before the connection is reported open.
+    """
+    client = _make_client(**kwargs)
+    client._invoke.return_value = _HELLO_OK  # type: ignore[attr-defined]
+
+    async def run() -> None:
+        if opens:
+            if auth_failure is not None:
+                await client._handle_authentication_failed(auth_failure)
+            await client._on_open()
+        await asyncio.Event().wait()
+
+    client._signalr_client.run = run
+    return client
+
+
+def _other_tasks() -> set[asyncio.Task[Any]]:
+    return {task for task in asyncio.all_tasks() if task is not asyncio.current_task()}
+
+
+class TestConnectAndClose:
+    """Explicit connect()/close(), and their equivalence with ``async with``."""
+
+    @pytest.mark.asyncio
+    async def test_connect_then_close(self) -> None:
+        client = _connectable_client()
+
+        await client.connect()
+
+        run_task = client._run_task
+        assert run_task is not None and not run_task.done()
+        client._invoke.assert_awaited_once()  # type: ignore[attr-defined]
+        assert client._invoke.call_args[0][0] == "ClientHello"  # type: ignore[attr-defined]
+
+        await client.close()
+
+        assert run_task.cancelled()
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_async_with_still_connects_and_closes(self) -> None:
+        client = _connectable_client()
+
+        async with client as entered:
+            assert entered is client
+            run_task = client._run_task
+            assert run_task is not None and not run_task.done()
+
+        assert run_task.cancelled()
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_async_with_closes_when_the_body_raises(self) -> None:
+        client = _connectable_client()
+
+        with pytest.raises(ValueError, match="body failed"):
+            async with client:
+                raise ValueError("body failed")
+
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_connect_raises_when_the_transport_fails(self) -> None:
+        client = _connectable_client()
+
+        async def run() -> None:
+            raise RuntimeError("no route to host")
+
+        client._signalr_client.run = run
+
+        with pytest.raises(FilamentConnectionError, match="no route to host"):
+            await client.connect()
+
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_connect_raises_on_timeout(self) -> None:
+        client = _connectable_client(opens=False, connection_timeout=0.05)
+
+        with pytest.raises(FilamentConnectionError, match="connection timed out"):
+            await client.connect()
+
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_connect_raises_on_authentication_failure(self) -> None:
+        client = _connectable_client(auth_failure="bad key")
+
+        with pytest.raises(FilamentAuthenticationError, match="bad key"):
+            await client.connect()
+
+        assert client._run_task is None
+        assert not _other_tasks()
+        client._invoke.assert_not_awaited()  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_connect_stops_the_run_loop_when_client_hello_fails(self) -> None:
+        client = _connectable_client()
+        client._invoke.side_effect = FilamentConnectionError("hello failed")  # type: ignore[attr-defined]
+
+        with pytest.raises(FilamentConnectionError, match="hello failed"):
+            await client.connect()
+
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_connect_twice_raises_and_keeps_the_first_connection(self) -> None:
+        client = _connectable_client()
+        await client.connect()
+        run_task = client._run_task
+
+        with pytest.raises(FilamentError, match="already connected"):
+            await client.connect()
+
+        assert client._run_task is run_task
+        assert run_task is not None and not run_task.done()
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_nested_async_with_raises(self) -> None:
+        client = _connectable_client()
+
+        async with client:
+            with pytest.raises(FilamentError, match="already connected"):
+                async with client:
+                    pass  # pragma: no cover
+
+    @pytest.mark.asyncio
+    async def test_close_is_idempotent(self) -> None:
+        client = _connectable_client()
+        await client.connect()
+
+        await client.close()
+        await client.close()
+
+        assert client._run_task is None
+
+    @pytest.mark.asyncio
+    async def test_close_before_connect_is_a_no_op(self) -> None:
+        client = _connectable_client()
+
+        await client.close()
+
+        assert client._run_task is None
+
+    @pytest.mark.asyncio
+    async def test_cancelling_connect_while_waiting_for_open_leaves_no_tasks(self) -> None:
+        """Cancellation during the wait for the socket must stop the run loop too."""
+        client = _connectable_client(opens=False)
+
+        connecting = asyncio.create_task(client.connect())
+        await asyncio.sleep(0.01)
+        run_task = client._run_task
+        assert run_task is not None and not run_task.done()
+
+        connecting.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await connecting
+
+        assert run_task.cancelled()
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_cancelling_connect_during_client_hello_leaves_no_tasks(self) -> None:
+        client = _connectable_client()
+        hello_started = asyncio.Event()
+
+        async def blocked_hello(*_args: Any) -> Any:
+            hello_started.set()
+            await asyncio.Event().wait()
+
+        client._invoke.side_effect = blocked_hello  # type: ignore[attr-defined]
+
+        connecting = asyncio.create_task(client.connect())
+        await hello_started.wait()
+        run_task = client._run_task
+        assert run_task is not None and not run_task.done()
+
+        connecting.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await connecting
+
+        assert run_task.cancelled()
+        assert client._run_task is None
+        assert not _other_tasks()
+
+    @pytest.mark.asyncio
+    async def test_wait_for_timeout_on_connect_leaves_no_tasks(self) -> None:
+        """The pattern an explicit connect() invites: an outer deadline."""
+        client = _connectable_client(opens=False)
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(client.connect(), timeout=0.05)
+
+        assert client._run_task is None
+        assert not _other_tasks()
 
 
 class TestClientHello:

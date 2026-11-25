@@ -1,6 +1,6 @@
 # Filament Python API
 
-An async Python client for the Filament platform, communicating over SignalR.
+A Python client for the Filament platform, communicating over SignalR, with async and blocking interfaces.
 
 ## Project Structure
 
@@ -9,6 +9,7 @@ filament-api-python/
 ├── src/
 │   ├── filament/
 │   │   ├── _client.py              # FilamentClient (async SignalR client)
+│   │   ├── _sync_client.py         # FilamentClientSync (blocking wrapper on a private loop thread)
 │   │   ├── _serialization.py       # Dataclass <-> dict conversion for SignalR wire format
 │   │   ├── _condition_builder.py   # Typed Condition(Entity).prop("field") builder
 │   │   ├── _exceptions.py          # FilamentError, FilamentAuthenticationError, etc.
@@ -43,6 +44,10 @@ async def main() -> None:
     ) as f:
         result = await f.read_data(request)
 ```
+
+Both clients can also be driven with explicit `connect()` / `close()` instead of a `with` block.
+
+`FilamentClientSync` (`_sync_client.py`) is the blocking counterpart. It owns a daemon thread running a private event loop, keeps a real `FilamentClient` on that loop, and each method schedules the matching coroutine there and blocks for the result. It deliberately exposes no subscriptions or callbacks. A public method added to `FilamentClient` needs a counterpart there (or an explicit exclusion); `tests/test_sync_client.py` fails otherwise.
 
 - **Authentication**: API key headers (`X-Api-Key-Name` + `X-Api-Key`) and organization header (`X-Organization-Id`)
 - **Default endpoint**: `https://backend.filament-software.com:443/api/v0` (server, port, path all configurable)

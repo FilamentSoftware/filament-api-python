@@ -1,6 +1,8 @@
 # Filament Python API
 
-An async Python client for the Filament platform, communicating over SignalR.
+A Python client for the Filament platform, communicating over SignalR. It comes
+in two forms: the async `FilamentClient`, and the blocking `FilamentClientSync`
+for code that does not use `asyncio`.
 
 ## Documentation
 
@@ -15,7 +17,7 @@ Full, multi-page documentation lives in [`docs/`](https://github.com/FilamentSof
 - [User-defined Properties](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/user-defined-properties.md) — discover, read, write, query, and administer runtime properties
 - [Subscriptions](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/subscriptions.md) — real-time updates and lifecycle events
 - [Data Options](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/data-options.md) — the typed `DataOption` key-value type
-- [API Reference](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/api-reference.md) — `FilamentClient`, the response envelope, exceptions
+- [API Reference](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/api-reference.md) — `FilamentClient`, `FilamentClientSync`, the response envelope, exceptions
 
 Runnable scripts are in [`examples/`](https://github.com/FilamentSoftware/filament-api-python/tree/main/examples/). The sections below are a quick
 overview; see the docs for the full detail.
@@ -119,6 +121,30 @@ f = filament.FilamentClient(
     path="api/v1",
 )
 ```
+
+### Synchronous usage
+
+`FilamentClientSync` offers the same request methods as ordinary blocking calls,
+with no `asyncio` in your code:
+
+```python
+import filament
+from filament.types import ReadDataRequest, ReadDataTypeRequest
+
+with filament.FilamentClientSync(
+    organization_id="my-org", api_key_name="my-key", api_key="secret",
+) as f:
+    result = f.read_data(
+        ReadDataRequest(request=ReadDataTypeRequest(type_name="UserEntity"))
+    )
+```
+
+It takes the same constructor arguments as `FilamentClient`. Subscriptions and
+event callbacks are not available on it; use `FilamentClient` for those.
+
+Both clients can also be opened and closed explicitly instead of with a `with`
+block: `f.connect()` / `f.close()` on the sync client, `await f.connect()` /
+`await f.close()` on the async one.
 
 ### Conditions (Typed)
 

@@ -1,7 +1,8 @@
 # API Reference
 
-A method-by-method reference for `FilamentClient`, the response envelope every
-call returns, and the exception hierarchy. For task-oriented walkthroughs, see
+A method-by-method reference for `FilamentClient` and its blocking counterpart
+`FilamentClientSync`, the response envelope every call returns, and the exception
+hierarchy. For task-oriented walkthroughs, see
 the topic guides linked from the [docs index](README.md).
 
 ## `FilamentClient`
@@ -31,6 +32,31 @@ async with filament.FilamentClient(...) as f:
 Entering raises [`FilamentConnectionError`](#exceptions) if the server is
 unreachable or times out, and [`FilamentAuthenticationError`](#exceptions) if the
 credentials are rejected.
+
+### Connecting and closing explicitly
+
+#### `connect() -> None`
+
+Open the connection; what entering `async with` does. Raises the same errors.
+However a `connect()` fails — an error, the connection timeout, or the caller
+being cancelled (for example by `asyncio.wait_for`) — nothing is left running, so
+it needs no matching `close()`. Raises [`FilamentError`](#exceptions) if the
+client is already connected.
+
+#### `close() -> None`
+
+Close the connection; what leaving `async with` does. Safe to call more than
+once, and on a client that never connected. Never raises for a connection that
+is already broken.
+
+```python
+f = filament.FilamentClient(...)
+await f.connect()
+try:
+    ...
+finally:
+    await f.close()
+```
 
 ### Methods
 
@@ -117,6 +143,87 @@ SignalR contract is declared as Protocol classes in
   `data_updated`, `keep_alive`. The client handles all of these internally and
   surfaces the relevant ones through the callback registration methods above.
 
+## `FilamentClientSync`
+
+```python
+filament.FilamentClientSync(
+    organization_id: str,
+    api_key_name: str,
+    api_key: str,
+    server: str = "https://backend.filament-software.com",
+    port: int = 443,
+    path: str = "api/v0",
+    connection_timeout: float = 10.0,
+)
+```
+
+A blocking client for code that does not use `asyncio`. It takes the same
+constructor parameters as `FilamentClient` and is used as an ordinary context
+manager, or with `connect()` / `close()`:
+
+```python
+with filament.FilamentClientSync(...) as f:
+    result = f.read_data(request)
+
+f = filament.FilamentClientSync(...)
+f.connect()
+try:
+    result = f.read_data(request)
+finally:
+    f.close()
+```
+
+### Methods
+
+Every request method of `FilamentClient` is available under the same name, with
+the same parameters and return type, as a blocking call: `read_data`,
+`read_connected_data`, `modify_data`, `get_entity_permissions`,
+`get_entity_property_permissions`, the user-defined property methods, the file
+methods (`request_file_upload`, `refresh_file_upload_grant`,
+`complete_file_upload`, `cancel_file_upload`, `get_file_urls`, `upload_file`,
+`download_file`, `download_file_reference`) and the `server_capabilities`
+property. They raise the same exceptions and return the same envelopes.
+
+Differences from `FilamentClient`:
+
+- **No subscriptions or callbacks.** `subscribe`, `unsubscribe`,
+  `unsubscribe_all` and the `on_processing_*` registration methods do not exist
+  on this class. Use `FilamentClient` for real-time updates.
+- **No `http_client` parameter** on `upload_file`, `download_file` and
+  `download_file_reference`. Each call uses its own short-lived HTTP client.
+- **Calling a method while not connected** — before `connect()`, after `close()`
+  — raises [`FilamentConnectionError`](#exceptions).
+
+### Lifecycle
+
+- `connect()` blocks until the connection is ready. It raises
+  `FilamentConnectionError` or `FilamentAuthenticationError` as the async client
+  does, and `FilamentError` if the client is already connected. A failed
+  `connect()` leaves nothing running.
+- `close()` is safe to call more than once, on a client that never connected,
+  and from a different thread. Calls still in flight on other threads are
+  cancelled and raise `FilamentConnectionError`.
+- A closed client can be connected again.
+
+### How it works, and what follows from it
+
+While connected, the client runs one background thread that owns the SignalR
+connection; each method call hands its request to that thread and waits for the
+answer. The thread starts in `connect()` and is gone when `close()` returns.
+
+- **Threads.** One client can be shared between threads. Calls made from
+  different threads run concurrently on the one connection and may complete in
+  any order, so coordinate calls that depend on each other.
+- **Async code.** Calling it from inside `async def` works, but blocks that event
+  loop for the duration of each call. Use `FilamentClient` there instead.
+- **Forking.** Do not carry a connected client across `fork()` (for example
+  `multiprocessing` with the fork start method). Connect in the child process.
+- **Interrupting.** Ctrl+C during a call raises `KeyboardInterrupt` promptly and
+  cancels that call.
+- **Closing with calls in flight.** `close()` cancels them and waits up to five
+  seconds for their cleanup — an interrupted `upload_file` releasing its
+  reservation, for instance — before closing the connection regardless.
+
 ## Top-level helpers
 
 ### `as_entity`
@@ -192,7 +299,8 @@ above minus `data`:
 
 Defined in `filament._exceptions` and re-exported at the top level. These are
 raised only for **connection/authentication** failures (when entering the context
-manager) — request-level failures use the envelope above instead.
+manager or calling `connect()`, or when a call is made on a connection that has
+gone) — request-level failures use the envelope above instead.
 
 ```text
 FilamentError                     # base — catch this to handle any client error

@@ -1,4 +1,4 @@
-"""Filament Python API — async client for the Filament platform over SignalR."""
+"""Filament Python API — async and blocking clients for the Filament platform over SignalR."""
 __version__ = "0.0.0-dev"
 
 import json
@@ -16,6 +16,7 @@ from ._exceptions import (
 from ._file_upload import build_upload_request, compute_checksum
 from ._serialization import from_dict
 from ._specified_properties import SpecifiedPropertiesBase
+from ._sync_client import FilamentClientSync
 from .user_defined_properties import UserDefinedProperty, UserDefinedValueAdapter
 from .types.generated.base.base import EntityBase
 from .types.generated.shared import FileReference
@@ -69,6 +70,7 @@ __all__ = [
     "CompressedPropertyError",
     "Condition",
     "FilamentClient",
+    "FilamentClientSync",
     "FilamentAuthenticationError",
     "FilamentConnectionError",
     "FilamentError",

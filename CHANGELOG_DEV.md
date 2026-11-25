@@ -1,3 +1,15 @@
+## 0.9.0-dev.0.0.1 (2026-11-25 20:14)
+
+### Client
+
+#### FEATURE
+- FilamentClient can be opened and closed with await connect() / await close() as an alternative to async with
+
+### Sync Client
+
+#### FEATURE
+- Added FilamentClientSync, a blocking client for code that does not use asyncio (no subscriptions or event callbacks)
+
 ## 0.8.2-dev.0.0.3 (2026-11-25 10:19)
 
 ### Release
