@@ -1,3 +1,24 @@
+## 0.8.2-dev.0.0.3 (2026-11-25 10:19)
+
+### Release
+
+#### FIX
+- filament.__version__ for dev builds matches the version pip reports (e.g. 0.8.2.dev2)
+
+## 0.8.2-dev.0.0.2 (2026-11-25 10:07)
+
+### Release
+
+#### FIX
+- Dev and stable releases now upload to the internal Artifact Registry
+
+## 0.8.2-dev.0.0.1 (2026-11-25 10:00)
+
+### Other
+
+#### OTHER
+- Stable releases are published to PyPI (pip install filament-api) under the MIT license
+
 ## 0.8.1-dev.0.0.5 (2026-11-21 22:16)
 
 ### Types

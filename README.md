@@ -4,20 +4,20 @@ An async Python client for the Filament platform, communicating over SignalR.
 
 ## Documentation
 
-Full, multi-page documentation lives in [`docs/`](docs/README.md):
+Full, multi-page documentation lives in [`docs/`](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/README.md):
 
-- [Getting Started](docs/getting-started.md) — install, connect, authenticate, error handling
-- [Finding Entity & Connection Types](docs/finding-types.md) — where every type and enum lives
-- [Type Reference](docs/type-reference.md) — auto-generated catalogue of every entity, connection, and enum
-- [Reading Data](docs/reading-data.md) — queries, ordering, paging, projections
-- [Building Conditions](docs/conditions.md) — the typed condition builder and operators
-- [Modifying Data](docs/modifying-data.md) — create, update, delete, partial updates
-- [User-defined Properties](docs/user-defined-properties.md) — discover, read, write, query, and administer runtime properties
-- [Subscriptions](docs/subscriptions.md) — real-time updates and lifecycle events
-- [Data Options](docs/data-options.md) — the typed `DataOption` key-value type
-- [API Reference](docs/api-reference.md) — `FilamentClient`, the response envelope, exceptions
+- [Getting Started](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/getting-started.md) — install, connect, authenticate, error handling
+- [Finding Entity & Connection Types](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/finding-types.md) — where every type and enum lives
+- [Type Reference](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/type-reference.md) — auto-generated catalogue of every entity, connection, and enum
+- [Reading Data](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/reading-data.md) — queries, ordering, paging, projections
+- [Building Conditions](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/conditions.md) — the typed condition builder and operators
+- [Modifying Data](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/modifying-data.md) — create, update, delete, partial updates
+- [User-defined Properties](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/user-defined-properties.md) — discover, read, write, query, and administer runtime properties
+- [Subscriptions](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/subscriptions.md) — real-time updates and lifecycle events
+- [Data Options](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/data-options.md) — the typed `DataOption` key-value type
+- [API Reference](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/api-reference.md) — `FilamentClient`, the response envelope, exceptions
 
-Runnable scripts are in [`examples/`](examples/). The sections below are a quick
+Runnable scripts are in [`examples/`](https://github.com/FilamentSoftware/filament-api-python/tree/main/examples/). The sections below are a quick
 overview; see the docs for the full detail.
 
 ### Claude Code skill
@@ -31,20 +31,63 @@ package so Claude has the API reference on hand:
 /plugin install filament-api@filament
 ```
 
-The skill routes Claude to the bundled [`docs/`](docs/README.md) — it stays in
+The skill routes Claude to the bundled [`docs/`](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/README.md) — it stays in
 sync with the documentation rather than duplicating it. Once installed, invoke it
 with `/filament-api:using-filament-api`.
 
 ## Requirements
 
 - Python 3.10, 3.11, 3.12, or 3.13
-- [Poetry](https://python-poetry.org/) for dependency management
 
 ## Installation
 
+Stable releases are published to [PyPI](https://pypi.org/project/filament-api/):
+
 ```bash
-poetry install
+pip install filament-api
+# or
+poetry add filament-api
 ```
+
+If your deployment's file store uses CRC32C checksums (GCS), install the
+`crc32c` extra:
+
+```bash
+pip install "filament-api[crc32c]"
+```
+
+### Installing from the internal index (Filament staff / dev builds)
+
+Every release, including the development builds cut from `develop`, is also
+published to Filament's internal Google Cloud Artifact Registry. Its virtual
+repository serves those releases together with a mirror of PyPI, so use it as
+your **only** index (`--index-url`, not `--extra-index-url`, which would let a
+same-named package on PyPI compete with the internal one).
+
+Access requires the `roles/artifactregistry.reader` role on the repository and
+[Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials)
+(e.g. `gcloud auth application-default login`). Ask your Filament contact for
+access.
+
+With pip:
+
+```bash
+pip install keyrings.google-artifactregistry-auth
+pip install --index-url https://europe-west2-python.pkg.dev/filament-artifacts/python/simple/ filament-api
+```
+
+With Poetry:
+
+```bash
+poetry self add keyrings.google-artifactregistry-auth
+poetry source add --priority=primary filament-internal https://europe-west2-python.pkg.dev/filament-artifacts/python/simple/
+poetry add filament-api
+```
+
+Dev builds are PEP 440 pre-releases (e.g. `0.8.1.dev4`), so installers skip
+them unless asked. Use `pip install --pre ...`, pin an exact version
+(`filament-api==0.8.1.dev4`), or `poetry add filament-api --allow-prereleases`
+(which sets `allow-prereleases = true` on the dependency).
 
 ## Usage
 
@@ -192,6 +235,8 @@ async with filament.FilamentClient(
 
 ## Development
 
+Working on the client itself needs [Poetry](https://python-poetry.org/):
+
 ```bash
 # Install with test dependencies
 poetry install --with test
@@ -202,3 +247,12 @@ poetry run pytest tests/ -v
 # Run type checking
 poetry run mypy src/
 ```
+
+Releases are built and published by `.github/workflows/create-release.yml`: every
+release goes to the internal Artifact Registry, and stable releases also go to
+PyPI. See [Publishing releases](https://github.com/FilamentSoftware/filament-api-python/blob/main/docs/publishing.md) for the flow and the
+one-off setup.
+
+## License
+
+[MIT](https://github.com/FilamentSoftware/filament-api-python/blob/main/LICENSE)
