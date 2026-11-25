@@ -18,7 +18,7 @@ filament-api-python/
 │   │       └── options.py          # DataOption + serialization
 │   └── filament_mypy_plugin.py     # Mypy plugin for typed condition builder
 ├── tests/              # Unit tests (pytest)
-├── plans/              # Plan documents for issue work
+├── plans/              # Plan documents for issue work (gitignored, local only)
 ├── .claude/            # Claude Code config and skills
 ├── .agent-docker/     # Docker sandbox config
 └── .github/workflows/  # CI/CD workflows
@@ -92,7 +92,7 @@ The main Filament backend repo is mounted read-only at its host path for referen
 
 When creating plans:
 
-- Always save plan files to `plans/`
+- Always save plan files to `plans/`. The folder is gitignored, so plans stay local and are never committed
 - Name plan files descriptively based on the task, with a date prefix, e.g., `2025-01-25-auth-endpoint-plan.md`
 
 ## Generated Code
