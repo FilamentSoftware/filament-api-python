@@ -8,5 +8,5 @@ __pycache__/
 .idea/
 .codex-sessions/
 
-# Local audit-branch artifacts
-plans/temp/
+# Plan documents (and audit-branch artifacts) stay local
+plans/
