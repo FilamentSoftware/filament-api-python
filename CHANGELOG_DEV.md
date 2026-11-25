@@ -1,3 +1,10 @@
+## 0.8.2-dev.0.0.3 (2026-11-25 10:19)
+
+### Release
+
+#### FIX
+- filament.__version__ for dev builds matches the version pip reports (e.g. 0.8.2.dev2)
+
 ## 0.8.2-dev.0.0.2 (2026-11-25 10:07)
 
 ### Release
