@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import gc
 import inspect
 import logging
 import threading
 import time
+import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -90,6 +92,32 @@ _ASYNC_ONLY = {
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Every client and every gate a test creates, so teardown can release and close
+# them even when the test failed before reaching its own close().
+_clients: list[FilamentClientSync] = []
+_gates: list["_Held"] = []
+
+
+@pytest.fixture(autouse=True)
+def _no_leaked_connections() -> Iterator[None]:
+    """Close whatever a test left open, then check no connection thread remains.
+
+    Without this a single failed assertion skips the test's ``close()``, the
+    worker thread lives on, and every later test fails its own leak check.
+    Autouse fixtures are torn down last, so this runs after ``fakes`` / ``hub``.
+    """
+    yield
+    for held in _gates:
+        held.release.set()
+        held.cleanup_release.set()
+    closers = [_Call(client.close) for client in _clients]
+    for closer in closers:
+        closer.join(2 * _TIMEOUT)
+    _gates.clear()
+    _clients.clear()
+    assert not _worker_threads(), "a test left a connection thread running"
+
+
 def _worker_threads() -> list[threading.Thread]:
     return [thread for thread in threading.enumerate() if thread.name == _THREAD_NAME]
 
@@ -147,6 +175,7 @@ class _Held:
         self.cancels = 0
         if not hold_cleanup:
             self.cleanup_release.set()
+        _gates.append(self)
 
     async def run(self, *_args: Any, **_kwargs: Any) -> str:
         self.started.set()
@@ -203,13 +232,14 @@ def fakes() -> Iterator[_Fakes]:
     fakes = _Fakes()
     with patch("filament._sync_client.FilamentClient", fakes):
         yield fakes
-    assert not _worker_threads(), "a test left a connection thread running"
 
 
 def _make_sync(**kwargs: Any) -> FilamentClientSync:
-    return FilamentClientSync(
+    sync = FilamentClientSync(
         organization_id="test-org", api_key_name="test-key", api_key="test-secret", **kwargs
     )
+    _clients.append(sync)
+    return sync
 
 
 @contextmanager
@@ -602,7 +632,7 @@ class TestClosingWithCallsInFlight:
         assert held.cancels == 1
         fakes.last.get_entity_permissions.assert_not_awaited()
 
-    def test_concurrent_close_calls_both_return(self, fakes: _Fakes) -> None:
+    def test_concurrent_close_calls_both_wait_for_the_shutdown(self, fakes: _Fakes) -> None:
         held = _Held(hold_cleanup=True)
         sync = _make_sync()
         sync.connect()
@@ -610,17 +640,33 @@ class TestClosingWithCallsInFlight:
         caller = _Call(lambda: sync.read_data("request"))  # type: ignore[arg-type]
         assert held.started.wait(_TIMEOUT)
 
-        first = _Call(sync.close)
-        assert held.cancelled.wait(_TIMEOUT)
-        second = _Call(sync.close)
-        time.sleep(0.05)
-        assert first.is_alive() and second.is_alive()
+        # Signalled each time a close() reaches the point where it waits for the
+        # worker, so the test knows both callers are really inside close().
+        waiting = threading.Semaphore(0)
+        wait_finished = FilamentClientSync._wait_finished
 
-        held.cleanup_release.set()
-        for call in (first, second, caller):
-            call.finish()
+        def tracked(self: FilamentClientSync, attempt: _Attempt) -> None:
+            waiting.release()
+            wait_finished(self, attempt)
 
-        assert first.error is None and second.error is None
+        with patch.object(FilamentClientSync, "_wait_finished", tracked):
+            first = _Call(sync.close)
+            second = _Call(sync.close)
+            assert waiting.acquire(timeout=_TIMEOUT)
+            assert waiting.acquire(timeout=_TIMEOUT)
+
+            # The worker cannot finish while the call's cleanup is held, so neither
+            # close() may have returned.
+            assert first.is_alive()
+            assert second.is_alive()
+            fakes.last.close.assert_not_awaited()
+
+            held.cleanup_release.set()
+            for call in (first, second, caller):
+                call.finish()
+
+        assert first.error is None
+        assert second.error is None
         fakes.last.close.assert_awaited_once_with()
         assert sync._state is _State.CLOSED
 
@@ -683,11 +729,15 @@ class TestClosingWithCallsInFlight:
         caller = _Call(lambda: sync.read_data("request"))  # type: ignore[arg-type]
         assert held.started.wait(_TIMEOUT)
 
-        with patch.object(_sync_client, "_CLOSE_GRACE_SECONDS", 0.1):
-            with caplog.at_level(logging.WARNING, logger="filament._sync_client"):
-                sync.close()
+        # Run on another thread so a shutdown that waits forever fails the test
+        # instead of hanging it.
+        with patch.object(_sync_client, "_CLOSE_GRACE_SECONDS", 0.1), caplog.at_level(
+            logging.WARNING, logger="filament._sync_client"
+        ):
+            closer = _Call(sync.close).finish()
         caller.finish()
 
+        assert closer.error is None
         assert isinstance(caller.error, FilamentConnectionError)
         assert "1 call(s) still cleaning up" in caplog.text
         # The drain itself cancelled the call once only; the connection was then
@@ -848,6 +898,90 @@ class TestOverlappingLifecycleCalls:
         assert sync._state is _State.CLOSED
 
 
+class TestInterruptedLifecycleCalls:
+    """Ctrl+C landing inside connect() or close() themselves."""
+
+    def test_interrupt_while_starting_the_worker_leaves_nothing_running(
+        self, fakes: _Fakes
+    ) -> None:
+        """The worker thread exists but connect() never got to wait for it."""
+
+        class InterruptedStart(threading.Thread):
+            def start(self) -> None:
+                super().start()
+                raise KeyboardInterrupt
+
+        sync = _make_sync()
+        with patch("filament._sync_client.threading.Thread", InterruptedStart):
+            with pytest.raises(KeyboardInterrupt):
+                sync.connect()
+
+        assert not _worker_threads()
+        assert sync._state is _State.CLOSED
+        assert sync._attempt is None
+        # Whether or not the worker got as far as creating a client, none is left open.
+        for instance in fakes.instances:
+            instance.close.assert_awaited_once_with()
+
+        with sync:
+            assert sync.get_entity_permissions() == "get_entity_permissions:result"
+
+    def test_close_retried_after_an_interrupt_before_the_stop_request(
+        self, fakes: _Fakes
+    ) -> None:
+        """The first close() marked the client closing but never told the worker."""
+        sync = _make_sync()
+        sync.connect()
+
+        with patch.object(sync, "_request_stop_locked", side_effect=KeyboardInterrupt):
+            with pytest.raises(KeyboardInterrupt):
+                sync.close()
+        assert sync._state is _State.CLOSING
+        assert len(_worker_threads()) == 1
+
+        retry = _Call(sync.close).finish()
+
+        assert retry.error is None
+        fakes.last.close.assert_awaited_once_with()
+        assert sync._state is _State.CLOSED
+        assert not _worker_threads()
+
+    def test_close_retried_after_an_interrupted_wait_still_waits_for_the_worker(
+        self, fakes: _Fakes
+    ) -> None:
+        held = _Held(hold_cleanup=True)
+        sync = _make_sync()
+        sync.connect()
+        fakes.last.read_data.side_effect = held.run
+        attempt = _attempt_of(sync)
+        caller = _Call(lambda: sync.read_data("request"))  # type: ignore[arg-type]
+        assert held.started.wait(_TIMEOUT)
+
+        with patch.object(attempt.finished, "wait", side_effect=KeyboardInterrupt):
+            with pytest.raises(KeyboardInterrupt):
+                sync.close()
+        assert held.cancelled.wait(_TIMEOUT)
+
+        # The worker is still cleaning up, so the retry must not report it done or
+        # let the client be connected again.
+        retry = _Call(sync.close)
+        time.sleep(0.1)
+        assert retry.is_alive()
+        assert sync._state is _State.CLOSING
+        with pytest.raises(FilamentError, match="still closing"):
+            sync.connect()
+        fakes.last.close.assert_not_awaited()
+
+        held.cleanup_release.set()
+        retry.finish()
+        caller.finish()
+
+        assert retry.error is None
+        assert held.cancels == 1
+        fakes.last.close.assert_awaited_once_with()
+        assert sync._state is _State.CLOSED
+
+
 class TestWorkerStartupFailure:
     def test_thread_that_cannot_start(self, fakes: _Fakes) -> None:
         class Unstartable(threading.Thread):
@@ -875,16 +1009,22 @@ class TestWorkerStartupFailure:
         assert fakes.instances == []
 
     def test_event_loop_that_cannot_be_created(self, fakes: _Fakes) -> None:
-        def run(coroutine: Any) -> None:
-            coroutine.close()
-            raise OSError("too many open files")
-
+        """asyncio.run() fails before it starts the coroutine it was given; the
+        error must surface without that coroutine being reported as never awaited."""
         sync = _make_sync()
-        with patch("filament._sync_client.asyncio.run", run):
-            with pytest.raises(OSError, match="too many open files"):
-                sync.connect()
 
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with patch(
+                "asyncio.events.new_event_loop", side_effect=OSError("too many open files")
+            ):
+                with pytest.raises(OSError, match="too many open files"):
+                    sync.connect()
+            gc.collect()
+
+        assert [str(w.message) for w in caught if "never awaited" in str(w.message)] == []
         assert sync._state is _State.CLOSED
+        assert fakes.instances == []
         assert not _worker_threads()
 
 
@@ -958,7 +1098,6 @@ def hub() -> Iterator[_Hub]:
     hub = _Hub()
     with patch("filament._client.SignalRClient", hub):
         yield hub
-    assert not _worker_threads(), "a test left a connection thread running"
 
 
 @contextmanager
