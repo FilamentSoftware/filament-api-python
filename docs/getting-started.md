@@ -50,6 +50,7 @@ The public surface lives at the top level of the `filament` package:
 import filament
 
 filament.FilamentClient          # the async client
+filament.FilamentClientSync      # the blocking client (no asyncio needed)
 filament.Condition               # the typed condition builder
 filament.as_entity               # safe downcast helper
 filament.FilamentError           # base exception
@@ -100,6 +101,69 @@ asyncio.run(main())
 You must call the client from within a running event loop (`asyncio.run(...)`,
 or an existing loop). Every API method is a coroutine and must be `await`ed.
 
+### Connecting without `async with`
+
+When a `with` block does not fit — the client is created in one place and closed
+in another, say — call `connect()` and `close()` yourself:
+
+```python
+f = filament.FilamentClient(
+    organization_id="your-organization-id",
+    api_key_name="your-api-key-name",
+    api_key="your-api-key",
+)
+await f.connect()
+try:
+    ...
+finally:
+    await f.close()
+```
+
+`connect()` raises the same errors as entering the context, and a `connect()`
+that fails leaves nothing to close. `close()` may be called more than once.
+Calling `connect()` on a client that is already connected raises
+`filament.FilamentError`.
+
+### Connecting without asyncio: `FilamentClientSync`
+
+If your code is not async, use `FilamentClientSync`. It takes the same
+constructor parameters, and its methods are ordinary blocking calls that return
+the same results:
+
+```python
+import filament
+
+with filament.FilamentClientSync(
+    organization_id="your-organization-id",
+    api_key_name="your-api-key-name",
+    api_key="your-api-key",
+) as f:
+    result = f.read_data(request)
+```
+
+or, without a `with` block:
+
+```python
+f = filament.FilamentClientSync(
+    organization_id="your-organization-id",
+    api_key_name="your-api-key-name",
+    api_key="your-api-key",
+)
+f.connect()
+try:
+    result = f.read_data(request)
+finally:
+    f.close()
+```
+
+Everything in the rest of these guides applies to it unchanged: drop the `async`
+and `await` keywords from an example and it works with `FilamentClientSync`. The
+exception is [Subscriptions](subscriptions.md) and processing-lifecycle
+callbacks, which need the async `FilamentClient`.
+
+See the [API Reference](api-reference.md#filamentclientsync) for what the
+blocking client does behind the scenes and the few caveats that follow from it.
+
 ### Constructor parameters
 
 | Parameter | Required | Default | Meaning |
@@ -136,7 +200,8 @@ The three credentials (`api_key_name`, `organization_id`, `api_key`) are combine
 and sent to the backend as part of the connection; you do not call a separate
 login method.
 
-If the backend rejects the credentials, opening the context manager raises
+If the backend rejects the credentials, opening the context manager (or calling
+`connect()`) raises
 [`FilamentAuthenticationError`](api-reference.md#exceptions). If the server
 cannot be reached or the handshake times out, it raises
 [`FilamentConnectionError`](api-reference.md#exceptions).
@@ -164,7 +229,7 @@ It is important to distinguish **connection/auth failures** from **request
 failures**:
 
 - **Connection and authentication failures raise exceptions** (above). They occur
-  when entering the `async with` block.
+  when entering the `with` block or calling `connect()`.
 - **Request failures do not raise.** Every API method returns a result envelope
   ([`ValueOrErrorPublic_1`](api-reference.md#the-response-envelope) or
   `SuccessOrErrorPublic`) carrying a `success` flag, a human-readable `message`,

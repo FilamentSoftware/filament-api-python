@@ -1,6 +1,7 @@
 # Filament Python API Documentation
 
-An async Python client for the [Filament](https://filament-software.com) platform.
+A Python client for the [Filament](https://filament-software.com) platform, with an
+async interface (`FilamentClient`) and a blocking one (`FilamentClientSync`).
 The client talks to the Filament backend over [SignalR](https://learn.microsoft.com/aspnet/core/signalr/introduction)
 and exchanges strongly-typed dataclasses that mirror the backend's C# entity model.
 
@@ -11,7 +12,7 @@ read [Getting Started](getting-started.md) first, then dip into the topic you ne
 
 | Guide | What it covers |
 | ----- | -------------- |
-| [Getting Started](getting-started.md) | Installation, connecting, configuration, authentication, error handling, and the async lifecycle. |
+| [Getting Started](getting-started.md) | Installation, connecting (async or blocking), configuration, authentication, error handling, and the connection lifecycle. |
 | [Finding Entity & Connection Types](finding-types.md) | Where every entity type, connection type, and enum lives; naming conventions; the base-class hierarchy; how to discover what fields exist. |
 | [Type Reference](type-reference.md) | Auto-generated catalogue of every entity, connection, and enum (with fields and types), regenerated from the source so it never drifts. |
 | [Reading Data](reading-data.md) | `read_data`, request shapes, ordering, paging, projections, counting, and parsing results back into typed entities. |
@@ -20,7 +21,7 @@ read [Getting Started](getting-started.md) first, then dip into the topic you ne
 | [User-defined Properties](user-defined-properties.md) | Discovering, reading, constructing, querying, and administering tenant-defined entity fields. |
 | [Subscriptions](subscriptions.md) | Real-time `DataUpdated` events, subscription modes and status flags, callbacks, condition filtering, unsubscribing, and processing-lifecycle events. |
 | [Data Options](data-options.md) | The typed `DataOption` key-value type and its constructors. |
-| [API Reference](api-reference.md) | `FilamentClient` method-by-method reference, the response envelope, and the exception hierarchy. |
+| [API Reference](api-reference.md) | `FilamentClient` and `FilamentClientSync` method-by-method reference, the response envelope, and the exception hierarchy. |
 
 ## A 60-second tour
 
@@ -82,6 +83,7 @@ this documentation refers to:
 - `update_user.py` — find and partially update an entity
 - `delete_user.py` — find and delete an entity
 - `list_users.py` — read with a property projection
+- `list_users_sync.py` — the same read with the blocking `FilamentClientSync`
 - `read_with_conditions.py` — read with the typed condition builder
 - `subscribe_users.py` — subscribe to real-time changes
 - `subscribe_with_conditions.py` — subscribe with a condition filter
