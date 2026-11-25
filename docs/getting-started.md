@@ -156,8 +156,9 @@ finally:
     f.close()
 ```
 
-The rest of these guides apply to it too: drop `async` and `await` from an
-example and it works with `FilamentClientSync`. There are two exceptions:
+The rest of these guides apply to it too. To convert an example, drop `async`
+and `await`, and call the now-ordinary function directly: replace
+`asyncio.run(main())` with `main()`. There are two exceptions:
 
 - [Subscriptions](subscriptions.md) and processing-lifecycle callbacks need the
   async `FilamentClient`.
