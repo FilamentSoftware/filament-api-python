@@ -18,7 +18,7 @@ filament-api-python/
 │   │       └── options.py          # DataOption + serialization
 │   └── filament_mypy_plugin.py     # Mypy plugin for typed condition builder
 ├── tests/              # Unit tests (pytest)
-├── plans/              # Plan documents for issue work
+├── plans/              # Plan documents for issue work (gitignored, local only)
 ├── .claude/            # Claude Code config and skills
 ├── .agent-docker/     # Docker sandbox config
 └── .github/workflows/  # CI/CD workflows
@@ -92,7 +92,7 @@ The main Filament backend repo is mounted read-only at its host path for referen
 
 When creating plans:
 
-- Always save plan files to `plans/`
+- Always save plan files to `plans/`. The folder is gitignored, so plans stay local and are never committed
 - Name plan files descriptively based on the task, with a date prefix, e.g., `2025-01-25-auth-endpoint-plan.md`
 
 ## Generated Code
@@ -120,9 +120,10 @@ GitHub Actions workflows in `.github/workflows/`:
 
 - `increment-version-develop.yml` / `increment-version-main.yml` — Semantic versioning
 - `mypy-check.yml` — Static type checking
+- `package-check.yml` — Build the sdist/wheel and validate metadata with `twine check --strict`
 - `run-unit-tests.yml` — Unit tests across Python 3.10–3.13
 - `validate-pull-request.yml` — PR validation (fixup commits, DO NOT MERGE, rebase check, CHANGELOG)
-- `create-release.yml` — Build and publish GitHub releases on version tags
+- `create-release.yml` — Build the package, create the GitHub release, publish every release to the internal GCP Artifact Registry and stable releases to PyPI (Trusted Publishing). Setup and runbook: `docs/publishing.md`, `scripts/setup_gcp_publishing.sh`
 
 ## Notes
 

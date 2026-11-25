@@ -8,15 +8,28 @@ on:
     types:
       - completed
 
+# No job inherits the default token permissions; each job grants only what it needs.
+permissions: {}
+
 jobs:
+  # workflow_run matches the triggering workflow by *name* only, and runs here
+  # with this repository's permissions. A fork PR could add its own workflow
+  # named "Increment Version (...)" with a pull_request trigger and a crafted
+  # version artifact. So only accept push runs of this repository's own
+  # develop/main branches.
   resolve-version:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.head_branch == 'develop' || github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       actions: read
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      is_dev: ${{ steps.get_version.outputs.is_dev }}
 
     steps:
       - name: Download version artifact
@@ -28,6 +41,8 @@ jobs:
 
       - name: Get version
         id: get_version
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           version="$(tr -d '[:space:]' < version.txt)"
@@ -35,18 +50,41 @@ jobs:
             echo "::error::version.txt is empty or contains only whitespace"
             exit 1
           fi
+          # Single source of truth for the release channel: dev tags look like
+          # vX.Y.Z-dev.A.B.C, stable tags like vX.Y.Z. Anything else (e.g. a
+          # refs/pull/... ref) is rejected, and the channel must match the
+          # branch the version was cut from.
+          if [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            is_dev=true
+            expected_branch=develop
+          elif [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            is_dev=false
+            expected_branch=main
+          else
+            echo "::error::version '$version' is not a vX.Y.Z or vX.Y.Z-dev.A.B.C tag"
+            exit 1
+          fi
+          if [[ "$HEAD_BRANCH" != "$expected_branch" ]]; then
+            echo "::error::version '$version' must come from $expected_branch, not $HEAD_BRANCH"
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: $version"
+          echo "is_dev=$is_dev" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $version (dev: $is_dev)"
 
   build:
     needs: resolve-version
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      pep440_version: ${{ steps.pep440.outputs.version }}
 
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.resolve-version.outputs.version }}
+          ref: refs/tags/${{ needs.resolve-version.outputs.version }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -101,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.resolve-version.outputs.version }}
+          ref: refs/tags/${{ needs.resolve-version.outputs.version }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v8
@@ -114,9 +152,10 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
+          IS_DEV: ${{ needs.resolve-version.outputs.is_dev }}
         run: |
-          # Determine which changelog to use based on version
-          if echo "$VERSION" | grep -q "dev"; then
+          # Determine which changelog to use based on the release channel
+          if [[ "$IS_DEV" == "true" ]]; then
             file="CHANGELOG_DEV.md"
           else
             file="CHANGELOG.md"
@@ -150,7 +189,122 @@ jobs:
         with:
           tag_name: ${{ needs.resolve-version.outputs.version }}
           body: ${{ steps.extract_changelog.outputs.body }}
-          prerelease: ${{ contains(needs.resolve-version.outputs.version, 'dev') }}
+          prerelease: ${{ needs.resolve-version.outputs.is_dev == 'true' }}
           files: |
             dist/*
             ${{ steps.extract_changelog.outputs.file }}
+
+  # Every release (dev and stable) is uploaded to the internal GCP Artifact
+  # Registry. Setup: docs/publishing.md and scripts/setup_gcp_publishing.sh.
+  publish-gcp:
+    needs: [resolve-version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REPOSITORY: ${{ vars.GCP_ARTIFACT_REPOSITORY }}
+      GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      PEP440_VERSION: ${{ needs.build.outputs.pep440_version }}
+
+    steps:
+      - name: Check GCP configuration
+        run: |
+          set -euo pipefail
+          missing=()
+          for v in GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REPOSITORY GCP_WIF_PROVIDER GCP_SERVICE_ACCOUNT; do
+            [[ -n "${!v:-}" ]] || missing+=("$v")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing repository variables: ${missing[*]} (see docs/publishing.md)"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install twine and Artifact Registry keyring
+        run: python -m pip install twine keyrings.google-artifactregistry-auth
+
+      # Re-runs (e.g. after a partial failure) must not fail on files that are
+      # already uploaded. Rather than rely on twine's --skip-existing heuristic
+      # recognising Artifact Registry's duplicate-file response, list what the
+      # repository already holds and upload only the missing files.
+      - name: Upload to Artifact Registry
+        run: |
+          set -euo pipefail
+          existing="$(gcloud artifacts files list \
+            --project="$GCP_PROJECT_ID" \
+            --location="$GCP_REGION" \
+            --repository="$GCP_ARTIFACT_REPOSITORY" \
+            --format='value(name.basename())')"
+
+          to_upload=()
+          for file in dist/*; do
+            name="$(basename "$file")"
+            if grep -qxF -- "$name" <<< "$existing"; then
+              echo "Already in Artifact Registry, skipping: $name"
+            else
+              to_upload+=("$file")
+            fi
+          done
+
+          if (( ${#to_upload[@]} == 0 )); then
+            echo "filament-api ${PEP440_VERSION} is already fully uploaded"
+            exit 0
+          fi
+
+          repository_url="https://${GCP_REGION}-python.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/"
+          echo "Uploading filament-api ${PEP440_VERSION} to ${repository_url}"
+          python -m twine upload --non-interactive --skip-existing \
+            --repository-url "$repository_url" \
+            "${to_upload[@]}"
+
+  # Stable releases only are published to public PyPI via Trusted Publishing.
+  # This job must stay in create-release.yml (Trusted Publishing does not
+  # support reusable workflows) and the "pypi" environment must allow the
+  # default branch (develop), because workflow_run always runs with
+  # github.ref = the default branch. See docs/publishing.md.
+  publish-pypi:
+    needs: [resolve-version, build]
+    if: >-
+      needs.resolve-version.outputs.is_dev == 'false' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/filament-api/${{ needs.build.outputs.pep440_version }}/
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
