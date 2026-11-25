@@ -1,3 +1,10 @@
+## 0.8.2-dev.0.0.2 (2026-11-25 10:07)
+
+### Release
+
+#### FIX
+- Dev and stable releases now upload to the internal Artifact Registry
+
 ## 0.8.2-dev.0.0.1 (2026-11-25 10:00)
 
 ### Other
