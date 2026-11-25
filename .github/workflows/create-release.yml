@@ -246,9 +246,9 @@ jobs:
         run: python -m pip install twine keyrings.google-artifactregistry-auth
 
       # Re-runs (e.g. after a partial failure) must not fail on files that are
-      # already uploaded. Rather than rely on twine's --skip-existing heuristic
-      # recognising Artifact Registry's duplicate-file response, list what the
-      # repository already holds and upload only the missing files.
+      # already uploaded. twine refuses --skip-existing for non-PyPI indexes,
+      # so list what the repository already holds and upload only the missing
+      # files instead.
       - name: Upload to Artifact Registry
         run: |
           set -euo pipefail
@@ -275,7 +275,7 @@ jobs:
 
           repository_url="https://${GCP_REGION}-python.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/"
           echo "Uploading filament-api ${PEP440_VERSION} to ${repository_url}"
-          python -m twine upload --non-interactive --skip-existing \
+          python -m twine upload --non-interactive \
             --repository-url "$repository_url" \
             "${to_upload[@]}"
 
