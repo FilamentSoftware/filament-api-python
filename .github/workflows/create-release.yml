@@ -106,7 +106,10 @@ jobs:
             major="${BASH_REMATCH[2]}"
             minor="${BASH_REMATCH[3]}"
             patch="${BASH_REMATCH[4]}"
-            dev_num=$(printf '%d%03d%03d' "$major" "$minor" "$patch")
+            # Compute the number arithmetically: string padding (%d%03d%03d)
+            # left leading zeros (0.0.2 -> dev0000002) in __version__, which
+            # PEP 440 tools normalise away (dev2), so the two disagreed.
+            dev_num=$(( 10#$major * 1000000 + 10#$minor * 1000 + 10#$patch ))
             raw="${base}.dev${dev_num}"
           fi
           echo "version=$raw" >> "$GITHUB_OUTPUT"
