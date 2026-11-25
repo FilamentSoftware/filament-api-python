@@ -156,10 +156,15 @@ finally:
     f.close()
 ```
 
-Everything in the rest of these guides applies to it unchanged: drop the `async`
-and `await` keywords from an example and it works with `FilamentClientSync`. The
-exception is [Subscriptions](subscriptions.md) and processing-lifecycle
-callbacks, which need the async `FilamentClient`.
+The rest of these guides apply to it too: drop `async` and `await` from an
+example and it works with `FilamentClientSync`. There are two exceptions:
+
+- [Subscriptions](subscriptions.md) and processing-lifecycle callbacks need the
+  async `FilamentClient`.
+- `upload_file`, `download_file` and `download_file_reference` take no
+  `http_client` argument on `FilamentClientSync`, so remove it from any call
+  that passes one. Calls that do not pass it need no other change. The
+  [API Reference](api-reference.md#filamentclientsync) explains why.
 
 See the [API Reference](api-reference.md#filamentclientsync) for what the
 blocking client does behind the scenes and the few caveats that follow from it.
