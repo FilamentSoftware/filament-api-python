@@ -1,3 +1,25 @@
+## 0.9.1-dev.0.0.1 (2026-11-26 19:17)
+
+### Client
+
+#### FIX
+- Updating an entity read from the server no longer sends fields outside update_properties, so the hub no longer refuses it
+
+### Serialization
+
+#### FIX
+- Availability, event and extension trigger times that are local to a time zone are now read and written correctly, where reading one previously failed
+- Permission lookups and reads no longer fail for API keys with conditional grants
+
+### Types
+
+#### OTHER
+- Adds extension registry, run and setting types, with typed, grouped and visible setting slots, per-value check results and structured status reports
+- Adds validation rules for extension manual parameters and setting slots
+- Adds extension trigger configuration: a timed schedule, a triggering entity type and condition, or a polled outside service
+- Adds permission grant origins
+- Generated type docstrings show readable cross-references, and write-only fields are marked as such
+
 ## 0.9.0-dev.0.0.1 (2026-11-25 20:14)
 
 ### Client
