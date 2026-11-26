@@ -36,6 +36,7 @@ from .user_defined_properties import (
     build_user_defined_properties,
     hydrate_user_defined_properties,
 )
+from .types.generated.base.base import EntityBase
 from .types.generated.entities.core import FileEntity, UserDefinedPropertyEntity
 from .types.generated.misc import (
     ClientHelloRequest,
@@ -1796,7 +1797,13 @@ class FilamentClient:
         self,
         request: ModifyDataRequest,
     ) -> ValueOrErrorPublic_1[RequestId]:
-        """Create, update, or delete entity data."""
+        """Create, update, or delete entity data.
+
+        On an ``Update`` with ``update_properties`` set, an entity that was
+        read back from the server (rather than constructed by the caller) is
+        sent as its ``id`` plus the named properties only, since those are all
+        the backend writes. Entities the caller constructed are sent as given.
+        """
         try:
             properties_by_type = (
                 dict(zip(
@@ -1813,13 +1820,24 @@ class FilamentClient:
         request_dict = to_dict(request)
         if request_dict is None:
             return _deserialization_error()
-        request_dict["data"] = {
-            type_name: [
-                to_dict(entity, user_defined_properties=properties_by_type.get(type_name))
+        # Already normalised to wire names by to_dict(request).
+        update_properties: Optional[list[str]] = (
+            request_dict.get("updateProperties")
+            if request.action == DataRequestAction.Update
+            else None
+        )
+        data: dict[str, list[Optional[dict[str, Any]]]] = {}
+        for type_name, entities in request.data.items():
+            keep = _read_back_update_keys(type_name, update_properties)
+            data[type_name] = [
+                _narrow_read_back_update(
+                    entity,
+                    to_dict(entity, user_defined_properties=properties_by_type.get(type_name)),
+                    keep,
+                )
                 for entity in entities
             ]
-            for type_name, entities in request.data.items()
-        }
+        request_dict["data"] = data
         result_dict: Any = await self._invoke("ModifyData", request_dict)
         try:
             result = from_dict(result_dict, ValueOrErrorPublic_1[RequestId])
@@ -2441,6 +2459,64 @@ class _UserDefinedPropertyLoadError(Exception):
         super().__init__(message)
         self.message = message
         self.error_code = error_code
+
+
+def _read_back_update_keys(
+    type_name: str,
+    update_properties: Optional[list[str]],
+) -> Optional[frozenset[str]]:
+    """Return the lower-cased wire keys an Update of *type_name* may write.
+
+    Mirrors the backend's ``ModifyDataRequest.GetUpdatePropertiesForType``: a
+    name is either a bare property, which applies to every type in the
+    request, or ``"TypeName.property"``, which applies to that type only. The
+    backend matches both parts case-insensitively. Returns ``None`` when
+    *update_properties* is ``None``, i.e. when there is nothing to narrow to.
+    """
+    if update_properties is None:
+        return None
+    keys = {"id"}
+    for name in update_properties:
+        parts = [part.strip() for part in name.split(".") if part.strip()]
+        if len(parts) == 1:
+            keys.add(parts[0].lower())
+        elif len(parts) == 2 and parts[0].lower() == type_name.lower():
+            keys.add(parts[1].lower())
+    return frozenset(keys)
+
+
+def _narrow_read_back_update(
+    entity: EntityBase,
+    entity_dict: Optional[dict[str, Any]],
+    keep: Optional[frozenset[str]],
+) -> Optional[dict[str, Any]]:
+    """Limit an Update of a server-decoded entity to ``id`` + its update properties.
+
+    ``from_dict`` leaves ``specified_properties`` as ``None`` on every entity it
+    decodes, so ``to_dict`` sends every field when such an entity is written
+    back. The hub checks every property in the body, not only the ones named
+    in ``UpdateProperties``, and refuses the whole request when one of them
+    can never be written (e.g. the transient ``grantOrigin`` and
+    ``sourcePermissionId`` on ``PermissionEntity``), even when its value is
+    unchanged. The backend only writes ``UpdateProperties`` on an Update, so
+    those are exactly the properties such a body needs. Entities the caller
+    constructed already send only what they were given, and are untouched.
+
+    *keep* is the result of :func:`_read_back_update_keys` for the entity's
+    type; ``None`` leaves the body as it is.
+    """
+    if (
+        entity_dict is None
+        or keep is None
+        or getattr(entity, "specified_properties", None) is not None
+    ):
+        return entity_dict
+    return {
+        key: value
+        for key, value in entity_dict.items()
+        if key.startswith("$") or key.lower() in keep
+    }
+
 
 def _deserialization_error() -> ValueOrErrorPublic_1[Any]:
     """Return a failed ``ValueOrErrorPublic_1`` for deserialization failures."""
