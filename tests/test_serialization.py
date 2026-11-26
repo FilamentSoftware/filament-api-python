@@ -23,6 +23,7 @@ from filament._serialization import (
     to_dict,
 )
 from filament._wire_formats import instant_from_wire, instant_to_wire
+from filament.types.conditions import DbConditionComparison
 from filament.types.generated.base.base import EntityBase
 from filament.types.generated.entities.note_service import NoteEntity
 from filament.types.generated.entities.permissions_service import PermissionEntity
@@ -33,6 +34,7 @@ from filament.types.generated.enums import (
     DataProcessingStatus,
     DataRequestAction,
     ErrorCodes,
+    PermissionAction,
     ReadMode,
     SubscriptionMode,
 )
@@ -40,6 +42,8 @@ from filament.types.generated.misc import (
     DataUpdateRejectedNotification,
     DbOrderInstance,
     DbOrderLevel,
+    EntityPermissions,
+    EntityPropertyPermissions,
     ModifyDataRequest,
     ProcessingStatus,
     ReadConnectedDataTypeRequest,
@@ -366,6 +370,70 @@ class TestFromDict:
 
     def test_non_dataclass_returns_none(self) -> None:
         assert from_dict({}, str) is None
+
+
+# ---------------------------------------------------------------------------
+# Conditional permission actions (enum-keyed dicts)
+# ---------------------------------------------------------------------------
+
+_EXTENSION_ID = "01a1f478-a944-7858-a6d1-309fa8455af9"
+
+
+def _conditional_permission_wire() -> dict[str, Any]:
+    # The hub writes enum dictionary keys as the enum value in text.
+    condition = {
+        "condition": "EqualTo",
+        "property": "ExtensionId",
+        "mode": "Property",
+        "value": _EXTENSION_ID,
+    }
+    return {
+        "actions": 0,
+        "conditionalActions": {"1": dict(condition), "2": dict(condition)},
+        "userDefinedData": None,
+    }
+
+
+class TestConditionalPermissionsFromDict:
+    def _assert_conditional(self, permission: Any) -> None:
+        assert permission.actions == PermissionAction.None_
+        assert set(permission.conditional_actions) == {
+            PermissionAction.Create, PermissionAction.Read,
+        }
+        for key, condition in permission.conditional_actions.items():
+            assert isinstance(key, PermissionAction)
+            assert isinstance(condition, DbConditionComparison)
+            assert condition.property == "ExtensionId"
+            assert condition.value == _EXTENSION_ID
+
+    def test_entity_permissions(self) -> None:
+        result = from_dict(
+            {"entities": {"ExtensionEntity": _conditional_permission_wire()}},
+            EntityPermissions,
+        )
+        assert result is not None
+        self._assert_conditional(result.entities["ExtensionEntity"])
+
+    def test_entity_property_permissions(self) -> None:
+        result = from_dict(
+            {"properties": {"extensionId": _conditional_permission_wire()}},
+            EntityPropertyPermissions,
+        )
+        assert result is not None
+        self._assert_conditional(result.properties["extensionId"])
+
+    def test_combined_flag_key(self) -> None:
+        # PermissionAction is a Flag; the hub can key by a combined value
+        # ("3" == Create | Read).
+        wire = _conditional_permission_wire()
+        wire["conditionalActions"] = {"3": wire["conditionalActions"]["1"]}
+        result = from_dict(
+            {"entities": {"ExtensionEntity": wire}},
+            EntityPermissions,
+        )
+        assert result is not None
+        keys = list(result.entities["ExtensionEntity"].conditional_actions)
+        assert keys == [PermissionAction.Create | PermissionAction.Read]
 
 
 # ---------------------------------------------------------------------------

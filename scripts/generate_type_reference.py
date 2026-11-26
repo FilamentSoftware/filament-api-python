@@ -82,7 +82,12 @@ def _clean_doc(text: str) -> str:
 
     text = re.sub(r'<see\s+cref="([^"]*)"\s*/>', _see_repl, text)
     text = re.sub(r'<see\s+cref="[^"]*"\s*>(.*?)</see>', r"\1", text)
-    text = re.sub(r"<[^>]+>", "", text)        # strip any remaining tags
+    # Strip any remaining tags, but leave ``literal`` spans alone: angle brackets
+    # inside one are placeholders (``<env>_ext_<extension>``), not markup.
+    text = "".join(
+        part if part.startswith("``") else re.sub(r"<[^>]+>", "", part)
+        for part in re.split(r"(``.*?``)", text, flags=re.DOTALL)
+    )
     text = re.sub(r"\s+", " ", text).strip()
     return text
 

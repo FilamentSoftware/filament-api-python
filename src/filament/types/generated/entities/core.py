@@ -83,19 +83,19 @@ class ProcessingRunEntity(Entity):
                      reported fraction, Pending counts 0). Monotonically non-decreasing within a single run
                      attempt; reset by the seed/reuse write when the run is retried.
     :param start_instant: When the run's processing started: stamped on the first transition to
-                          <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Processing" /> and left untouched on any later re-entry
+                          ``ProcessingRunStatus.Processing`` and left untouched on any later re-entry
                           (e.g. a retry after an instance went offline — the first dispatch is the start). Null
                           until the run starts.
-    :param end_instant: When the run reached a terminal state — marked <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Completed" />,
-                        <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Failed" /> or <see cref="F:Filament.FSCore.CoreEntities.ProcessingRunStatus.Cancelled" />.
-                        Null while the run is pending or processing. <c>EndInstant - StartInstant</c> is the
+    :param end_instant: When the run reached a terminal state — marked ``ProcessingRunStatus.Completed``,
+                        ``ProcessingRunStatus.Failed`` or ``ProcessingRunStatus.Cancelled``.
+                        Null while the run is pending or processing. ``EndInstant - StartInstant`` is the
                         wall-clock time the run took, whether it succeeded or not.
     :param request_ids: Identifiers of the requests/operations in this processing run. For runs created by the
-                        main processing pipeline or scenario-request processing these are <c>RequestEntity.Id</c>
+                        main processing pipeline or scenario-request processing these are ``RequestEntity.Id``
                         values; for runs created by scenario propagation this is a synthetic identifier for the
-                        propagation operation with no corresponding <c>RequestEntity</c> in the database.
-    :param processing_service_data: JSON-serialized dictionary of service name → <see cref="T:Filament.FSCore.CoreEntities.ServiceProcessingInfo" /> for the
-                                    services participating in this processing run. Use <see cref="P:Filament.FSCore.CoreEntities.ProcessingRunEntity.ServiceData" /> for the
+                        propagation operation with no corresponding ``RequestEntity`` in the database.
+    :param processing_service_data: JSON-serialized dictionary of service name → ``ServiceProcessingInfo`` for the
+                                    services participating in this processing run. Use ``ProcessingRunEntity.service_data`` for the
                                     strongly-typed view.
     """
     sequence: int = field(default=0)
@@ -112,14 +112,14 @@ class ProcessingRunEntity(Entity):
 class ProcessingSettingsEntity(Entity):
     """
     Per-organisation processing configuration. This is a singleton per tenant: the single
-    instance has both <see cref="P:Filament.FSCore.Entities.EntityBase.Id" /> and <see cref="P:Filament.FSCore.Entities.EntityBase.ScenarioId" /> set to
-    <see cref="F:System.Guid.Empty" /> (it lives outside any scenario). When no row exists for a tenant,
+    instance has both ``EntityBase.id`` and ``EntityBase.scenario_id`` set to
+    ``Guid.Empty`` (it lives outside any scenario). When no row exists for a tenant,
     the processing run falls back to the property defaults defined here.
     
     :param success_snapshots: Whether processing-succeeded snapshots should be written for this organisation.
                               Defaults to false.
     :param anonymise_snapshots: Whether this organisation's processing snapshots (failed and succeeded) are anonymised: every
-                                <see cref="T:Filament.FSCore.Entities.Attributes.AnonymiseInSnapshotsAttribute" /> property and user-defined
+                                ``AnonymiseInSnapshotsAttribute`` property and user-defined
                                 text value replaced by a pseudonym. Defaults to true; turn it off only for development organisations,
                                 whose snapshots may then carry the original values.
     """
@@ -136,7 +136,7 @@ class FileEntity(Entity):
     :param description: Alternative text or a description, for accessibility and search.
     :param reference_type: The entity type that owns this file. Immutable after create.
     :param reference_id: The row that owns this file. Immutable after create.
-    :param reference_property: The file-link property on <see cref="P:Filament.FSCore.CoreEntities.FileEntity.ReferenceType" /> that gates this file — the permission
+    :param reference_property: The file-link property on ``FileEntity.reference_type`` that gates this file — the permission
                                anchor. Required and immutable after create.
     :param state: Where this file is in its lifecycle.
     :param grant_expires_at: When the most recent upload grant stops being accepted.
@@ -171,12 +171,12 @@ class FileEntity(Entity):
 @dataclass(kw_only=True)
 class FileStatsEntity(Entity):
     """
-    Per-tenant file usage. Hub-owned, and a singleton keyed on <see cref="P:Filament.FSCore.Entities.EntityBase.Id" /> of
-    <see cref="F:System.Guid.Empty" />.
+    Per-tenant file usage. Hub-owned, and a singleton keyed on ``EntityBase.id`` of
+    ``Guid.Empty``.
     
-    :param used_bytes: Bytes counted against the quota: <see cref="F:Filament.FSCore.CoreEntities.FileState.Available" /> plus
-                       <see cref="F:Filament.FSCore.CoreEntities.FileState.Pending" />.
-    :param pending_bytes: The part of <see cref="P:Filament.FSCore.CoreEntities.FileStatsEntity.UsedBytes" /> belonging to uploads that have not completed.
+    :param used_bytes: Bytes counted against the quota: ``FileState.Available`` plus
+                       ``FileState.Pending``.
+    :param pending_bytes: The part of ``FileStatsEntity.used_bytes`` belonging to uploads that have not completed.
     :param pending_count: How many uploads are currently incomplete, for the per-user concurrency ceiling.
     :param file_count: How many files the tenant holds in total.
     """
@@ -361,13 +361,13 @@ class UserDefinedTableEntity(Entity):
 class UserDefinedPropertyEntity(Entity):
     """
     One user-defined property definition — a single column on the sidecar table named by the
-    <see cref="T:Filament.FSCore.CoreEntities.UserDefinedTableEntity" /> this row points at.
+    ``UserDefinedTableEntity`` this row points at.
     
     :param table_id: The sidecar table this property is a column of.
     :param entity_type_name: The name of the entity or connection type this property is defined on.
     :param name: The property's identifier, carrying the reserved prefix that keeps user-defined names disjoint from
                  schema property names.
-    :param name_key: The snake_case normalisation of <see cref="P:Filament.FSCore.CoreEntities.UserDefinedPropertyEntity.Name" />.
+    :param name_key: The snake_case normalisation of ``UserDefinedPropertyEntity.name``.
     :param label: The display text a client shows for this property.
     :param description: Optional longer client-facing text describing what the property is for.
     :param property_type: The property's declared type, reusing the existing wire enum rather than introducing a second type

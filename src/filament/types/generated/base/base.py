@@ -25,12 +25,12 @@ class EntityBase(SpecifiedPropertiesBase):
     :param id: The unique identifier for this entity.
     :param created_at: When this entity was created.
     :param created_by_id: The ID of the user who created this entity.
-    :param created_by_type: The kind of principal <see cref="P:Filament.FSCore.Entities.EntityBase.CreatedById" /> identifies — see
-                            <see cref="T:Filament.FSCore.Authentication.AuthPrincipalTypes" />.
+    :param created_by_type: The kind of principal ``EntityBase.created_by_id`` identifies — see
+                            ``AuthPrincipalTypes``.
     :param updated_at: When this entity was last updated.
     :param updated_by_id: The ID of the user who last updated this entity.
-    :param updated_by_type: The kind of principal <see cref="P:Filament.FSCore.Entities.EntityBase.UpdatedById" /> identifies — see
-                            <see cref="T:Filament.FSCore.Authentication.AuthPrincipalTypes" />.
+    :param updated_by_type: The kind of principal ``EntityBase.updated_by_id`` identifies — see
+                            ``AuthPrincipalTypes``.
     :param scope_id: The scope ID this entity belongs to.
     """
     id: UUID = field(default_factory=uuid7)
@@ -58,8 +58,8 @@ class EntityConnectionBase(EntityBase):
     
     :param from_id: The ID of the entity linked from.
     :param to_id: The ID of the entity linked to.
-    :param from_entity: A helper function to set <see cref="P:Filament.FSCore.Entities.EntityConnectionBase.FromId">FromId</see> from an entity.
-    :param to_entity: A helper function to set <see cref="P:Filament.FSCore.Entities.EntityConnectionBase.ToId">ToId</see> from an entity.
+    :param from_entity: A helper function to set FromId from an entity.
+    :param to_entity: A helper function to set ToId from an entity.
     """
     from_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     to_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

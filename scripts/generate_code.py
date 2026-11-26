@@ -14,6 +14,9 @@ from pathlib import Path
 
 
 def main() -> int:
+    default_output_path = (
+        Path(__file__).resolve().parents[1] / "src" / "filament" / "types" / "generated"
+    )
     parser = argparse.ArgumentParser(
         description="Generate Python code from the Filament backend.",
     )
@@ -26,11 +29,7 @@ def main() -> int:
         "-o",
         "--output",
         type=Path,
-        default=Path(__file__).resolve().parents[1]
-        / "src"
-        / "filament"
-        / "types"
-        / "generated",
+        default=default_output_path,
         help="Output directory for generated code (default: src/filament/types/generated).",
     )
     parser.add_argument(
@@ -116,20 +115,39 @@ def main() -> int:
     staging_path.replace(output_path)
 
     # Regenerate the human-readable type reference from the new output so it
-    # never drifts from the generated dataclasses.
-    _regenerate_type_reference()
+    # never drifts from the generated dataclasses. A failure here fails the
+    # run: a silently stale docs/type-reference.md is worse than a red exit.
+    # The reference generator only reads the default tree, so it has nothing
+    # to say about output written elsewhere.
+    if output_path != default_output_path:
+        print(
+            f"Note: docs/type-reference.md not regenerated, because {output_path} "
+            "is not the default output directory."
+        )
+        return 0
+    if not _regenerate_type_reference():
+        print(
+            "Error: generated types were updated, but docs/type-reference.md "
+            "was NOT regenerated and is now stale. Fix the error above and "
+            "re-run scripts/generate_type_reference.py.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
-def _regenerate_type_reference() -> None:
-    """Run the type-reference doc generator, best-effort (never fails codegen)."""
+def _regenerate_type_reference() -> bool:
+    """Run the type-reference doc generator. Returns False on failure."""
     script = Path(__file__).resolve().parent / "generate_type_reference.py"
     if not script.exists():
-        return
+        print(f"Error: type reference generator not found at {script}", file=sys.stderr)
+        return False
     try:
         subprocess.run([sys.executable, str(script)], check=True)
     except (subprocess.CalledProcessError, OSError) as exc:
-        print(f"Warning: failed to regenerate type reference: {exc}", file=sys.stderr)
+        print(f"Error: failed to regenerate type reference: {exc}", file=sys.stderr)
+        return False
+    return True
 
 
 if __name__ == "__main__":

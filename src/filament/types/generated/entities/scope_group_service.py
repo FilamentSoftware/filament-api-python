@@ -24,12 +24,12 @@ class ScopeGroupLevelEntity(Entity):
     
     :param name: The name of the scope group level.
     :param description: A brief description of the scope group level
-    :param mode: The role of this level: <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> (default) for an
+    :param mode: The role of this level: ``ScopeGroupLevelModeEnum.Arbitrary`` (default) for an
                  ordinary user-defined level, or a template mode marking this level as the source of the
                  corresponding built-in task group level's Name/Description/rollup config. Intended to be
                  immutable after create (converting a level means creating a new one); this is currently
                  unenforced, and population self-heals flips in either direction.
-    :param actual_status_rollup_rules_data: JSON-serialized <see cref="P:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelEntity.ActualStatusRollupRules" /> for this level. Null means the
+    :param actual_status_rollup_rules_data: JSON-serialized ``ScopeGroupLevelEntity.actual_status_rollup_rules`` for this level. Null means the
                                             level inherits the nearest ancestor level's config (walking the parent chain), or the
                                             built-in default (no rules, hard-coded priority order) when no ancestor defines one.
     :param parent_id: The parent scope group level of this group. This should be of the type ScopeGroupLevelEntity.
@@ -58,8 +58,8 @@ class ScopeGroupEntity(Entity):
     :param group_level_id: A link to the scope group level
     :param group_level: A helper property for setting the group level ID.
     :param child_type: The type of children that this group can contain.
-    :param child_group_level_id: If <see cref="P:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupEntity.ChildType" /> is <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupChildType.Group" />, this is the id of the level that child groups should be.
-    :param child_group_level: If <see cref="P:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupEntity.ChildType" /> is <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupChildType.Group" />, this is the level that child groups should be.
+    :param child_group_level_id: If ``ScopeGroupEntity.child_type`` is ``ScopeGroupChildType.Group``, this is the id of the level that child groups should be.
+    :param child_group_level: If ``ScopeGroupEntity.child_type`` is ``ScopeGroupChildType.Group``, this is the level that child groups should be.
     :param child_item_category_ids: Represents the collection of category IDs associated with the child items of an entity.
     :param child_item_categories: A collection representing the categories associated with the child items of an entity.
     """

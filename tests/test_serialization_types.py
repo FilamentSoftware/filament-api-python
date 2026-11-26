@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Optional
 
+import pytest
 from uuid_utils import UUID
 
 from filament._serialization import from_dict, to_dict
@@ -224,6 +225,13 @@ class TestScalarFromWire:
 
     def test_enum(self) -> None:
         result = from_dict({"enumValue": 2}, ScalarEntity)
+        assert result is not None
+        assert result.enum_value == SampleEnum.Value3
+
+    def test_enum_as_numeric_text(self) -> None:
+        # The numeric-text form enum dictionary keys use is also accepted
+        # for plain enum fields (both share the same decoder).
+        result = from_dict({"enumValue": "2"}, ScalarEntity)
         assert result is not None
         assert result.enum_value == SampleEnum.Value3
 
@@ -447,6 +455,41 @@ class TestNonStringKeyDictToWire:
         assert {str(k): v for k, v in wire.items()} == {"1": "a"}
 
 
+class TestNonStringKeyDictFromWire:
+    """Enum dictionary keys arrive as the integer value in text (per C#
+    ``EnumIntegerDictionaryConverterFactory``)."""
+
+    def test_enum_key_as_numeric_text(self) -> None:
+        result = from_dict({"enumStringDict": {"1": "a", "2": "b"}}, NonStringKeyDictEntity)
+        assert result is not None
+        assert result.enum_string_dict == {SampleEnum.Value2: "a", SampleEnum.Value3: "b"}
+        assert all(isinstance(k, SampleEnum) for k in result.enum_string_dict)
+
+    def test_enum_key_as_name(self) -> None:
+        result = from_dict({"enumStringDict": {"Value2": "a"}}, NonStringKeyDictEntity)
+        assert result is not None
+        assert result.enum_string_dict == {SampleEnum.Value2: "a"}
+
+    def test_enum_key_round_trip(self) -> None:
+        original = NonStringKeyDictEntity(enum_string_dict={SampleEnum.Value3: "a"})
+        wire = to_dict(original)
+        assert wire is not None
+        wire["enumStringDict"] = {str(k): v for k, v in wire["enumStringDict"].items()}
+        assert from_dict(wire, NonStringKeyDictEntity) == original
+
+    def test_unknown_numeric_key_raises(self) -> None:
+        with pytest.raises(ValueError):
+            from_dict({"enumStringDict": {"99": "a"}}, NonStringKeyDictEntity)
+
+    def test_unknown_negative_numeric_key_raises(self) -> None:
+        with pytest.raises(ValueError):
+            from_dict({"enumStringDict": {"-1": "a"}}, NonStringKeyDictEntity)
+
+    def test_unknown_name_key_raises(self) -> None:
+        with pytest.raises(KeyError):
+            from_dict({"enumStringDict": {"Bogus": "a"}}, NonStringKeyDictEntity)
+
+
 # ===========================================================================
 # Nested dataclass
 # ===========================================================================
@@ -504,3 +547,183 @@ class TestRoundTrip:
         assert restored.int_list == original.int_list
         assert restored.duration_list == original.duration_list
         assert restored.enum_list == original.enum_list
+
+
+# ---------------------------------------------------------------------------
+# LocalDateTime: annotated as datetime.datetime like an Instant, but marked
+# with ``metadata={"wire_type": "LocalDateTime"}`` and written with no zone.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(kw_only=True)
+class LocalDateTimeEntity:
+    instant_value: datetime.datetime
+    local_value: datetime.datetime = field(metadata={"wire_type": "LocalDateTime"})
+    nullable_local_value: Optional[datetime.datetime] = field(
+        default=None, metadata={"wire_type": "LocalDateTime"},
+    )
+
+
+_SAMPLE_LOCAL = datetime.datetime(2025, 1, 15, 10, 30, 45, 123456)
+_SAMPLE_LOCAL_WIRE = "2025-01-15T10:30:45.123456000"
+
+
+class TestLocalDateTimeToWire:
+    def test_local_date_time_has_no_zone(self) -> None:
+        wire = to_dict(LocalDateTimeEntity(
+            instant_value=_SAMPLE_INSTANT, local_value=_SAMPLE_LOCAL,
+        ))
+        assert wire is not None
+        assert wire["localValue"] == _SAMPLE_LOCAL_WIRE
+        # The unmarked sibling is still an Instant.
+        assert wire["instantValue"] == _SAMPLE_INSTANT_WIRE
+        assert wire["nullableLocalValue"] is None
+
+    def test_nullable_local_date_time(self) -> None:
+        wire = to_dict(LocalDateTimeEntity(
+            instant_value=_SAMPLE_INSTANT,
+            local_value=_SAMPLE_LOCAL,
+            nullable_local_value=_SAMPLE_LOCAL,
+        ))
+        assert wire is not None
+        assert wire["nullableLocalValue"] == _SAMPLE_LOCAL_WIRE
+
+    def test_aware_value_keeps_its_wall_clock(self) -> None:
+        # The zone lives in a sibling property, so nothing is converted.
+        aware = _SAMPLE_LOCAL.replace(
+            tzinfo=datetime.timezone(datetime.timedelta(hours=5)),
+        )
+        wire = to_dict(LocalDateTimeEntity(
+            instant_value=_SAMPLE_INSTANT, local_value=aware,
+        ))
+        assert wire is not None
+        assert wire["localValue"] == _SAMPLE_LOCAL_WIRE
+
+
+class TestLocalDateTimeFromWire:
+    @pytest.mark.parametrize(("wire", "expected"), [
+        ("2025-01-15T10:30:45.123456000", _SAMPLE_LOCAL),
+        ("2025-01-15T10:30:45.123456789", _SAMPLE_LOCAL),
+        ("2025-01-15T10:30:45.1234567", _SAMPLE_LOCAL),
+        ("2025-01-15T10:30:45.12", _SAMPLE_LOCAL.replace(microsecond=120000)),
+        ("2025-01-15T10:30:45", _SAMPLE_LOCAL.replace(microsecond=0)),
+        ("2025-01-15T10:30:45.123456000 (ISO)", _SAMPLE_LOCAL),
+    ])
+    def test_local_date_time(self, wire: str, expected: datetime.datetime) -> None:
+        result = from_dict(
+            {"instantValue": _SAMPLE_INSTANT_WIRE, "localValue": wire},
+            LocalDateTimeEntity,
+        )
+        assert result is not None
+        assert result.local_value == expected
+        assert result.local_value.tzinfo is None
+        assert result.nullable_local_value is None
+
+    def test_null_local_date_time(self) -> None:
+        result = from_dict(
+            {
+                "instantValue": _SAMPLE_INSTANT_WIRE,
+                "localValue": _SAMPLE_LOCAL_WIRE,
+                "nullableLocalValue": None,
+            },
+            LocalDateTimeEntity,
+        )
+        assert result is not None
+        assert result.nullable_local_value is None
+
+    @pytest.mark.parametrize("wire", [
+        "2025-01-15T10:30:45Z",
+        "2025-01-15T10:30:45+01:00",
+        "2025-01-15",
+        "",
+    ])
+    def test_value_that_is_not_a_local_date_time_raises(self, wire: str) -> None:
+        with pytest.raises(ValueError):
+            from_dict(
+                {"instantValue": _SAMPLE_INSTANT_WIRE, "localValue": wire},
+                LocalDateTimeEntity,
+            )
+
+    def test_round_trip(self) -> None:
+        original = LocalDateTimeEntity(
+            instant_value=_SAMPLE_INSTANT,
+            local_value=_SAMPLE_LOCAL,
+            nullable_local_value=_SAMPLE_LOCAL,
+        )
+        wire = to_dict(original)
+        assert wire is not None
+        assert from_dict(wire, LocalDateTimeEntity) == original
+
+
+class TestGeneratedLocalDateTimeFields:
+    """The generated types that carry the marker decode a zone-less value."""
+
+    def test_extension_trigger_config(self) -> None:
+        from filament.types.generated.misc import ExtensionTriggerConfig
+
+        config = from_dict(
+            {
+                "repeats": True,
+                "firstRunAt": "2026-12-01T09:00:00.000000000",
+                "timeZone": "Europe/London",
+                "intervalSeconds": 3600,
+                "finishAt": None,
+            },
+            ExtensionTriggerConfig,
+        )
+        assert config is not None
+        assert config.first_run_at == datetime.datetime(2026, 12, 1, 9, 0, 0)
+        assert config.finish_at is None
+        wire = to_dict(config)
+        assert wire is not None
+        assert wire["firstRunAt"] == "2026-12-01T09:00:00.000000000"
+
+    def test_availability_entity(self) -> None:
+        from filament.types.generated.entities.availability_service import (
+            AvailabilityEntity,
+        )
+
+        entity = from_dict(
+            {
+                "$type": "AvailabilityEntity",
+                "id": "01a1f478-a944-7858-a6d1-309fa8455af9",
+                "startDateTime": "2024-01-01T09:00:00.000000000",
+                "endDateTime": "2024-01-01T14:00:00.000000000",
+                "dateTimeZone": "Europe/London",
+            },
+            AvailabilityEntity,
+        )
+        assert isinstance(entity, AvailabilityEntity)
+        assert entity.start_date_time == datetime.datetime(2024, 1, 1, 9, 0, 0)
+        assert entity.end_date_time == datetime.datetime(2024, 1, 1, 14, 0, 0)
+        assert entity.repeat_end is None
+
+    def test_trigger_config_as_stored_in_trigger_config_data(self) -> None:
+        # The inner JSON of ExtensionEntity.trigger_config_data is not written
+        # with the hub's options: a zero fraction is dropped, where an entity
+        # property always carries nine digits. Payload as pinned by the
+        # backend's ExtensionServiceTests.
+        import json
+
+        from filament.types.generated.misc import ExtensionTriggerConfig
+
+        stored = (
+            '{"repeats":true,"firstRunAt":"2026-12-01T09:00:00",'
+            '"timeZone":"Europe/London","intervalSeconds":3600,'
+            '"finishAt":"2027-03-01T00:00:00"}'
+        )
+        config = from_dict(json.loads(stored), ExtensionTriggerConfig)
+        assert config is not None
+        assert config.first_run_at == datetime.datetime(2026, 12, 1, 9, 0, 0)
+        assert config.finish_at == datetime.datetime(2027, 3, 1, 0, 0, 0)
+        assert config.time_zone == "Europe/London"
+
+    def test_entity_property_form_pinned_by_the_backend(self) -> None:
+        from filament._wire_formats import (
+            local_datetime_from_wire,
+            local_datetime_to_wire,
+        )
+
+        value = local_datetime_from_wire("2026-09-07T17:17:08.123000000")
+        assert value == datetime.datetime(2026, 9, 7, 17, 17, 8, 123000)
+        assert local_datetime_to_wire(value) == "2026-09-07T17:17:08.123000000"

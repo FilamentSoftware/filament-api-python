@@ -25,47 +25,47 @@ class ScheduleSettingsEntity(Entity):
                                                 created even if CreatePlaceholderUsers is false.
     :param maintain_schedule_for: Window of stability for the maintain-schedule feature. When this property is set to a
                                   positive duration, any reschedule (incremental or settings-driven rebuild — but NOT an
-                                  explicit <c>FullSchedule = true</c> request) compares the existing schedule against the
-                                  new one within <c>[now, now + MaintainScheduleFor]</c> and prefers to keep tasks on the
-                                  same real user (and in roughly the same order) over that window. <c>Duration.Zero</c>
+                                  explicit ``FullSchedule = true`` request) compares the existing schedule against the
+                                  new one within ``[now, now + MaintainScheduleFor]`` and prefers to keep tasks on the
+                                  same real user (and in roughly the same order) over that window. ``Duration.Zero``
                                   disables the in-window pin and the task-side ordering boost but leaves cross-cycle
                                   user-to-task affinity active.
     :param task_priority_start_buffer_days_a_weight_multiplier: Multiplier applied to the task-priority StartBufferDaysA weight from
-                                                                <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                disables the component; values above <c>1.0</c> amplify it.
+                                                                ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                disables the component; values above ``1.0`` amplify it.
     :param task_priority_start_buffer_days_b_weight_multiplier: Multiplier applied to the task-priority StartBufferDaysB weight from
-                                                                <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                disables the component; values above <c>1.0</c> amplify it.
+                                                                ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                disables the component; values above ``1.0`` amplify it.
     :param task_priority_earliest_milestone_days_weight_multiplier: Multiplier applied to the task-priority EarliestMilestoneDays weight from
-                                                                    <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                    disables the component; values above <c>1.0</c> amplify it.
+                                                                    ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                    disables the component; values above ``1.0`` amplify it.
     :param task_priority_available_user_count_weight_multiplier: Multiplier applied to the task-priority AvailableUserCount weight from
-                                                                 <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                 disables the component; values above <c>1.0</c> amplify it.
+                                                                 ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                 disables the component; values above ``1.0`` amplify it.
     :param task_priority_remaining_duration_hours_weight_multiplier: Multiplier applied to the task-priority RemainingDurationHours weight from
-                                                                     <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                     disables the component; values above <c>1.0</c> amplify it.
+                                                                     ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                     disables the component; values above ``1.0`` amplify it.
     :param task_priority_proportion_complete_weight_multiplier: Multiplier applied to the task-priority ProportionComplete weight from
-                                                                <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                disables the component; values above <c>1.0</c> amplify it.
+                                                                ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                disables the component; values above ``1.0`` amplify it.
     :param task_priority_task_priority_weight_multiplier: Multiplier applied to the task-priority TaskPriority weight from
-                                                          <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                          disables the component; values above <c>1.0</c> amplify it.
+                                                          ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                          disables the component; values above ``1.0`` amplify it.
     :param task_priority_siblings_scheduled_score_weight_multiplier: Multiplier applied to the task-priority SiblingsScheduledScore weight from
-                                                                     <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                                     disables the component; values above <c>1.0</c> amplify it.
+                                                                     ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                                     disables the component; values above ``1.0`` amplify it.
     :param task_priority_window_order_weight_multiplier: Multiplier applied to the task-priority PreviousScheduleOrderInMaintainWindow weight
-                                                         from <c>SchedulePrioritySettings</c>. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                         disables the in-window task-ordering boost; values above <c>1.0</c> amplify it. See the
+                                                         from ``SchedulePrioritySettings``. ``1.0`` leaves the default unchanged; ``0.0``
+                                                         disables the in-window task-ordering boost; values above ``1.0`` amplify it. See the
                                                          maintain-schedule feature for context.
-    :param priority_milestone_weight_multiplier: Multiplier applied to the priority-milestone weight from <c>SchedulePrioritySettings</c>
-                                                 (<c>SpringLayout.PriorityMilestone.Weight</c>), which sets how hard a Priority milestone
-                                                 front-loads its upstream tasks. <c>1.0</c> leaves the default unchanged; <c>0.0</c>
-                                                 disables Priority milestones' pull; values above <c>1.0</c> amplify it. Does not affect
+    :param priority_milestone_weight_multiplier: Multiplier applied to the priority-milestone weight from ``SchedulePrioritySettings``
+                                                 (``SpringLayout.PriorityMilestone.Weight``), which sets how hard a Priority milestone
+                                                 front-loads its upstream tasks. ``1.0`` leaves the default unchanged; ``0.0``
+                                                 disables Priority milestones' pull; values above ``1.0`` amplify it. Does not affect
                                                  Fixed milestones the scheduler demotes to Priority for a run.
-    :param max_event_repeat: Maximum horizon past <c>CurrentInstant</c> for which recurring events are materialised.
+    :param max_event_repeat: Maximum horizon past ``CurrentInstant`` for which recurring events are materialised.
                              Occurrences whose target start is beyond this horizon are not scheduled until a later
-                             run when <c>CurrentInstant</c> has advanced. Default: 365 days.
+                             run when ``CurrentInstant`` has advanced. Default: 365 days.
     :param initial_repeating_event_alignment_lookahead: Number of leading occurrences across which the planner attempts to align a recurring
                                                         event's time-within-period. Until this many anchors have been persisted, the planner
                                                         uses a lookahead pass to pick a single target time-within-period that the most of the
@@ -73,17 +73,17 @@ class ScheduleSettingsEntity(Entity):
                                                         mode-of-history calculation drives the target instead. Default: 4.
     :param event_history_sample_size: Number of historical occurrences of a recurring event the planner looks back over. It bounds
                                       two things at once:
-                                      <list type="bullet">
-                                      <item><description>the history sample fed to the mode-of-history offset calculation — the
-                                      newest N started anchors (plus any placements made earlier in the same pass) decide the
-                                      time-within-period that future occurrences are aligned to, so recent cadence outweighs
-                                      year-old placements;</description></item>
-                                      <item><description>the occurrence walk-back on an ordinary (non-repair) pass — enumeration
-                                      starts no earlier than the target of the Nth-newest started anchor, so retained history is
-                                      not re-walked every cycle. Holes older than that are back-filled only on an operator
-                                      <c>FullSchedule</c> pass.</description></item>
-                                      </list>
-                                      Both arms are additionally clamped by <c>MaxEventRepeat</c>. Default: 20.
+
+                                      - the history sample fed to the mode-of-history offset calculation — the
+                                        newest N started anchors (plus any placements made earlier in the same pass) decide the
+                                        time-within-period that future occurrences are aligned to, so recent cadence outweighs
+                                        year-old placements;
+                                      - the occurrence walk-back on an ordinary (non-repair) pass — enumeration
+                                        starts no earlier than the target of the Nth-newest started anchor, so retained history is
+                                        not re-walked every cycle. Holes older than that are back-filled only on an operator
+                                        ``FullSchedule`` pass.
+
+                                      Both arms are additionally clamped by ``MaxEventRepeat``. Default: 20.
     """
     full_schedule: bool = field(default=False)
     hiring_delay: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
@@ -112,7 +112,7 @@ class ScheduleScopeSettingsEntity(Entity):
     
     :param duration_rounding_thresholds: Defines the thresholds used for rounding durations in the schedule.
     :param mode: How the scheduler positions tasks within their allowed window for this scope.
-                 Different scopes may use different modes. Defaults to <see cref="F:Filament.Services.CoreServices.Entities.ScheduleSettingsService.ScheduleMode.FrontLoad" />.
+                 Different scopes may use different modes. Defaults to ``ScheduleMode.FrontLoad``.
     :param near_buffer_distance: Represents the distance from the current time for the near buffer proportions.
     :param near_buffer_min_proportion: The minimum proportion of a task's duration that should be used as buffer at the near distance.
     :param near_buffer_initial_proportion: The initial proportion of a task's duration that should be used as buffer at the near distance.
@@ -123,43 +123,43 @@ class ScheduleScopeSettingsEntity(Entity):
     :param far_buffer_max_proportion: The maximum proportion of a task's duration that should be used as buffer at the far distance.
     :param max_review_event_search_distance: How far ahead the scheduler searches for a review-event occurrence when automatically
                                              linking a task that needs review. The search window is
-                                             <c>[searchStart, searchStart + MaxReviewEventSearchDistance]</c>, where <c>searchStart</c>
+                                             ``[searchStart, searchStart + MaxReviewEventSearchDistance]``, where ``searchStart``
                                              is the later of the task's processing end and the current instant. Tasks with no matching
                                              occurrence inside the window are not linked (threshold-miss behaviour is decided by the
                                              scheduler).
     :param user_priority_reference_cost_weight_multiplier: Multiplier applied to the user-selection ReferenceCost priority weight from
-                                                           <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                           unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                           ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                           unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_actual_user_weight_multiplier: Multiplier applied to the user-selection ActualUser priority weight from
-                                                        <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                        unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                        ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                        unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_user_last_worked_on_task_weight_multiplier: Multiplier applied to the user-selection UserLastWorkedOnTask priority weight from
-                                                                     <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                                     unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                                     ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                                     unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_hours_worked_on_task_weight_multiplier: Multiplier applied to the user-selection HoursWorkedOnTask priority weight from
-                                                                 <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                                 unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                                 ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                                 unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_hours_to_start_weight_multiplier: Multiplier applied to the user-selection HoursToStart priority weight from
-                                                           <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                           unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                           ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                           unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_real_world_duration_weight_multiplier: Multiplier applied to the user-selection RealWorldDurationProportion priority weight
-                                                                from <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the
-                                                                default unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify
+                                                                from ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the
+                                                                default unchanged; ``0.0`` disables the component; values above ``1.0`` amplify
                                                                 it.
     :param user_priority_total_group_duration_hours_weight_multiplier: Multiplier applied to the user-selection TotalGroupDurationHours priority weight from
-                                                                       <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                                       unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                                       ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                                       unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_solved_deviation_weight_multiplier: Multiplier applied to the user-selection SolvedDeviation priority weight from
-                                                             <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c> leaves the default
-                                                             unchanged; <c>0.0</c> disables the component; values above <c>1.0</c> amplify it.
+                                                             ``SchedulePrioritySettings`` for tasks in this scope. ``1.0`` leaves the default
+                                                             unchanged; ``0.0`` disables the component; values above ``1.0`` amplify it.
     :param user_priority_assigned_in_window_weight_multiplier: Multiplier applied to the user-selection PreviouslyAssignedToTaskInMaintainWindow
-                                                               priority weight from <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c>
-                                                               leaves the default unchanged; <c>0.0</c> disables the in-window pin for this scope;
-                                                               values above <c>1.0</c> amplify it. See the maintain-schedule feature for context.
+                                                               priority weight from ``SchedulePrioritySettings`` for tasks in this scope. ``1.0``
+                                                               leaves the default unchanged; ``0.0`` disables the in-window pin for this scope;
+                                                               values above ``1.0`` amplify it. See the maintain-schedule feature for context.
     :param user_priority_assigned_outside_window_weight_multiplier: Multiplier applied to the user-selection PreviouslyAssignedToTaskNotInMaintainWindow
-                                                                    priority weight from <c>SchedulePrioritySettings</c> for tasks in this scope. <c>1.0</c>
-                                                                    leaves the default unchanged; <c>0.0</c> disables the long-horizon affinity for this
-                                                                    scope; values above <c>1.0</c> amplify it.
+                                                                    priority weight from ``SchedulePrioritySettings`` for tasks in this scope. ``1.0``
+                                                                    leaves the default unchanged; ``0.0`` disables the long-horizon affinity for this
+                                                                    scope; values above ``1.0`` amplify it.
     """
     duration_rounding_thresholds: list[datetime.timedelta] = field(default_factory=list)
     mode: ScheduleMode = field(default=ScheduleMode.FrontLoad)

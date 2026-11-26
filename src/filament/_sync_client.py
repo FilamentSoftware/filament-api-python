@@ -689,7 +689,13 @@ class FilamentClientSync:
         self,
         request: ModifyDataRequest,
     ) -> ValueOrErrorPublic_1[RequestId]:
-        """Create, update, or delete entity data."""
+        """Create, update, or delete entity data.
+
+        On an ``Update`` with ``update_properties`` set, an entity that was
+        read back from the server (rather than constructed by the caller) is
+        sent as its ``id`` plus the named properties only, since those are all
+        the backend writes. Entities the caller constructed are sent as given.
+        """
         return self._run(lambda client: client.modify_data(request))
 
     def read_connected_data(

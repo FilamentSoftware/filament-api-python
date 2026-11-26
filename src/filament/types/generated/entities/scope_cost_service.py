@@ -29,7 +29,7 @@ class ScopeCostEntity(ReferenceEntityBase):
                          Typically stores the name of the entity type that the context refers to.
     :param context_id: Represents the unique identifier for the associated context entity linked to the scope cost.
     :param instance: Whether or not this entity is referring to a specific instance of the referenced entity,
-                     or the entity as a whole. This is used when referencing a ScopeItemEntity with a Count &gt; 1.
+                     or the entity as a whole. This is used when referencing a ScopeItemEntity with a Count > 1.
                      The ScopeCostEntity with Instance set to false will be the cost of all of the instances
                      of the ScopeItemEntity, and the ScopeCostEntity with Instance set to true will be the cost
                      of a single instance of the ScopeItemEntity.

@@ -48,9 +48,9 @@ class ScopeItemCustomComplexityEntity(GenericComplexityBase):
 @dataclass(kw_only=True)
 class ScopeVersionEntity(Entity):
     """
-    A scope version: a named grouping of scope item versions (<see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity" />) - the record of a
+    A scope version: a named grouping of scope item versions (``ScopeItemVersionEntity``) - the record of a
     scope as it stood. A client creates one in its scope and groups item versions under it through
-    <see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeVersionItemVersionConnection" />. It computes nothing: the item versions it groups carry the records,
+    ``ScopeVersionItemVersionConnection``. It computes nothing: the item versions it groups carry the records,
     and they are captured, pinned and restored exactly as they are outside a grouping.
     
     :param name: The client's name for this version of the scope.
@@ -68,8 +68,8 @@ class ScopeItemEntity(Entity):
     :param name: The name of this scope item.
     :param description: A short description of the item.
     :param image_id: An image to use when referencing this Scope Item.
-    :param image_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemEntity.ImageId" />, carrying a <c>FileReference</c>.
-    :param image: The image as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>ImageData</c>.</b>
+    :param image_data: The hub-populated read projection of ``ScopeItemEntity.image_id``, carrying a ``FileReference``.
+    :param image: The image as a ``FileReference``. **Arrives unset — populate it from ``ImageData``.**
     :param category_id: The category of this entity. E.g. Shot, Asset, Development.
     :param category: A helper method for setting the category id.
     :param size: The size of this item.   In film this might be the frame count.
@@ -78,8 +78,8 @@ class ScopeItemEntity(Entity):
     :param task_duration_multiplier: This allows fine-grained control over task durations on a per item basis.
     :param chargeable_multiplier: A multiplier on the chargeable cost for this item.  Used for discounting (or adding surplus) to
                                   chargeable costs.
-    :param priority_weight: The scheduling weight of this scope item, between 0 and 1 (inclusive). <b>Higher is higher
-                            priority</b>: it multiplies with the scope's <see cref="P:Filament.FSCore.CoreEntities.ScopeEntity.PriorityWeight" /> into the weight
+    :param priority_weight: The scheduling weight of this scope item, between 0 and 1 (inclusive). **Higher is higher
+                            priority**: it multiplies with the scope's ``ScopeEntity.priority_weight`` into the weight
                             of every task generated from the item.
     :param status_id: The status assigned to this scope item.
     :param status: A helper method for setting the StatusId property.
@@ -91,11 +91,11 @@ class ScopeItemEntity(Entity):
     :param assumptions_manual: If a user decides to override the calculated assumptions entirely.
     :param ignore_calculated_assumptions: Whether to ignore the calculated assumptions or use them
     :param dependent_task_source_item_ids: The ids of the source items whose dependent tasks are routed onto this item (sorted, distinct). Derived
-                                           from the dependency graph, the sources' <c>AddToDependentCategoryIds</c> lists and this item's overrides, and only
+                                           from the dependency graph, the sources' ``AddToDependentCategoryIds`` lists and this item's overrides, and only
                                            as current as the item's last recalculation.
     :param currency_id: The currency used for this scope item's monetary values.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
-    :param version_id: The scope item version (<see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity" />) this item is pinned to, or null. While set, the
+    :param version_id: The scope item version (``ScopeItemVersionEntity``) this item is pinned to, or null. While set, the
                        item's tasks and costs are taken from the version rather than calculated from its configuration. Set and cleared
                        only by clients; a version cannot be deleted while an item is pinned to it. Protection-only rather than a link:
                        the version already links to its item, and the type registry refuses circular links.
@@ -135,28 +135,28 @@ class ScopeItemEntity(Entity):
 @dataclass(kw_only=True)
 class ScopeItemVersionEntity(Entity):
     """
-    A scope item version: a stored, frozen record of one <see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemEntity" /> at the moment it was taken - the
+    A scope item version: a stored, frozen record of one ``ScopeItemEntity`` at the moment it was taken - the
     item's settings and outbound connections, the tasks its configuration produced and the costs it produced. A client
     creates one by naming the item (and a name); the scope item service completes it in the same run, either with the
     full record or, when the outcome matches a version the item already has, as a duplicate that names that version
-    (<see cref="P:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity.DuplicateOfId" />) and carries no record of its own.
+    (``ScopeItemVersionEntity.duplicate_of_id``) and carries no record of its own.
     
     :param scope_item_id: The scope item this is a version of. Set on create and never changed. Deleting the item deletes its versions.
-    :param scope_item: A helper method for setting <see cref="P:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity.ScopeItemId" />.
+    :param scope_item: A helper method for setting ``ScopeItemVersionEntity.scope_item_id``.
     :param name: The client's name for this version.
     :param description: The client's description of this version.
     :param settings_data: The item's settings and outbound connections when the version was taken, as a compressed
-                          <see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionSettings" />. Empty on a duplicate, and until the version is captured.
+                          ``ScopeItemVersionSettings``. Empty on a duplicate, and until the version is captured.
     :param tasks_data: The tasks the item's configuration produced when the version was taken, as a compressed
-                       <see cref="T:Filament.Services.CoreServices.Services.ScopeItemTaskSet" />. Empty on a duplicate, and until the version is captured.
+                       ``ScopeItemTaskSet``. Empty on a duplicate, and until the version is captured.
     :param costs_data: The costs the item's configuration produced when the version was taken, as a compressed
-                       <see cref="T:Filament.Services.CoreServices.Services.ScopeItemCostSet" />. Empty on a duplicate, and until the version is captured.
+                       ``ScopeItemCostSet``. Empty on a duplicate, and until the version is captured.
     :param structure_hash: Hex SHA-256 over the item's configuration and the tasks it produces, with ids and audit fields stripped (the
                            costs are deliberately outside it). Two versions of one item with the same hash are the same version. Set on
                            every captured version, duplicates included.
     :param duplicate_of_id: The version of the same item this one duplicates, when the outcome matched it at capture; null otherwise. A
                             duplicate stands for the version it names: every reader of a version's record resolves it first
-                            (<see cref="M:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity.ResolveCanonicalAsync(Filament.FSCore.Cache.EntityCache{Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity},System.Nullable{System.Guid})" />). The named version cannot be deleted while a duplicate names it.
+                            (``ScopeItemVersionEntity.ResolveCanonicalAsync``). The named version cannot be deleted while a duplicate names it.
     :param capture_warnings: What the capture could not record faithfully. Empty for a clean capture.
     :param restore_warnings: What the last restore from this version could not put back. Rewritten by each restore.
     :param last_restored_at: When an item was last restored from this version.

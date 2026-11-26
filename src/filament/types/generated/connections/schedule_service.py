@@ -29,12 +29,12 @@ class ScheduledEventReviewTaskConnection(EntityConnection):
     Represents a scheduler-computed automatic link from an event occurrence to a task it reviews.
     Owned by ScheduleService and fully re-diffed against the desired links at the end of every
     schedule pass — never data-entered by clients (manually authored links use
-    <see cref="T:Filament.Services.CoreServices.Entities.EventService.EventReviewTaskConnection" /> instead). FROM = the reviewing
-    <see cref="T:Filament.Services.CoreServices.Entities.EventService.EventEntity" />; TO = the reviewed <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
+    ``EventReviewTaskConnection`` instead). FROM = the reviewing
+    ``EventEntity``; TO = the reviewed ``TaskEntity``. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
-    :param occurrence_target_instant: The drift-free target instant of the specific occurrence the task is reviewed in. <c>null</c>
-                                      for a non-recurring (single-occurrence) event; non-<c>null</c> for a specific occurrence of a
-                                      recurring event. Mirrors <c>ScheduleSegmentEntity.OccurrenceTargetInstant</c> so that
-                                      <c>(FromId, OccurrenceTargetInstant)</c> resolves to the same occurrence the planner placed.
+    :param occurrence_target_instant: The drift-free target instant of the specific occurrence the task is reviewed in. ``null``
+                                      for a non-recurring (single-occurrence) event; non-``null`` for a specific occurrence of a
+                                      recurring event. Mirrors ``ScheduleSegmentEntity.OccurrenceTargetInstant`` so that
+                                      ``(FromId, OccurrenceTargetInstant)`` resolves to the same occurrence the planner placed.
     """
     occurrence_target_instant: Optional[datetime.datetime] = field(default=None)

@@ -19,9 +19,9 @@ class UserSettingsEntity(Entity):
     A set of settings for one context - a page, a widget, anything a client chooses to key on - owned by a user
     and optionally shared with every other user in the organisation.
     
-    :param owner_user_id: The id of the user who owns these settings. Null or <see cref="F:System.Guid.Empty" /> when the row has no owner, which
+    :param owner_user_id: The id of the user who owns these settings. Null or ``Guid.Empty`` when the row has no owner, which
                           only a shared row may be.
-    :param owner_user: The user who owns these settings. Assigning a value populates <see cref="P:Filament.Services.CoreServices.Entities.UserSettingsService.UserSettingsEntity.OwnerUserId" />.
+    :param owner_user: The user who owns these settings. Assigning a value populates ``UserSettingsEntity.owner_user_id``.
     :param shared: Whether every user in the organisation may read these settings. Only the owner may write them either way.
     :param context: What these settings are for, as a key the client chooses. A user may hold several rows for one context.
     :param name: An optional display name, so a client can tell several rows for one context apart. Empty when there is none.

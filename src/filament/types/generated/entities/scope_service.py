@@ -24,12 +24,12 @@ class ScopeEntity(Entity):
     :param description: A description of the scope/project.
     :param scope_type: The type of project this is.  This will be used to auto set up some aspects of the project.
     :param image_id: An image to use when referencing this Scope.
-    :param image_data: The hub-populated read projection of <see cref="P:Filament.FSCore.CoreEntities.ScopeEntity.ImageId" />, carrying a <c>FileReference</c>.
-    :param image: The image as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>ImageData</c>.</b>
+    :param image_data: The hub-populated read projection of ``ScopeEntity.image_id``, carrying a ``FileReference``.
+    :param image: The image as a ``FileReference``. **Arrives unset — populate it from ``ImageData``.**
     :param task_duration_multiplier: An overall multiplier that applies to all task durations. This allows a project to effectively
                                      adjust the duration of all tasks in one place.
     :param chargeable_multiplier: An overall multiplier on chargeable costs. This is used to set global discounts for an entire project.
-    :param priority_weight: The scheduling weight of this scope, between 0 and 1 (inclusive). <b>Higher is higher priority</b>:
+    :param priority_weight: The scheduling weight of this scope, between 0 and 1 (inclusive). **Higher is higher priority**:
                             it multiplies into the weight of every task in the scope, so a task in a 1.0 scope is scheduled
                             ahead of an otherwise-equal task in a 0.5 scope.
     :param status_id: The status assigned to this scope.

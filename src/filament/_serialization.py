@@ -16,7 +16,7 @@ import logging
 import re
 import types
 from collections.abc import Sequence as ABCSequence
-from dataclasses import MISSING, fields, is_dataclass
+from dataclasses import MISSING, Field, fields, is_dataclass
 from enum import Enum
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Mapping, Optional, TypeVar, Type, Union, get_origin, get_args
@@ -38,6 +38,8 @@ from ._wire_formats import (  # noqa: E402
     DATETIME_FORMAT as DATETIME_FORMAT,
     instant_from_wire as instant_from_wire,
     instant_to_wire as instant_to_wire,
+    local_datetime_from_wire as local_datetime_from_wire,
+    local_datetime_to_wire as local_datetime_to_wire,
     timedelta_from_wire as timedelta_from_wire,
     timedelta_to_wire as timedelta_to_wire,
 )
@@ -177,6 +179,17 @@ def _is_optional(tp: Any) -> bool:
     if isinstance(tp, types.UnionType):
         return type(None) in tp.__args__
     return False
+
+
+def _is_local_datetime_field(f: Field[Any]) -> bool:
+    """Return whether *f* is generated from a C# ``LocalDateTime`` property.
+
+    The generator annotates both ``Instant`` and ``LocalDateTime`` properties
+    as ``datetime.datetime`` and marks the latter with
+    ``metadata={"wire_type": "LocalDateTime"}``. They differ on the wire: an
+    instant is UTC with a trailing ``Z``, a local date and time has neither.
+    """
+    return f.metadata.get("wire_type") == "LocalDateTime"
 
 
 def _unwrap_optional(tp: Any) -> Any:
@@ -369,6 +382,10 @@ def _resolve_type_hints(cls: Any) -> dict[str, Any]:
 
 _NONE_MEMBER = "None_"
 _NONE_WIRE = "None"
+# An enum value written as text, as the backend's
+# ``EnumIntegerDictionaryConverterFactory`` writes enum dictionary keys
+# (JSON object keys are always strings).
+_ENUM_NUMERIC_TEXT = re.compile(r"-?[0-9]+")
 
 
 def _enum_to_wire(data: Any) -> Any:
@@ -377,10 +394,16 @@ def _enum_to_wire(data: Any) -> Any:
 
 
 def _enum_from_wire(data: Any, enum_type: Any) -> Any:
-    """Convert a wire value to an enum member."""
+    """Convert a wire value to an enum member.
+
+    Accepts the int value, the member name, or the int value as text (the
+    form enum-keyed dictionaries arrive in).
+    """
     if isinstance(data, str):
         if data == _NONE_WIRE:
             return enum_type[_NONE_MEMBER]
+        if _ENUM_NUMERIC_TEXT.fullmatch(data):
+            return enum_type(int(data))
         return enum_type[data]
     if isinstance(data, Enum):
         return data
@@ -632,7 +655,10 @@ def to_dict(
         field_type = hints.get(f.name, f.type)
         camel_key = camel_case_from_snake_case(f.name)
         value = getattr(data, f.name)
-        converted = _convert_to_dict_value(value, field_type, None, convert_uuid)
+        if _is_local_datetime_field(f) and isinstance(value, datetime.datetime):
+            converted: Any = local_datetime_to_wire(value)
+        else:
+            converted = _convert_to_dict_value(value, field_type, None, convert_uuid)
         # Property-name conversion is write-only: these fields are request
         # inputs sent to the backend, never read back, so there is deliberately
         # no from_dict counterpart.
@@ -732,7 +758,10 @@ def from_dict(data: dict[str, Any], cls: Type[T]) -> Optional[T]:
 
         raw_value = data.get(camel_key, data.get(f.name))
         field_type = hints.get(f.name, f.type)
-        value = _convert_from_dict_value(raw_value, field_type, type_arg)
+        if _is_local_datetime_field(f) and isinstance(raw_value, str):
+            value: Any = local_datetime_from_wire(raw_value)
+        else:
+            value = _convert_from_dict_value(raw_value, field_type, type_arg)
         # Fields marked with compression/encoding metadata may hold
         # ``<compression>+<encoding>:<payload>``; decode before construction so
         # the instance (and _populate_json_companion_fields) sees plain text.

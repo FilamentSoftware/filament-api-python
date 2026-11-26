@@ -39,20 +39,21 @@ class MediaEntity(Entity):
     :param review: Whether this media should be included in any review of the task it is attached to.
     :param transcode_progress: How far through transcoding this media is, between 0.0 and 1.0, or null when no transcode has started.
     :param thumbnail_file_id: A still thumbnail of this media, held in Filament's own store. Null when there is none.
-    :param thumbnail_file_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.MediaService.MediaEntity.ThumbnailFileId" />, carrying a <c>FileReference</c>.
-    :param thumbnail_file: The thumbnail as a <c>FileReference</c>. <b>Arrives unset — populate it from
-                           <c>ThumbnailFileData</c>.</b>
-    :param animated_thumbnail_file_id: An animated thumbnail of this media, held in Filament's own store. Null when there is none.
-    :param animated_thumbnail_file_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.MediaService.MediaEntity.AnimatedThumbnailFileId" />, carrying a
-                                         <c>FileReference</c>.
-    :param animated_thumbnail_file: The animated thumbnail as a <c>FileReference</c>. <b>Arrives unset — populate it from
-                                    <c>AnimatedThumbnailFileData</c>.</b>
+    :param thumbnail_file_data: The hub-populated read projection of ``MediaEntity.thumbnail_file_id``, carrying a ``FileReference``.
+    :param thumbnail_file: The thumbnail as a ``FileReference``. **Arrives unset — populate it from
+                           ``ThumbnailFileData``.**
+    :param animated_thumbnail_file_id: A filmstrip of this media's frames, for scrubbing on hover, held in Filament's own store. Null when there is
+                                       none.
+    :param animated_thumbnail_file_data: The hub-populated read projection of ``MediaEntity.animated_thumbnail_file_id``, carrying a
+                                         ``FileReference``.
+    :param animated_thumbnail_file: The filmstrip thumbnail as a ``FileReference``. **Arrives unset — populate it from
+                                    ``AnimatedThumbnailFileData``.**
     :param preview_file_ids: The previews of this media, held in Filament's own store: the file id of each, keyed by the kind of
                              preview it is. Empty when there are none.
-    :param preview_files_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.MediaService.MediaEntity.PreviewFileIds" />: the JSON of a
-                               <c>FileReference</c> for each preview, under the same keys.
-    :param preview_files: The previews as <c>FileReference</c>s, keyed by the kind of preview. <b>Arrives unset — populate it
-                          from <c>PreviewFilesData</c>.</b>
+    :param preview_files_data: The hub-populated read projection of ``MediaEntity.preview_file_ids``: the JSON of a
+                               ``FileReference`` for each preview, under the same keys.
+    :param preview_files: The previews as ``FileReference``s, keyed by the kind of preview. **Arrives unset — populate it
+                          from ``PreviewFilesData``.**
     """
     name: str = field(default='')
     description: str = field(default='')
@@ -83,7 +84,7 @@ class MediaEntity(Entity):
 @dataclass(kw_only=True)
 class MediaElementEntity(Entity):
     """
-    One piece of source data belonging to a <see cref="T:Filament.Services.CoreServices.Entities.MediaService.MediaEntity" />: an EXR sequence, a movie uploaded for
+    One piece of source data belonging to a ``MediaEntity``: an EXR sequence, a movie uploaded for
     review, a matte, a project file.
     
     :param media_id: The media this element belongs to.
@@ -94,12 +95,12 @@ class MediaElementEntity(Entity):
                         short for. Empty when there is none.
     :param media_type: The kind of thing this element's data is.
     :param status: Whether this element's data can be fetched yet.
-    :param local_file_path: The path to this element's data on the <b>customer's</b> filesystem or network share, or a pattern for a
-                            sequence such as <c>shot010_v003.%04d.exr</c>. Null when there is no local copy.
+    :param local_file_path: The path to this element's data on the **customer's** filesystem or network share, or a pattern for a
+                            sequence such as ``shot010_v003.%04d.exr``. Null when there is no local copy.
     :param file_id: This element's data, held in Filament's own store. Null when there is no uploaded copy, and null until an
                     upload has completed.
-    :param file_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.MediaService.MediaElementEntity.FileId" />, carrying a <c>FileReference</c>.
-    :param file: The uploaded copy as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>FileData</c>.</b>
+    :param file_data: The hub-populated read projection of ``MediaElementEntity.file_id``, carrying a ``FileReference``.
+    :param file: The uploaded copy as a ``FileReference``. **Arrives unset — populate it from ``FileData``.**
     """
     media_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     media: Optional[MediaEntity] = field(default=None)

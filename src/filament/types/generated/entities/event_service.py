@@ -29,28 +29,28 @@ class EventEntity(Entity):
     :param description: The description of what the event is about.
     :param duration: The expected duration of the event.
     :param owner_user_id: The id of the user that is responsible for the event.
-    :param owner_user: A helper property for setting the <property cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.OwnerUserId" /> property.
+    :param owner_user: A helper property for setting the ``EventEntity.owner_user_id`` property.
     :param earliest_start_date_time: The earliest time the event can start.
     :param latest_start_date_time: The latest time the event can start.
     :param date_time_zone: What time zone the event is being called under.
     :param task_review_group_type: The type name of the entity this event reviews tasks for: either a
-                                   <see cref="T:Filament.Services.CoreServices.Entities.ReviewGroupService.ReviewGroupEntity" /> or a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />. Empty when this event
+                                   ``ReviewGroupEntity`` or a ``TaskGroupEntity``. Empty when this event
                                    does not review tasks.
     :param task_review_group_id: The id of the review group or task group this event reviews tasks for. Empty when this
                                  event does not review tasks.
     :param task_review_group: Represents the review group or task group this event reviews tasks for. When set, it
-                              assigns <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.TaskReviewGroupType" /> and <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.TaskReviewGroupId" /> based on the
-                              provided entity instance; setting <c>null</c> clears both.
+                              assigns ``EventEntity.task_review_group_type`` and ``EventEntity.task_review_group_id`` based on the
+                              provided entity instance; setting ``null`` clears both.
     :param include_review_task_users: Should the users who created content to be reviewed be automatically invited to the event?
-    :param repeat_mode: How often this event should repeat. <see cref="F:Filament.FSCore.Entities.Recurrence.RepeatModeEnum.None" /> means
+    :param repeat_mode: How often this event should repeat. ``RepeatModeEnum.None`` means
                         the event has a single occurrence.
-    :param repeat_days: If <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.RepeatMode" /> is <see cref="F:Filament.FSCore.Entities.Recurrence.RepeatModeEnum.Week" />, which days of
+    :param repeat_days: If ``EventEntity.repeat_mode`` is ``RepeatModeEnum.Week``, which days of
                         the week the event repeats on. Ignored for other modes.
-    :param repeat_count: If it is a repeating event, how many occurrences to materialise. <c>0</c> means repeat
-                         indefinitely (bounded by <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.RepeatEnd" /> and
-                         <c>ScheduleSettingsEntity.MaxEventRepeat</c>).
+    :param repeat_count: If it is a repeating event, how many occurrences to materialise. ``0`` means repeat
+                         indefinitely (bounded by ``EventEntity.repeat_end`` and
+                         ``ScheduleSettingsEntity.MaxEventRepeat``).
     :param repeat_end: If it is a repeating event, when to finish repeating. Takes precedence over
-                       <see cref="P:Filament.Services.CoreServices.Entities.EventService.EventEntity.RepeatCount" />: if the repeat count has not been reached when this time
+                       ``EventEntity.repeat_count``: if the repeat count has not been reached when this time
                        arrives, repeating stops anyway.
     """
     name: str = field(default='')
@@ -58,8 +58,8 @@ class EventEntity(Entity):
     duration: datetime.timedelta = field(default_factory=lambda: datetime.timedelta())
     owner_user_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     owner_user: Optional[UserEntity] = field(default=None)
-    earliest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
-    latest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now)
+    earliest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now, metadata={"wire_type": "LocalDateTime"})
+    latest_start_date_time: datetime.datetime = field(default_factory=datetime.datetime.now, metadata={"wire_type": "LocalDateTime"})
     date_time_zone: str = field(default='UTC')
     task_review_group_type: str = field(default='')
     task_review_group_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
@@ -68,7 +68,7 @@ class EventEntity(Entity):
     repeat_mode: RepeatModeEnum = field(default=RepeatModeEnum.None_)
     repeat_days: RepeatDaysEnum = field(default=RepeatDaysEnum.None_)
     repeat_count: int = field(default=0)
-    repeat_end: Optional[datetime.datetime] = field(default=None)
+    repeat_end: Optional[datetime.datetime] = field(default=None, metadata={"wire_type": "LocalDateTime"})
 
 
 @dataclass(kw_only=True)
@@ -80,7 +80,7 @@ class EventCalendarEntity(Entity):
     :param color: Display colour for the calendar.
     :param description: An optional description of the calendar.
     :param owner_user_id: The id of the user that owns the calendar.
-    :param owner_user: A helper property for setting the <property cref="P:Filament.Services.CoreServices.Entities.EventService.EventCalendarEntity.OwnerUserId" /> property.
+    :param owner_user: A helper property for setting the ``EventCalendarEntity.owner_user_id`` property.
     """
     name: str = field(default='')
     color: str = field(default='#00AA64')
@@ -98,8 +98,8 @@ class EventAgendaItemEntity(Entity):
     :param event: A helper property for setting EventId. Pass in an EventEntity type.
     :param title: The agenda item title
     :param description: A more detailed description of the agenda item.
-    :param priority_order: The position of this item in the agenda. <b>Lower is higher priority</b>: items run in ascending
-                           <c>PriorityOrder</c>, so 1 comes first.
+    :param priority_order: The position of this item in the agenda. **Lower is higher priority**: items run in ascending
+                           ``PriorityOrder``, so 1 comes first.
     """
     event_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     event: Optional[EventEntity] = field(default=None)

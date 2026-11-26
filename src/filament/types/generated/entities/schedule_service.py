@@ -34,9 +34,9 @@ class PlaceholderUserEntity(Entity):
     :param name: The name of the placeholder user entity.
                  This property represents a string value used to identify or label the entity.
     :param office_location_id: The identifier for the office location associated with the placeholder user entity.
-                               This property links the entity to a specific <see cref="T:Filament.Services.CoreServices.Entities.OrganizationService.OfficeLocationEntity" />.
+                               This property links the entity to a specific ``OfficeLocationEntity``.
     :param office_location: The office location associated with the placeholder user entity.
-                            This property establishes a relationship with a specific <see cref="T:Filament.Services.CoreServices.Entities.OrganizationService.OfficeLocationEntity" />
+                            This property establishes a relationship with a specific ``OfficeLocationEntity``
                             and facilitates the linkage to its identifier.
     :param primary_specialty_id: The unique identifier for the primary specialty associated with the placeholder user entity.
                                  This property links the user entity to a specific specialty through a relational reference.
@@ -64,19 +64,19 @@ class ScheduleResultEntity(Entity):
     :param schedule_start_instant: The start instant of the scheduling process.
     :param schedule_end_instant: The end instant of the scheduling process.
     :param unscheduled_events: A mapping of per-occurrence diagnostic keys (see
-                               <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.OccurrenceKey(System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; reason string for event occurrences
+                               ``ScheduleResultKeys.OccurrenceKey``) -> reason string for event occurrences
                                the scheduler could not place (for example insufficient required users, required-user
-                               conflicts, or no feasible slot). Keys are composite <c>"{eventId:N}:{ISO8601 target
-                               instant or empty}"</c>; non-recurring events / event-level diagnostics use an empty
+                               conflicts, or no feasible slot). Keys are composite ``"{eventId:N}:{ISO8601 target
+                               instant or empty}"``; non-recurring events / event-level diagnostics use an empty
                                instant part. Cleared and repopulated on each run.
     :param events_excluding_required_users: A mapping of per-occurrence diagnostic keys (see
-                                            <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.OccurrenceKey(System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; user ids (comma-separated) of
+                                            ``ScheduleResultKeys.OccurrenceKey``) -> user ids (comma-separated) of
                                             required users excluded because they could not be made available at the chosen slot.
-                                            Keys are composite <c>"{eventId:N}:{ISO8601 target instant or empty}"</c>. Cleared and
+                                            Keys are composite ``"{eventId:N}:{ISO8601 target instant or empty}"``. Cleared and
                                             repopulated on each run.
-    :param degraded_review_gates: A mapping of diagnostic keys (see <see cref="M:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultKeys.ReviewGateKey(System.Guid,System.Guid,System.Nullable{NodaTime.Instant})" />) -&gt; reason
+    :param degraded_review_gates: A mapping of diagnostic keys (see ``ScheduleResultKeys.ReviewGateKey``) -> reason
                                   string for review gates that could not be applied on the most recent run. Keys are composite
-                                  <c>"{taskId:N}:{eventId:N}:{ISO8601 target instant or empty}"</c>, so a task with more than one
+                                  ``"{taskId:N}:{eventId:N}:{ISO8601 target instant or empty}"``, so a task with more than one
                                   degraded gate carries one entry each without collision. Cleared and repopulated on each run.
     :param milestones_missed: A dictionary representing the milestones that were not achieved during the scheduling process,
                               keyed by their unique identifiers, with the associated missed duration for each milestone.
@@ -84,7 +84,7 @@ class ScheduleResultEntity(Entity):
                                     earliest start time, with the associated instant representing the earliest start time required.
     :param deadline_window_infeasible_escape_count: Deadline diagnostic: how many times Pass 2's window-infeasible pre-check escaped to
                                                     ignoring downstream milestones after the deadline-advance loop could not restore a feasible
-                                                    window (<c>EarliestStart &gt; LatestStart</c>). Global across all tasks. Reset per schedule
+                                                    window (``EarliestStart > LatestStart``). Global across all tasks. Reset per schedule
                                                     attempt, so the value describes only the last pass that ran (the full-reschedule retry when
                                                     it fires).
     :param deadline_no_candidate_ignore_fallback_count: Deadline diagnostic: how many times Pass 2's no-candidate final fallback retried with
@@ -99,36 +99,34 @@ class ScheduleResultEntity(Entity):
     :param solve_error_count: Number of connected components that threw an exception during the spring-layout
                               relaxation on the most recent run. Each one represents a partial solve where some
                               tasks were skipped — strong signal that the parameter combination broke the
-                              solver, distinct from the data-driven warnings on <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultEntity.Warnings" />.
+                              solver, distinct from the data-driven warnings on ``ScheduleResultEntity.warnings``.
     :param spring_layout_iterations_run: Maximum number of relaxation iterations observed across all spring-layout
-                                         components on the most recent run. Useful for tuning the <c>iterations</c>
-                                         setting in <c>SpringLayoutSettings</c>.
-    :param spring_layout_convergence_delta: Largest <c>|solved(t) - solved(t-1)|</c> observed on the final iteration
+                                         components on the most recent run. Useful for tuning the ``iterations``
+                                         setting in ``SpringLayoutSettings``.
+    :param spring_layout_convergence_delta: Largest ``|solved(t) - solved(t-1)|`` observed on the final iteration
                                             across all spring-layout components. Useful for detecting non-convergence.
     :param working_hours_axis_component_count: Number of connected components the spring-layout solver built an axis for on
                                                the most recent run.
-    :param working_hours_axis_total_component_hours: Sum of <c>WorkingHoursAxis.TotalWorkingHours</c> across all components — a
+    :param working_hours_axis_total_component_hours: Sum of ``WorkingHoursAxis.TotalWorkingHours`` across all components — a
                                                      rough health check for total envelope schedulable capacity.
     :param event_history_backfill_version: The version of the one-shot event-history repair that has been applied to this
                                            organisation's schedule. While this is below
-                                           <see cref="F:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleResultEntity.CurrentEventHistoryBackfillVersion" />, the next successful schedule pass
+                                           ``ScheduleResultEntity.CurrentEventHistoryBackfillVersion``, the next successful schedule pass
                                            deep-walks every event's history (rather than the usual bounded window), back-fills
                                            every elapsed occurrence that has no segments at all, and completes historical anchors
                                            that carry no participant segments from the event's current invitee list; it then stamps
                                            itself with the current version so the repair runs exactly once.
-                                           <para>
+
                                            The stamp is what makes the zero-attendance carve-out a migration rather than a standing
                                            rule. Before it, a pinned occurrence with zero participants means "the old code deleted
                                            the participants", so completing it from the current invitee list restores what was lost.
                                            After it, the only ways a bucket reaches zero participants are an upstream user deletion
-                                           or an upstream <c>EventUserConnection</c> deletion — both of which assert that nobody
+                                           or an upstream ``EventUserConnection`` deletion — both of which assert that nobody
                                            should be there — so zero is the correct, final state and must not be repopulated.
-                                           </para>
-                                           <para>
-                                           Written in <c>PropagateData</c> after a pass succeeds, never inside the pass itself: a
+
+                                           Written in ``PropagateData`` after a pass succeeds, never inside the pass itself: a
                                            stamp written on a failed run would mean the one-shot repair never happens. For the same
                                            reason it must not be cleared when the rest of the result is reset per schedule attempt.
-                                           </para>
     """
     schedule_start_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     schedule_end_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -182,10 +180,10 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
     :param description: A brief textual explanation or characterization of the schedule segment.
                         Provides additional context or details about the segment.
     :param reasons_data: A descriptive field that provides justification or explanation related to the schedule segment,
-                         stored as JSON. New values are Brotli-compressed and base64-encoded behind a <c>br+base64:</c> header; a value
+                         stored as JSON. New values are Brotli-compressed and base64-encoded behind a ``br+base64:`` header; a value
                          with no header is plain JSON (rows written before compression). Written once, at segment construction, via the
-                         set-only <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Reasons" /> property; never read back as an object server-side (the user-facing audit view
-                         decodes it in the frontend). Marked <see cref="T:Filament.FSCore.Entities.Attributes.ExcludeFromEqualityAttribute" />; reasons are an audit/diagnostic
+                         set-only ``ScheduleSegmentEntity.reasons`` property; never read back as an object server-side (the user-facing audit view
+                         decodes it in the frontend). Marked ``ExcludeFromEqualityAttribute``; reasons are an audit/diagnostic
                          blob, not part of the segment's identity.
     :param start_instant: Represents the starting point in time for the schedule segment as an instant.
                           This property defines the exact timestamp from which the segment begins.
@@ -203,24 +201,24 @@ class ScheduleSegmentEntity(ReferenceEntityBase):
                        Used to establish hierarchical relationships between segments.
     :param parents: The parent schedule segment entities. Represents the hierarchical relationship where this segment is a child of another segment.
     :param priority_weight: The scheduling weight of this schedule segment, copied from the associated task's
-                            <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.PriorityWeight" />. <b>Higher is higher priority.</b> Meeting segments
+                            ``TaskEntity.priority_weight``. **Higher is higher priority.** Meeting segments
                             have a weight of 1.0.
     :param time_log_id: The identifier of the time log entry associated with this schedule segment.
                         This is used to link logged work time segments back to their source time log.
-    :param duration_multiplier: Snapshot of the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> for the user who
+    :param duration_multiplier: Snapshot of the ``CastUserConnection.duration_multiplier`` for the user who
                                 performed the logged work, captured at the time the segment was first created. Only
-                                populated on segments with <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.Mode" /> = <see cref="F:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentModeEnum.TimeLog" />;
-                                null for all other modes and when no matching <see cref="T:Filament.Services.CoreServices.Entities.CastService.CastUserConnection" /> existed at
+                                populated on segments with ``ScheduleSegmentEntity.mode`` = ``ScheduleSegmentModeEnum.TimeLog``;
+                                null for all other modes and when no matching ``CastUserConnection`` existed at
                                 creation time. The value is intentionally frozen — later changes to the underlying
-                                <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastUserConnection.DurationMultiplier" /> do not update this snapshot.
+                                ``CastUserConnection.duration_multiplier`` do not update this snapshot.
     :param time_log: The time log entry associated with this schedule segment.
                      Used to conveniently link a segment to its source time log.
     :param occurrence_target_instant: For event segments belonging to a recurring event, the drift-free target instant of
-                                      this occurrence (the rule's configured <c>StartDateTime + N * period</c>, converted to
+                                      this occurrence (the rule's configured ``StartDateTime + N * period``, converted to
                                       UTC via the event's time zone). Stable across re-plans even when the actual chosen
-                                      <see cref="P:Filament.Services.CoreServices.Entities.ScheduleService.ScheduleSegmentEntity.StartInstant" /> drifts within the shifted search window. Null for
+                                      ``ScheduleSegmentEntity.start_instant`` drifts within the shifted search window. Null for
                                       non-recurring events and for non-event segments. Used as the three-tier reuse key
-                                      together with <c>ReferenceId</c>.
+                                      together with ``ReferenceId``.
     """
     reference: Optional[Union[EventEntity, ScopeEntity, TaskEntity, TaskGroupEntity]] = field(default=None)
     name: str = field(default='')

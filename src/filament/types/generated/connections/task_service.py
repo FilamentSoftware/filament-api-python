@@ -22,8 +22,8 @@ class TaskDependencyConnection(EntityConnection):
     """
     Represents a connection that defines a dependency relationship between two task entities.
     
-    :param auto_generated_by: The name of the task module that generated this dependency during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this dependency during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -35,12 +35,12 @@ class TaskDependencyConnection(EntityConnection):
 class TaskGroupConnection(EntityConnection):
     """
     Represents a connection between a task entity and a task group entity.
-    This class is a specialization of <see cref="T:Filament.FSCore.Entities.EntityConnection`2" /> to handle
-    connections specifically between <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" /> and <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />.
-    Implements the <see cref="T:System.IEquatable`1" /> interface for equality checks.
+    This class is a specialization of ``EntityConnection`` to handle
+    connections specifically between ``TaskEntity`` and ``TaskGroupEntity``.
+    Implements the ``IEquatable`` interface for equality checks.
     
-    :param auto_generated_by: The name of the task module that generated this group membership during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this group membership during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -53,8 +53,8 @@ class TaskGroupParentConnection(EntityConnection):
     """
     Represents a connection between a task group entity and its parent task group entity.
     
-    :param auto_generated_by: The name of the task module that generated this group parent link during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this group parent link during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -69,8 +69,8 @@ class TaskMilestoneConnection(EntityConnection):
     Used to define and manage the association between tasks and their respective milestones.
     This class extends from the EntityConnection generic base class and implements equality checks.
     
-    :param auto_generated_by: The name of the task module that generated this milestone link during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this milestone link during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -85,8 +85,8 @@ class TaskSkillConnection(GenericTaskSkillConnection_1[TaskEntity]):
     extending functionality of a generic task-skill connection.
     This class provides equality checks suited for TaskSkillConnection objects.
     
-    :param auto_generated_by: The name of the task module that generated this skill requirement during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this skill requirement during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -99,11 +99,11 @@ class TaskOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a task and an office location within the system, extending the EntityConnection functionality.
     
-    :param priority_order: The rank of this office among the offices the task can be assigned to. <b>Lower is higher
-                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+    :param priority_order: The rank of this office among the offices the task can be assigned to. **Lower is higher
+                           priority**: the office with the smallest ``PriorityOrder`` is preferred, and offices sharing
                            the smallest value are equally preferred.
-    :param auto_generated_by: The name of the task module that generated this office location link during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this office location link during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.

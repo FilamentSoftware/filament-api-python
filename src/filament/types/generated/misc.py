@@ -14,9 +14,16 @@ from .connections.scope_item_service import ScopeItemDependencyConnection, Scope
 from .connections.task_service import TaskOfficeLocationConnection, TaskSkillConnection
 from .entities.scope_item_service import ScopeItemCustomComplexityEntity, ScopeItemEntity, ScopeItemNoteEntity
 from .entities.task_service import TaskEntity
-from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType, UserDefinedPropertyStatus
+from .enums import DataProcessingStatus, DataRequestAction, DbOrderDirection, ErrorCodes, ExtensionParameterType, ExtensionSettingProblemKind, ExtensionStatusSource, FileChecksumAlgorithm, PermissionAction, ReadMode, ScheduleSegmentModeEnum, ServiceProcessingMode, ServiceProcessingStatus, SubscriptionMode, TypeSchemaPropertyType, UserDefinedPropertyStatus
 
 __all__ = [
+    "ExtensionTriggerConfig",
+    "ExtensionManualParameter",
+    "ExtensionSettingSlot",
+    "ExtensionSettingGroup",
+    "ExtensionStatusProblem",
+    "ExtensionStatusSettingProblem",
+    "ExtensionRunResult",
     "ScopeItemVersionSettings",
     "ScopeItemTaskTypeDependencyRule",
     "ScopeItemStepTask",
@@ -45,6 +52,7 @@ __all__ = [
     "GetFileUrlsRequest",
     "EntityServiceDataUpdate",
     "ServiceProcessingInfo",
+    "ExtensionStatusReport",
     "ScopeItemCombinedTaskSet",
     "ScopeItemTaskDependency",
     "ScopeItemTaskTypeCost",
@@ -93,17 +101,197 @@ T_EntityBase = TypeVar("T_EntityBase", bound=EntityBase)
 
 
 @dataclass(kw_only=True)
+class ExtensionTriggerConfig:
+    """
+    What an extension says about when it runs, serialised as JSON into
+    ``ExtensionEntity.trigger_config_data``: a ``ExtensionTriggerMode.Timed`` extension's schedule,
+    a ``ExtensionTriggerMode.Triggered`` extension's entity type and condition in words, or an
+    ``ExtensionTriggerMode.External`` extension's outside service and poll interval.
+    
+    :param repeats: ``ExtensionTriggerMode.Timed``: whether the extension runs again every
+                    ``ExtensionTriggerConfig.interval_seconds``, or once.
+    :param first_run_at: ``ExtensionTriggerMode.Timed``: when the first run is due, as a local date and time in
+                         ``ExtensionTriggerConfig.time_zone``.
+    :param time_zone: ``ExtensionTriggerMode.Timed``: the IANA id of the time zone ``ExtensionTriggerConfig.first_run_at`` and
+                      ``ExtensionTriggerConfig.finish_at`` are in, such as ``Europe/London``.
+    :param interval_seconds: ``ExtensionTriggerMode.Timed``, repeating: the seconds between runs. A firing the extension
+                             missed is not made up: it runs once for the latest.
+    :param finish_at: ``ExtensionTriggerMode.Timed``, repeating: when the runs stop, as a local date and time in
+                      ``ExtensionTriggerConfig.time_zone``, or null for no end.
+    :param entity_type: ``ExtensionTriggerMode.Triggered``: the name of the entity type whose changes start a run.
+    :param description: ``ExtensionTriggerMode.Triggered``: the condition in words, written by the extension's author
+                        for a person to read. Not the condition itself.
+    :param source: ``ExtensionTriggerMode.External``: the name of the outside service the extension polls.
+    :param poll_interval_seconds: ``ExtensionTriggerMode.External``: the seconds between polls, or null when the extension does
+                                  not say.
+    """
+    repeats: Optional[bool] = field(default=None)
+    first_run_at: Optional[datetime.datetime] = field(default=None, metadata={"wire_type": "LocalDateTime"})
+    time_zone: Optional[str] = field(default=None)
+    interval_seconds: Optional[int] = field(default=None)
+    finish_at: Optional[datetime.datetime] = field(default=None, metadata={"wire_type": "LocalDateTime"})
+    entity_type: Optional[str] = field(default=None)
+    description: Optional[str] = field(default=None)
+    source: Optional[str] = field(default=None)
+    poll_interval_seconds: Optional[int] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class ExtensionManualParameter:
+    """
+    One parameter a ``ExtensionTriggerMode.Manual`` extension declares. A list of them is serialised as
+    JSON into ``ExtensionEntity.manual_parameters_data``.
+    
+    :param name: The parameter's name, unique within the extension. The key a run's ``Parameters`` holds its value under.
+    :param type: The type a value must parse as. For an array, the type of each element.
+    :param is_array: Whether a value is a JSON array of ``ExtensionManualParameter.type`` rather than a single value.
+    :param required: Whether a manual run must give a value. A required array may be empty.
+    :param default: The value written into a run that leaves an optional parameter out, as text, or null when there is none.
+    :param min_length: The fewest characters a ``String`` value may have, inclusive, or null for no limit. Characters are Unicode
+                       code points, as Python's ``len`` counts them, not UTF-16 units.
+    :param max_length: The most characters a ``String`` value may have, inclusive, or null for no limit. Characters are Unicode
+                       code points.
+    :param minimum: The smallest an ``Integer`` or ``Number`` value may be, inclusive, as text in the type's form (such as
+                    ``"1"``), or null for no bound. Text, so a 64-bit integer is exact.
+    :param maximum: The largest an ``Integer`` or ``Number`` value may be, inclusive, as text in the type's form, or null for
+                    no bound.
+    :param choices: The only values a ``String`` or ``Integer`` value may take, each as text in the type's form, or null for
+                    any value.
+    :param format: A format a ``String`` value must have, or null for none: ``Url`` (absolute, ``http`` or
+                   ``https``, with a host and no whitespace) or ``Email``.
+    :param pattern: A regular expression the whole of a ``String`` value must match, or null for none. It carries no anchors and
+                    is in the portable subset the backend accepts at registration.
+    """
+    name: str = field(default='')
+    type: ExtensionParameterType = field(default=ExtensionParameterType.Unknown)
+    is_array: bool = field(default=False)
+    required: bool = field(default=False)
+    default: Optional[str] = field(default=None)
+    min_length: Optional[int] = field(default=None)
+    max_length: Optional[int] = field(default=None)
+    minimum: Optional[str] = field(default=None)
+    maximum: Optional[str] = field(default=None)
+    choices: Optional[list[str]] = field(default=None)
+    format: Optional[str] = field(default=None)
+    pattern: Optional[str] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class ExtensionSettingSlot:
+    """
+    One setting slot an extension declares. A list of them is serialised as JSON into
+    ``ExtensionEntity.setting_slots_data``.
+    
+    :param name: The slot's name, unique within the extension. It has the form an extension's name has.
+    :param description: What the slot holds, for an organisation admin filling it in.
+    :param required: Whether the extension needs the slot filled to work. For a slot in an optional group, only once the group is
+                     in use.
+    :param group: The name of the ``ExtensionSettingGroup`` in ``ExtensionEntity.setting_groups_data``
+                  the slot is shown in, or null for an ungrouped slot.
+    :param type: The type a value must parse as. A row written before slots were typed has none, and reads as
+                 ``ExtensionParameterType.String``.
+    :param secret: Whether the value is a secret. A row written before slots were typed has none, and reads as secret, which is
+                   what every slot was then.
+    :param min_length: The fewest characters a ``String`` value may have, inclusive, or null for no limit. Characters are Unicode
+                       code points, as Python's ``len`` counts them, not UTF-16 units.
+    :param max_length: The most characters a ``String`` value may have, inclusive, or null for no limit. Characters are Unicode
+                       code points.
+    :param minimum: The smallest an ``Integer`` or ``Number`` value may be, inclusive, as text in the type's form (such as
+                    ``"1"``), or null for no bound. Text, so a 64-bit integer is exact.
+    :param maximum: The largest an ``Integer`` or ``Number`` value may be, inclusive, as text in the type's form, or null for
+                    no bound.
+    :param choices: The only values a ``String`` or ``Integer`` value may take, each as text in the type's form, or null for
+                    any value.
+    :param format: A format a ``String`` value must have, or null for none: ``Url`` (absolute, ``http`` or
+                   ``https``, with a host and no whitespace) or ``Email``.
+    :param pattern: A regular expression the whole of a ``String`` value must match, or null for none. It carries no anchors and
+                    is in the portable subset the backend accepts at registration.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    required: bool = field(default=False)
+    group: Optional[str] = field(default=None)
+    type: ExtensionParameterType = field(default=ExtensionParameterType.String)
+    secret: bool = field(default=True)
+    min_length: Optional[int] = field(default=None)
+    max_length: Optional[int] = field(default=None)
+    minimum: Optional[str] = field(default=None)
+    maximum: Optional[str] = field(default=None)
+    choices: Optional[list[str]] = field(default=None)
+    format: Optional[str] = field(default=None)
+    pattern: Optional[str] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class ExtensionSettingGroup:
+    """
+    One group of setting slots an extension declares, usually one outside service it talks to. A list of them is
+    serialised as JSON into ``ExtensionEntity.setting_groups_data``, in the order they are shown.
+    
+    :param name: The group's name, unique among the extension's groups. It has the form an extension's name has.
+    :param description: The group's heading, for an organisation admin.
+    :param required: Whether the extension needs the group's required slots filled to work. An optional group is in use once any
+                     of its slots is filled, and only then are its required slots required. The extension works this out and
+                     reports it in its status; the backend does not check it.
+    """
+    name: str = field(default='')
+    description: str = field(default='')
+    required: bool = field(default=True)
+
+
+@dataclass(kw_only=True)
+class ExtensionStatusProblem:
+    """
+    One problem with an extension as a whole, in ``ExtensionStatusReport.problems``.
+    
+    :param source: Where the problem comes from.
+    :param message: What is wrong, for an organisation admin: not empty, at most ``ExtensionEntity.StatusMessageMaxLength``
+                    characters, and holding no part of a secret value.
+    """
+    source: ExtensionStatusSource = field(default=ExtensionStatusSource.Unknown)
+    message: str = field(default='')
+
+
+@dataclass(kw_only=True)
+class ExtensionStatusSettingProblem:
+    """
+    One problem with a setting slot, in ``ExtensionStatusReport.settings``.
+    
+    :param name: The slot's name: one in the extension's ``ExtensionEntity.setting_slots_data``.
+    :param problem: What is wrong with the slot.
+    :param message: More about the problem, or null: not empty when given, at most
+                    ``ExtensionEntity.StatusMessageMaxLength`` characters, and holding no part of the value.
+    """
+    name: str = field(default='')
+    problem: ExtensionSettingProblemKind = field(default=ExtensionSettingProblemKind.Unknown)
+    message: Optional[str] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class ExtensionRunResult:
+    """
+    One entity a run produced or changed. A list of them is serialised as JSON into
+    ``ExtensionRunEntity.result_data``.
+    
+    :param entity_type: The entity's type name, such as ``MediaEntity``.
+    :param entity_id: The entity's id.
+    """
+    entity_type: str = field(default='')
+    entity_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
+
+
+@dataclass(kw_only=True)
 class ScopeItemVersionSettings:
     """
     The settings record of a scope item version: the rows the scope item service owns for the item, as the entities
     themselves, plus two scalars describing the item's standing at capture. Each section is a list of real entity or
     connection objects, written with every schema property and read back with
-    <see cref="P:Filament.FSCore.Entities.EntityBase.SpecifiedProperties" /> naming what the record carried, so a property added to one of these
+    ``EntityBase.specified_properties`` naming what the record carried, so a property added to one of these
     types later is captured without touching this class, and is left alone by a restore from an older record.
     
     :param schema_version: The schema version of this record's shape.
-    :param scheduled: Whether the item's status scheduled it at capture (its <c>Schedule</c> gate).
-    :param costed: Whether the item's status counted its costs at capture (its <c>Costs</c> gate).
+    :param scheduled: Whether the item's status scheduled it at capture (its ``Schedule`` gate).
+    :param costed: Whether the item's status counted its costs at capture (its ``Costs`` gate).
     :param item: The item, with its own link columns blanked: a version does not record its own link.
     :param dependencies: The item's dependencies on other items (outbound only).
     :param groups: The item's group memberships.
@@ -150,17 +338,17 @@ class ScopeItemStepTask:
     """
     One step task of a combined task.
     
-    :param task: The task candidate. Its <c>Id</c>, <c>AncestorGroupIds</c> and the other live-row columns are the applying
+    :param task: The task candidate. Its ``Id``, ``AncestorGroupIds`` and the other live-row columns are the applying
                  module's to set.
     :param step_id: The task type step the task was built from.
     :param step_sort_order: The step's sort order at build time.
     :param start_proportion: Where the step starts within its task type, as a proportion of the task type's total time weight.
     :param step_proportion: The step's own share of its task type's total time weight; the step ends at
-                            <see cref="P:Filament.Services.CoreServices.Services.ScopeItemStepTask.StartProportion" /> + this. Kept rather than the end itself because the overlap rule
-                            (<see cref="M:Filament.Services.CoreServices.Services.ScopeItemTaskBuilder.GetOverlapStepIndex(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Double,System.Double}},System.Double,System.Boolean)" />) sums shares, and a subtraction would not give them
+                            ``ScopeItemStepTask.start_proportion`` + this. Kept rather than the end itself because the overlap rule
+                            (``ScopeItemTaskBuilder.GetOverlapStepIndex``) sums shares, and a subtraction would not give them
                             back exactly.
-    :param skills: The skill connection candidates. Their <c>FromId</c> is unset; the applying module sets it.
-    :param office_locations: The office-location connection candidates. Their <c>FromId</c> is unset; the applying module sets it.
+    :param skills: The skill connection candidates. Their ``FromId`` is unset; the applying module sets it.
+    :param office_locations: The office-location connection candidates. Their ``FromId`` is unset; the applying module sets it.
     """
     task: TaskEntity
     step_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
@@ -178,7 +366,7 @@ class ScopeItemTaskKey:
     single-instance item), its task type, its combine key and its step. The same key the scope module matches
     existing tasks by, and the one place it is defined.
     
-    :param instance_key: The instance number as a string for a <c>Count &gt; 1</c> item; empty otherwise.
+    :param instance_key: The instance number as a string for a ``Count > 1`` item; empty otherwise.
     :param task_type_id: The task type the step belongs to.
     :param combine_key: The combine key of the combined task.
     :param step_id: The task type step the task was built from.
@@ -209,7 +397,7 @@ class CostFigures:
 class TaskMilestoneWarning:
     """
     A structured warning payload. A milestone's warnings are serialized together as a single JSON
-    array into <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.WarningsData" />.
+    array into ``TaskMilestoneEntity.warnings_data``.
     
     :param message: A human-readable description of the issue.
     :param entity_type: The type name of the entity the warning relates to - for example an ineffective
@@ -281,12 +469,12 @@ class ClientHelloRequest:
     Represents a connect-time capability handshake sent by the client to advertise what it can
     accept. Sent as a request object (rather than bare arguments) so additional capability fields
     (protocol version, supported features, etc.) can be added later without changing the
-    <c>ClientHello</c> hub-method signature.
+    ``ClientHello`` hub-method signature.
     
     :param max_message_size_bytes: The maximum number of bytes the client can accept in a single SignalR message (an invocation
-                                   response or a pushed event). <c>null</c> (or absent) means the client does not specify one, so
-                                   invocation responses are held to the server default (<c>--default-max-message-size</c>) — a
-                                   client cannot opt out of that cap. The server default does <em>not</em> extend to pushed
+                                   response or a pushed event). ``null`` (or absent) means the client does not specify one, so
+                                   invocation responses are held to the server default (``--default-max-message-size``) — a
+                                   client cannot opt out of that cap. The server default does *not* extend to pushed
                                    events: a connection that never negotiated has no byte ceiling on pushes, which remain bounded
                                    only by the per-update entity count. A negotiated value applies to both. The server rejects
                                    values that are zero, negative, or below a small floor.
@@ -309,8 +497,8 @@ class FileCapabilities:
 @dataclass(kw_only=True)
 class SuccessOrErrorBase:
     """
-    Abstract base class providing shared error-handling logic for <see cref="T:Filament.FSCore.Structs.SuccessOrError" />
-    and <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
+    Abstract base class providing shared error-handling logic for ``SuccessOrError``
+    and ``ValueOrError``.
     
     :param success: Whether it is in a success state or not
     :param message: The message to go along with the result
@@ -384,7 +572,7 @@ class SubscriptionConfig:
     :param status: Gets the current data processing status of the subscription configuration.
                    This property indicates the state of the data processing workflow associated
                    with the subscription, such as whether it is pending, in progress, or complete.
-                   The value is represented by a combination of flags from the <see cref="T:Filament.FSCore.ServiceDataTypes.DataProcessingStatus" /> enumeration,
+                   The value is represented by a combination of flags from the ``DataProcessingStatus`` enumeration,
                    allowing multiple states to be tracked concurrently.
                    It is often used to control or filter subscription operations based on the processing state.
     :param type_name: Gets the fully qualified name of the data type linked to the subscription configuration.
@@ -398,16 +586,16 @@ class SubscriptionConfig:
                       of a database condition instance to encapsulate filtering logic and operations.
     :param mode: Gets the subscription mode that dictates the types of updates or events the subscription should handle.
                  This property specifies which aspects of the subscription (e.g., data changes, progress updates) are relevant,
-                 as defined by the flags in the <see cref="T:Filament.FilamentHub.Subscriptions.SubscriptionMode" /> enumeration.
+                 as defined by the flags in the ``SubscriptionMode`` enumeration.
                  Use this property to configure the behavior of the subscription mechanism
                  to process data or monitor progress according to specific requirements.
-    :param properties: The entity property names this subscription wants pushed. <c>null</c> (the default) means <b>all</b>
+    :param properties: The entity property names this subscription wants pushed. ``null`` (the default) means **all**
                        properties, matching today's behaviour; a non-null set narrows what the subscriber receives. The
                        subscription manager hydrates the union of every active subscription's property set for a type (plus
                        its condition/permission and identity columns). Because it changes what a subscriber receives, it is
-                       part of the subscription's identity (see <see cref="M:Filament.FilamentHub.Subscriptions.SubscriptionConfig.Equals(Filament.FilamentHub.Subscriptions.SubscriptionConfig)" /> /
-                       <see cref="M:Filament.FilamentHub.Subscriptions.SubscriptionConfig.GetHashCode" />): two otherwise-identical subscriptions with different property sets are
-                       distinct <c>SubscriptionCache.ByConfig</c> entries, so one's narrowing never applies to the other.
+                       part of the subscription's identity (see ``SubscriptionConfig.Equals`` /
+                       ``SubscriptionConfig.GetHashCode``): two otherwise-identical subscriptions with different property sets are
+                       distinct ``SubscriptionCache.ByConfig`` entries, so one's narrowing never applies to the other.
     """
     scenario_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     status: DataProcessingStatus = field(default=DataProcessingStatus.Unknown)
@@ -526,19 +714,19 @@ class UploadGrant:
     
     :param file_id: The id of the file entity this grant uploads for.
     :param url: The absolute URL to submit to. Always the storage endpoint, never the hub.
-    :param method: The HTTP method to use. <c>POST</c> for every provider today.
-    :param issued_at: When the grant was minted. <see cref="P:Filament.FSCore.FileStore.UploadGrant.ExpiresAt" /> minus this is the lifetime the grant was signed
+    :param method: The HTTP method to use. ``POST`` for every provider today.
+    :param issued_at: When the grant was minted. ``UploadGrant.expires_at`` minus this is the lifetime the grant was signed
                       with, which a client can measure against its own clock without trusting the server's.
-    :param expires_at: When the grant stops being accepted. Evaluated when the request is <i>received</i>, not when
+    :param expires_at: When the grant stops being accepted. Evaluated when the request is *received*, not when
                        it completes, so a transfer that starts in time may finish afterwards.
     :param max_bytes: The ceiling the policy enforces, in bytes. Equal to the declared size.
-    :param headers: Request headers the submission must carry. Normally <b>empty</b>, and that is load-bearing: a
-                    cross-origin <c>POST</c> whose only content type is <c>multipart/form-data</c> and which sends
-                    no custom headers is a CORS <i>simple</i> request, so no preflight is issued. Any entry here
+    :param headers: Request headers the submission must carry. Normally **empty**, and that is load-bearing: a
+                    cross-origin ``POST`` whose only content type is ``multipart/form-data`` and which sends
+                    no custom headers is a CORS *simple* request, so no preflight is issued. Any entry here
                     makes it non-simple. Nullable and omitted rather than required, so a client can skip it.
     :param fields: Form fields the submission must carry — the policy document, its signature, the key, and
                    whatever else the provider requires. Present for a policy upload; null for a plain-body one.
-                   <b>Order matters:</b> the file part must be appended last.
+                   **Order matters:** the file part must be appended last.
     :param checksum_algorithm: The checksum algorithm the store will verify against, so a client holding only a grant knows the form.
     """
     file_id: UUID
@@ -598,18 +786,18 @@ class ServiceProcessingInfo:
     :param status: Current execution status of the service within the run.
     :param mode: The role the service is playing in the run.
     :param progress: The latest reported progress for this service within the run, between 0.0 and 1.0.
-                     Updated from the service's progress updates while <see cref="P:Filament.FSCore.CoreEntities.ServiceProcessingInfo.Status" /> is
-                     <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" />; monotonically non-decreasing within a
+                     Updated from the service's progress updates while ``ServiceProcessingInfo.status`` is
+                     ``ServiceProcessingStatus.Processing``; monotonically non-decreasing within a
                      single run attempt (a late-arriving lower value is clamped away). Reset by the seed/reuse
                      write when a run is retried.
     :param start_instant: When this service's processing started: stamped on the first transition to
-                          <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" /> and left untouched on any later re-entry
+                          ``ServiceProcessingStatus.Processing`` and left untouched on any later re-entry
                           (e.g. a failover re-dispatch — the first dispatch is the start). Null until the service
                           starts.
     :param end_instant: When this service's processing ended: stamped on the first transition out of
-                        <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Processing" /> (to Publishing, Completed, Failed or
+                        ``ServiceProcessingStatus.Processing`` (to Publishing, Completed, Failed or
                         Cancelled) and not overwritten by the later Publishing → Completed transition — so
-                        <c>EndInstant - StartInstant</c> is the service's own processing time, excluding the hub's
+                        ``EndInstant - StartInstant`` is the service's own processing time, excluding the hub's
                         publish phase. Null while running or if the service never started.
     """
     sort_order: int = field(default=0)
@@ -618,6 +806,22 @@ class ServiceProcessingInfo:
     progress: float = field(default=0)
     start_instant: Optional[datetime.datetime] = field(default=None)
     end_instant: Optional[datetime.datetime] = field(default=None)
+
+
+@dataclass(kw_only=True)
+class ExtensionStatusReport:
+    """
+    What is wrong with an extension in one organisation. Serialised as JSON into
+    ``ExtensionEntity.status_data``, and only ever while ``ExtensionEntity.status`` is
+    ``ExtensionStatus.Problem``.
+    
+    :param problems: What is wrong with the extension as a whole, at most one entry per ``ExtensionStatusSource``. May be
+                     empty, but not left out.
+    :param settings: What is wrong with individual setting slots, at most one entry per slot, each naming a slot the extension
+                     declares. May be empty, but not left out.
+    """
+    problems: Optional[list[ExtensionStatusProblem]] = field(default=None)
+    settings: Optional[list[ExtensionStatusSettingProblem]] = field(default=None)
 
 
 @dataclass(kw_only=True)
@@ -637,8 +841,8 @@ class ScopeItemCombinedTaskSet:
 @dataclass(kw_only=True)
 class ScopeItemTaskDependency:
     """
-    A dependency edge between two of one item's own tasks. <see cref="P:Filament.Services.CoreServices.Services.ScopeItemTaskDependency.From" /> is the downstream task, which depends on
-    <see cref="P:Filament.Services.CoreServices.Services.ScopeItemTaskDependency.To" /> - the same direction as a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskDependencyConnection" />.
+    A dependency edge between two of one item's own tasks. ``ScopeItemTaskDependency.from_`` is the downstream task, which depends on
+    ``ScopeItemTaskDependency.to`` - the same direction as a ``TaskDependencyConnection``.
     
     :param from_: The downstream task.
     :param to: The upstream task.
@@ -692,7 +896,7 @@ class ServerCapabilities:
     """
     Everything the server can tell a client about itself before the client does any work.
     
-    :param files: What this deployment can do with files, or <see langword="null" /> when it has no file store.
+    :param files: What this deployment can do with files, or ``None`` when it has no file store.
     """
     files: Optional[FileCapabilities] = field(default=None)
 
@@ -856,15 +1060,15 @@ class ScopeItemTaskTypeTaskSet:
 @dataclass(kw_only=True)
 class ScopeItemCostSet:
     """
-    The costs one scope item's configuration produces, as computed by <see cref="T:Filament.Services.CoreServices.Services.ScopeItemCostCalculator" />: the item
-    total, the per-instance figure for a <c>Count &gt; 1</c> item, and the per-task-type figures, all in the item's
+    The costs one scope item's configuration produces, as computed by ``ScopeItemCostCalculator``: the item
+    total, the per-instance figure for a ``Count > 1`` item, and the per-task-type figures, all in the item's
     currency.
     
     :param schema_version: The schema version of this set's shape.
     :param priced_at: The instant the rates were read at.
     :param currency_id: The item's currency, which every figure is in.
     :param item_total: The item total: every instance.
-    :param instance: One instance's figures, for a <c>Count &gt; 1</c> item; null otherwise.
+    :param instance: One instance's figures, for a ``Count > 1`` item; null otherwise.
     :param task_types: The per-task-type figures, for one instance, in the order the task types were first met.
     """
     schema_version: int = field(default=1)
@@ -935,7 +1139,7 @@ class UserOptionReason:
 @dataclass(kw_only=True)
 class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
     """
-    Represents a public-facing abstraction derived from <see cref="T:Filament.FSCore.Structs.ValueOrError`1" />.
+    Represents a public-facing abstraction derived from ``ValueOrError``.
     This class is used to expose data and error information in a way that is
     consumable by external systems or APIs.
     
@@ -948,7 +1152,7 @@ class ValueOrErrorPublic_1(ValueOrError_1[T], Generic[T]):
 @dataclass(kw_only=True)
 class SuccessOrErrorPublic(SuccessOrError):
     """
-    Represents a public-facing version of the <see cref="T:Filament.FSCore.Structs.SuccessOrError" /> class.
+    Represents a public-facing version of the ``SuccessOrError`` class.
     This class is used to expose results while ensuring only public errors and messages are shared externally.
     
     :param error_id: Identifies the specific error encountered, represented as a nullable GUID.
@@ -978,8 +1182,8 @@ class DataUpdateRejectedNotification:
     """
     Notifies a subscribed client that a pushed data update was not delivered because its
     serialised size would have exceeded the maximum message size the client negotiated via the
-    connect-time <c>ClientHello</c> capability handshake. The client routes this to the affected
-    subscription's callback as an error path, in place of the <c>DataUpdated</c> event that would
+    connect-time ``ClientHello`` capability handshake. The client routes this to the affected
+    subscription's callback as an error path, in place of the ``DataUpdated`` event that would
     otherwise have been sent.
     
     :param subscription_id: The identifier of the subscription whose update was rejected. Lets the client correlate
@@ -1000,11 +1204,11 @@ class SubscriptionRemovedNotification:
     Notifies a subscribed client that the hub has removed one of its subscriptions. Sent only when
     the removal originates in the hub itself — for example a subscription dropped because its
     condition can no longer be evaluated — never for a removal the client requested through
-    <c>Unsubscribe</c>. Carries no reason: the identifier alone tells the client the subscription
+    ``Unsubscribe``. Carries no reason: the identifier alone tells the client the subscription
     is dead, without disclosing why.
     
     :param subscription_id: The identifier of the removed subscription. No further pushes will be delivered for it,
-                            and an <c>Unsubscribe</c> for it is unnecessary.
+                            and an ``Unsubscribe`` for it is unnecessary.
     """
     subscription_id: SubscriptionId
 
@@ -1037,7 +1241,7 @@ class ModifyDataRequest(StructBase):
                         with the corresponding scenario in various processes.
     :param user_id: Represents the unique identifier associated with a user in the context of the operation.
                     This identifier is used to track and associate the request with the specific user initiating or responsible for it.
-    :param user_type: The kind of principal <see cref="P:Filament.FSCore.Structs.ModifyDataRequest.UserId" /> identifies — see <see cref="T:Filament.FSCore.Authentication.AuthPrincipalTypes" />.
+    :param user_type: The kind of principal ``ModifyDataRequest.user_id`` identifies — see ``AuthPrincipalTypes``.
     :param requested_at: Represents the timestamp at which the data modification request was created.
                          This property is used to track the specific time the request was initialized,
                          ensuring proper ordering and auditing of operations.
@@ -1106,12 +1310,12 @@ class ServiceDataUpdate:
                          used to track and order service data updates consistently.
     :param part_idx: The zero-based index of this update within the set of parts produced when a single logical
                      update is split for delivery because it would exceed the client's negotiated message-size
-                     limit. <c>0</c> when the update was not split (the default). All parts of a split update
-                     share the same <see cref="P:Filament.FSCore.ServiceDataTypes.ServiceDataUpdate.SequenceIdx" />, <see cref="P:Filament.FSCore.ServiceDataTypes.ServiceDataUpdate.SubscriptionId" />, and other envelope
-                     fields, differing only in their entities and <see cref="P:Filament.FSCore.ServiceDataTypes.ServiceDataUpdate.PartIdx" />.
+                     limit. ``0`` when the update was not split (the default). All parts of a split update
+                     share the same ``ServiceDataUpdate.sequence_idx``, ``ServiceDataUpdate.subscription_id``, and other envelope
+                     fields, differing only in their entities and ``ServiceDataUpdate.part_idx``.
     :param part_count: The total number of parts a single logical update was split into for delivery (because it
-                       would exceed the client's negotiated message-size limit). <c>1</c> when the update was not
-                       split (the default). Lets the client know how many <c>DataUpdated</c> events to expect for
+                       would exceed the client's negotiated message-size limit). ``1`` when the update was not
+                       split (the default). Lets the client know how many ``DataUpdated`` events to expect for
                        the update.
     """
     scenario_id: UUID
@@ -1139,7 +1343,7 @@ class ReadDataTypeRequest:
     :param offset: The number of records to skip before returning results.
     :param properties: The list of properties to include in the results. Required when Mode is Distinct.
     :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is true.
-    :param populate_file_data: Whether the hub should populate any requested <c>[FileDataProperty]</c> projections on the results.
+    :param populate_file_data: Whether the hub should populate any requested ``[FileDataProperty]`` projections on the results.
     """
     type_name: str = field(default='')
     condition: Optional[DbConditionInstance] = field(default=None)
@@ -1170,7 +1374,7 @@ class ReadConnectedDataTypeRequest:
     :param entity_properties: The list of entity properties to include in the results.
     :param apply_pending_requests: Whether to apply pending requests before reading the data. Default is false,
                                    as this is not currently supported on ReadConnectedData.
-    :param populate_file_data: Whether the hub should populate any requested <c>[FileDataProperty]</c> projections, on either side.
+    :param populate_file_data: Whether the hub should populate any requested ``[FileDataProperty]`` projections, on either side.
     """
     connection_type_name: str = field(default='')
     entity_type_name: str = field(default='')
@@ -1192,7 +1396,7 @@ class ScopeItemInstanceTaskSet:
     """
     The tasks of one instance of a scope item.
     
-    :param instance_key: The instance number as a string for a <c>Count &gt; 1</c> item; empty otherwise.
+    :param instance_key: The instance number as a string for a ``Count > 1`` item; empty otherwise.
     :param instance_num: The 1-based instance number.
     :param task_types: The task types, in the order the gather produced them.
     """
@@ -1304,15 +1508,15 @@ class ReadConnectedDataRequest(StructBase):
 @dataclass(kw_only=True)
 class ScopeItemTaskSet:
     """
-    The tasks one scope item's configuration produces, as computed by <see cref="T:Filament.Services.CoreServices.Services.ScopeItemTaskBuilder" />: per
-    instance, per task type, per combined task, the step tasks as <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" /> candidates, with their skill
+    The tasks one scope item's configuration produces, as computed by ``ScopeItemTaskBuilder``: per
+    instance, per task type, per combined task, the step tasks as ``TaskEntity`` candidates, with their skill
     and office-location connections, the internal dependency edges between them, and each task type's resolved upstream
     dependency rules. It carries no task ids: the module that applies it matches candidates to existing tasks by
-    <see cref="T:Filament.Services.CoreServices.Services.ScopeItemTaskKey" />.
+    ``ScopeItemTaskKey``.
     
     :param schema_version: The schema version of this set's shape.
-    :param count: The item's <c>Count</c> the set was built for.
-    :param instances: One entry for a single-instance item (<c>InstanceKey</c> empty), else one per instance.
+    :param count: The item's ``Count`` the set was built for.
+    :param instances: One entry for a single-instance item (``InstanceKey`` empty), else one per instance.
     :param internal_dependencies: The edges between this item's own tasks.
     """
     schema_version: int = field(default=1)

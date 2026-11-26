@@ -38,7 +38,7 @@ class TaskDependencyConnectionBase_2(EntityConnection, Generic[TFromEntity, TToE
     
     :param overlap_proportion: The proportion tasks can overlap the connected task type. This is used when building task templates to
                                automatically determine the upstream and downstream dependencies between different tasks.
-                               
+
                                For example if you had an OverlapProportion of 0.5 between a lighting and compositing task type,
                                Filament would connect step 3 of the lighting task to step 1 of the compositing task (assuming the
                                dependency chain was: Lighting ---(0.5)--- Compositing ).
@@ -81,9 +81,9 @@ class GenericScopeTaskTypeConnection_2(EntityConnection, Generic[TEntityFrom, TC
     
     :param complexity_source: Where the duration of this task is determined.  It can be a custom amount or from the Complexity
                               linked to the task.
-    :param complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to <see cref="F:Filament.Services.CoreServices.Entities.Other.ScopeTaskTypeComplexitySource.TaskTypeComplexity" />.
+    :param complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to ``ScopeTaskTypeComplexitySource.TaskTypeComplexity``.
     :param complexity: A helper method for setting the complexity id.
-    :param custom_complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to <see cref="F:Filament.Services.CoreServices.Entities.Other.ScopeTaskTypeComplexitySource.Custom" />.
+    :param custom_complexity_id: A link to the complexity entity. Used to determine the task duration if ComplexitySource is set to ``ScopeTaskTypeComplexitySource.Custom``.
     :param custom_complexity: A helper method for setting the custom complexity id.
     """
     add_to_dependent_category_ids: Optional[list[UUID]] = field(default=None)

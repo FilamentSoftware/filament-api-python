@@ -17,6 +17,15 @@ __all__ = [
     "DbOrderDirection",
     "ErrorCodes",
     "EventUserConnectionStatus",
+    "ExtensionApprovalDecision",
+    "ExtensionParameterType",
+    "ExtensionRunStatus",
+    "ExtensionSettingCheckResult",
+    "ExtensionSettingProblemKind",
+    "ExtensionStatus",
+    "ExtensionStatusSource",
+    "ExtensionTriggerKind",
+    "ExtensionTriggerMode",
     "FileChecksumAlgorithm",
     "FileState",
     "Industry",
@@ -27,6 +36,7 @@ __all__ = [
     "NoteUserConnectionType",
     "PermissionAction",
     "PermissionDeltaMode",
+    "PermissionGrantOrigin",
     "PermissionType",
     "PreviewType",
     "ProcessingRunStatus",
@@ -77,11 +87,11 @@ class ActualStatusEnum(Enum):
     and the post-work pipeline (automated processing, then human review).
     
     :cvar NotReady: The task cannot yet start because at least one first-level upstream dependency has not
-                    reached <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" />.
+                    reached ``ActualStatusEnum.Finished``.
     :cvar Waiting: The task cannot yet start because its planned start date is in the future (tomorrow or
-                   later, UTC date comparison). Upstream dependencies are all <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" /> —
-                   otherwise the task is <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.NotReady" />.
-    :cvar ReadyToStart: All first-level upstream dependencies are <see cref="F:Filament.Services.CoreServices.Entities.ActualService.ActualStatusEnum.Finished" /> (or the task has no
+                   later, UTC date comparison). Upstream dependencies are all ``ActualStatusEnum.Finished`` —
+                   otherwise the task is ``ActualStatusEnum.NotReady``.
+    :cvar ReadyToStart: All first-level upstream dependencies are ``ActualStatusEnum.Finished`` (or the task has no
                         dependencies) and the planned start date has arrived, but no work has started on the
                         task yet.
     :cvar InProgress: The task has started work, indicated by either an open time log or a qualifying submitted work time log.
@@ -105,7 +115,7 @@ class ActualStatusEnum(Enum):
 
 class AvailabilityModeEnum(Enum):
     """
-    An enum to define what affect an <see cref="T:Filament.Services.CoreServices.Entities.AvailabilityService.AvailabilityEntity" /> has on overall availability.
+    An enum to define what affect an ``AvailabilityEntity`` has on overall availability.
     
     :cvar Unknown: Unknown
     :cvar Unavailable: This entity defines a time period when the user is specifically unavailable.
@@ -166,11 +176,11 @@ class ChangedEntityStatus(Enum):
 
 class CompressionMethod(Enum):
     """
-    The compression codec a <see cref="T:Filament.FSCore.Entities.Attributes.CompressedPropertyAttribute">[CompressedProperty]</see> value is written with.
-    Each member maps to a header token in <see cref="T:Filament.FSCore.Entities.PropertyCompression" />, the only place that knows the tokens.
+    The compression codec a [CompressedProperty] value is written with.
+    Each member maps to a header token in ``PropertyCompression``, the only place that knows the tokens.
     
-    :cvar Brotli: Brotli (RFC 7932). Header token <c>br</c>.
-    :cvar Gzip: Gzip (RFC 1952). Header token <c>gzip</c>. Decodable everywhere without a dependency (browsers and the Python
+    :cvar Brotli: Brotli (RFC 7932). Header token ``br``.
+    :cvar Gzip: Gzip (RFC 1952). Header token ``gzip``. Decodable everywhere without a dependency (browsers and the Python
                 standard library included), which is why every reader supports it even where nothing writes it.
     """
     Brotli = 0
@@ -427,14 +437,181 @@ class EventUserConnectionStatus(Enum):
     Declined = 2
 
 
+class ExtensionApprovalDecision(Enum):
+    """
+    A user's decision on a run that is awaiting approval, held on ``ExtensionRunEntity.approval_decision``.
+    
+    :cvar Unknown: Not a decision. Never a valid value to write.
+    :cvar Approved: The proposal is approved.
+    :cvar Rejected: The proposal is rejected.
+    """
+    Unknown = 0
+    Approved = 1
+    Rejected = 2
+
+
+class ExtensionParameterType(Enum):
+    """
+    The type of a manual parameter an extension declares, held in
+    ``ExtensionManualParameter.type``.
+    
+    :cvar Unknown: Not set. Never a valid type.
+    :cvar String: The text itself.
+    :cvar Integer: A signed 64-bit whole number in decimal digits, with an optional leading ``-``.
+    :cvar Number: A finite 64-bit floating-point number in JSON number syntax.
+    :cvar Boolean: ``true`` or ``false``.
+    :cvar Guid: A guid in its hyphenated, 36-character form.
+    """
+    Unknown = 0
+    String = 1
+    Integer = 2
+    Number = 3
+    Boolean = 4
+    Guid = 5
+
+
+class ExtensionRunStatus(Enum):
+    """
+    Where a run is in its life. See the run state machine in the #2091 plan.
+    
+    :cvar Queued: Waiting for the extension to claim it.
+    :cvar Running: The extension is working on it.
+    :cvar Suspended: The extension paused it and will resume it.
+    :cvar AwaitingApproval: The extension has proposed something and is waiting for a user's decision.
+    :cvar Completed: Finished successfully.
+    :cvar Failed: Finished unsuccessfully. A user may ask for it to be retried.
+    :cvar Approved: A user approved its proposal. Set by the processor, never written directly.
+    :cvar Rejected: A user rejected its proposal. Set by the processor, never written directly.
+    """
+    Queued = 0
+    Running = 1
+    Suspended = 2
+    AwaitingApproval = 3
+    Completed = 4
+    Failed = 5
+    Approved = 6
+    Rejected = 7
+
+
+class ExtensionSettingCheckResult(Enum):
+    """
+    What an extension made of one write of a setting's value, held in
+    ``ExtensionSettingEntity.check_result``.
+    
+    :cvar Unchecked: The extension has not tried the current value yet.
+    :cvar Accepted: The extension tried the value and it worked.
+    :cvar Refused: The outside service refused the value.
+    :cvar Invalid: The value does not fit its slot: the slot's type or restrictions changed under it.
+    :cvar Unreadable: The secret store answered, and this slot's secret is not there to read: it does not exist, or has no live
+                      version. A read the store refuses for want of permission is not this: on a new secret the grant can take a
+                      few minutes to apply, so the extension tries again and writes no verdict meanwhile.
+    """
+    Unchecked = 0
+    Accepted = 1
+    Refused = 2
+    Invalid = 3
+    Unreadable = 4
+
+
+class ExtensionSettingProblemKind(Enum):
+    """
+    What is wrong with one setting slot, held in ``ExtensionStatusSettingProblem.problem``.
+    
+    :cvar Unknown: Not set. Never a valid problem.
+    :cvar Missing: A required slot is not set, or a slot of an optional group that is in use. Only the extension knows when an
+                   optional group is in use, so the backend does not check this against the declaration.
+    :cvar Refused: The outside service refused the value.
+    :cvar Invalid: The value no longer fits its slot: the slot's type or restrictions changed under it.
+    :cvar Unreadable: The secret store answered, and this slot's secret is not there to read: it does not exist, or has no live
+                      version. A read the store refuses for want of permission is not this: on a new secret the grant can take a
+                      few minutes to apply, so the extension tries again and reports nothing against the slot meanwhile.
+    :cvar Unreachable: The service the slot's value points at could not be reached. That says nothing against the value, which may
+                       be right, so the extension writes no verdict on it (``ExtensionSettingEntity.check_result``).
+    """
+    Unknown = 0
+    Missing = 1
+    Refused = 2
+    Invalid = 3
+    Unreadable = 4
+    Unreachable = 5
+
+
+class ExtensionStatus(Enum):
+    """
+    What an extension last said about itself in an organisation, held on ``ExtensionEntity.status``.
+    
+    :cvar Unknown: The extension has said nothing since it was last provisioned.
+    :cvar Ok: The extension reports that it is working.
+    :cvar Problem: The extension reports a problem, described by ``ExtensionEntity.status_data``.
+    """
+    Unknown = 0
+    Ok = 1
+    Problem = 2
+
+
+class ExtensionStatusSource(Enum):
+    """
+    Where a problem with an extension as a whole comes from, held in ``ExtensionStatusProblem.source``.
+    
+    :cvar Unknown: Not set. Never a valid source.
+    :cvar Poll: An ``ExtensionTriggerMode.External`` extension's poll of its outside service failed.
+    :cvar Events: Events from the last poll could not become runs.
+    :cvar Secrets: The secret store could not be read at all. A single secret that cannot be read is a setting entry with
+                   ``ExtensionSettingProblemKind.Unreadable`` instead.
+    :cvar Other: Anything else the extension reports.
+    """
+    Unknown = 0
+    Poll = 1
+    Events = 2
+    Secrets = 3
+    Other = 4
+
+
+class ExtensionTriggerKind(Enum):
+    """
+    What started a particular run, held on ``ExtensionRunEntity.trigger_kind``.
+    
+    :cvar Unknown: Not set. Never a valid kind.
+    :cvar Manual: A user started the run.
+    :cvar Timed: The extension started the run on its schedule.
+    :cvar Triggered: The extension started the run because a watched entity changed.
+    :cvar Approval: A follow-up the processor created when a decision was made on another run. Only the processor creates one.
+    :cvar External: The extension started the run for an event outside Filament.
+    """
+    Unknown = 0
+    Manual = 1
+    Timed = 2
+    Triggered = 3
+    Approval = 4
+    External = 5
+
+
+class ExtensionTriggerMode(Enum):
+    """
+    How an extension's runs are started. Taken from the extension's registered manifest and written onto
+    ``ExtensionEntity.trigger_mode`` by provisioning.
+    
+    :cvar Unknown: Not set. Never a valid mode.
+    :cvar Manual: A user starts each run, with parameters the extension declares.
+    :cvar Timed: The extension starts runs on a schedule held in its own code.
+    :cvar Triggered: The extension starts a run when a Filament entity it watches changes.
+    :cvar External: The extension starts a run for each event it finds when it polls a service outside Filament.
+    """
+    Unknown = 0
+    Manual = 1
+    Timed = 2
+    Triggered = 3
+    External = 4
+
+
 class FileChecksumAlgorithm(Enum):
     """
     The checksum a file store computes, and the encoding it reports it in.
     
-    :cvar None_: The store computes no checksum, and advertises no <c>ServerSideChecksum</c>.
+    :cvar None_: The store computes no checksum, and advertises no ``ServerSideChecksum``.
     :cvar Sha256Hex: SHA-256, lower-case hexadecimal. The Filament storage service.
-    :cvar Md5Base64: MD5, canonical padded base64. GCS <c>md5Hash</c>.
-    :cvar Crc32cBase64: CRC32C, canonical padded base64. GCS <c>crc32c</c>.
+    :cvar Md5Base64: MD5, canonical padded base64. GCS ``md5Hash``.
+    :cvar Crc32cBase64: CRC32C, canonical padded base64. GCS ``crc32c``.
     """
     None_ = 0
     Sha256Hex = 1
@@ -449,7 +626,7 @@ class FileState(Enum):
     :cvar Pending: A grant has been issued and the bytes have not been confirmed. Counts against the tenant's
                    quota, so nobody can evade it by never completing.
     :cvar Available: The bytes arrived and were verified against what was declared.
-    :cvar Failed: Verification failed and the object was deleted. Distinct from <see cref="F:Filament.FSCore.CoreEntities.FileState.Deleted" /> so the
+    :cvar Failed: Verification failed and the object was deleted. Distinct from ``FileState.Deleted`` so the
                   sweeper can tell a failed upload from a removed file, and so the quota can be released at the
                   point of failure rather than at the next sweep.
     :cvar Deleted: Marked for removal. The row survives until the sweeper has removed the object, so a failed
@@ -573,6 +750,19 @@ class PermissionDeltaMode(Enum):
     Suppress = 4
 
 
+class PermissionGrantOrigin(Enum):
+    """
+    Where a permission row's grant comes from, which decides the ``PermissionRestrictAttribute``s it can lift.
+    
+    :cvar User: An organisation's own role or permission, or anything a delta added to a core one. The default.
+    :cvar Core: A core definition, as composed with no organisation delta widening it.
+    :cvar Extension: The permission set the hub builds for an extension key.
+    """
+    User = 0
+    Core = 1
+    Extension = 2
+
+
 class PermissionType(Enum):
     """
     The type of permission.
@@ -617,10 +807,10 @@ class ProcessingRunStatus(Enum):
 class PropertyEncoding(Enum):
     """
     The text encoding applied to the compressed bytes of a
-    <see cref="T:Filament.FSCore.Entities.Attributes.CompressedPropertyAttribute">[CompressedProperty]</see> value, so the value stays an ordinary string.
-    Each member maps to a header token in <see cref="T:Filament.FSCore.Entities.PropertyCompression" />.
+    [CompressedProperty] value, so the value stays an ordinary string.
+    Each member maps to a header token in ``PropertyCompression``.
     
-    :cvar Base64: Standard base64 with padding (RFC 4648 §4). Header token <c>base64</c>.
+    :cvar Base64: Standard base64 with padding (RFC 4648 §4). Header token ``base64``.
     """
     Base64 = 0
 
@@ -673,7 +863,7 @@ class RepeatModeEnum(Enum):
     :cvar None_: No repeat.
     :cvar Day: Repeat each day.
     :cvar Week: Repeat each week (with optional repeating on multiple days of the week - see
-                <see cref="T:Filament.FSCore.Entities.Recurrence.RepeatDaysEnum" />).
+                ``RepeatDaysEnum``).
     :cvar Month: Repeat each month.
     :cvar Year: Repeat each year.
     """
@@ -694,9 +884,9 @@ class RequestStatus(Enum):
     :cvar Completed: Request has been completed.
     :cvar Failed: Request has failed.
     :cvar Cancelled: Request has been cancelled.
-    :cvar Resubmitted: Request has been resubmitted. A request that ended <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Cancelled" /> or
-                       <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Failed" /> can be moved to this status, which retires it and queues a fresh copy of
-                       it as a new <see cref="F:Filament.FSCore.CoreEntities.RequestStatus.Pending" /> request. This is a terminal status for the original request -
+    :cvar Resubmitted: Request has been resubmitted. A request that ended ``RequestStatus.Cancelled`` or
+                       ``RequestStatus.Failed`` can be moved to this status, which retires it and queues a fresh copy of
+                       it as a new ``RequestStatus.Pending`` request. This is a terminal status for the original request -
                        the copy carries the work from here, and nothing moves a request out of it.
     """
     Unknown = 0
@@ -819,7 +1009,7 @@ class ScopeGroupChildType(Enum):
 
 class ScopeGroupLevelModeEnum(Enum):
     """
-    The role of a scope group level. <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> levels are ordinary user-defined
+    The role of a scope group level. ``ScopeGroupLevelModeEnum.Arbitrary`` levels are ordinary user-defined
     levels that populate their own derived task group level; the other modes mark the level as
     the template for the corresponding built-in task group level, which copies the template's
     Name, Description, and rollup configuration during population (and produces no derived
@@ -851,13 +1041,13 @@ class ScopeMilestoneModeEnum(Enum):
     """
     Defines how a scope milestone constrains scheduling.
     
-    :cvar Report: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.Instant" /> and should not affect
+    :cvar Report: The milestone has a null ``ScopeMilestoneEntity.instant`` and should not affect
                   scheduling. Its instant is placed immediately before or after all linked tasks for
                   reporting purposes only.
-    :cvar Priority: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.Instant" />. All upstream tasks
+    :cvar Priority: The milestone has a null ``ScopeMilestoneEntity.instant``. All upstream tasks
                     should be prioritised, but the milestone's instant is derived from the schedule rather
                     than imposed.
-    :cvar Fixed: The milestone has a non-null <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.Instant" /> and linked tasks
+    :cvar Fixed: The milestone has a non-null ``ScopeMilestoneEntity.instant`` and linked tasks
                  should be placed at that instant where possible.
     """
     Report = 0
@@ -938,7 +1128,7 @@ class ServiceProcessingStatus(Enum):
     :cvar Processing: The service is currently executing as part of the run.
     :cvar Publishing: The service has finished its work and the Hub is currently publishing the results to
                       subscribers. Only used for services that publish per-node data (Update / Propagate / Source
-                      / Live / LivePropagate); pure Read services transition directly to <see cref="F:Filament.FSCore.CoreEntities.ServiceProcessingStatus.Completed" />.
+                      / Live / LivePropagate); pure Read services transition directly to ``ServiceProcessingStatus.Completed``.
     :cvar Completed: The service has finished its work for the run successfully.
     :cvar Failed: The service failed during the run.
     :cvar Cancelled: The service was cancelled before completing.
@@ -956,9 +1146,9 @@ class SubscriptionMode(Flag):
     """
     Represents the mode of a subscription, defining the types of updates
     that the subscription should receive. Each mode can be combined using bitwise operations
-    by leveraging the <see cref="T:System.FlagsAttribute" />.
+    by leveraging the ``FlagsAttribute``.
     
-    :cvar None_: Represents the absence of a subscription mode. When the mode is set to <c>None</c>,
+    :cvar None_: Represents the absence of a subscription mode. When the mode is set to ``None``,
                  the subscription will not receive any updates or notifications.
     :cvar Data: Represents a subscription mode that allows receiving updates related to data changes,
                 including creation, updates, or deletion of entities.
@@ -1017,13 +1207,13 @@ class TaskMilestoneModeEnum(Enum):
     """
     Defines how a task milestone constrains scheduling.
     
-    :cvar Report: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.Instant" /> and should not affect
+    :cvar Report: The milestone has a null ``TaskMilestoneEntity.instant`` and should not affect
                   scheduling. Its instant is placed immediately before or after all linked tasks for
                   reporting purposes only.
-    :cvar Priority: The milestone has a null <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.Instant" />. All upstream tasks
+    :cvar Priority: The milestone has a null ``TaskMilestoneEntity.instant``. All upstream tasks
                     should be prioritised, but the milestone's instant is derived from the schedule rather
                     than imposed.
-    :cvar Fixed: The milestone has a non-null <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity.Instant" /> and linked tasks
+    :cvar Fixed: The milestone has a non-null ``TaskMilestoneEntity.instant`` and linked tasks
                  should be placed at that instant where possible.
     """
     Report = 0
@@ -1036,8 +1226,8 @@ class TaskStatusEnum(Enum):
     Represents the state of one post-work stage (processing or review) of a task.
     
     :cvar Undefined: The stage has not been specified. Whether the stage is required is derived from the
-                     task's own configuration (<see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.DefaultProcessingDuration" /> for
-                     processing, <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.RequiresReview" /> for review).
+                     task's own configuration (``TaskEntity.default_processing_duration`` for
+                     processing, ``TaskEntity.requires_review`` for review).
     :cvar NotRequired: The stage is explicitly not required for this task, regardless of the task's own
                        configuration.
     :cvar Pending: The stage is required and has not been completed yet.
@@ -1168,7 +1358,7 @@ class UserDefinedPropertyStatus(Enum):
                   writable, and available to conditions and orders.
     :cvar Hidden: Set by an administrator to retire the property without deleting it — the soft delete, in the same
                   sense that a currency is disabled rather than removed. Everywhere a value could be seen or written the
-                  property behaves exactly as <see cref="F:Filament.FSCore.CoreEntities.UserDefinedPropertyStatus.Pending" /> does: absent from the permission map, the join,
+                  property behaves exactly as ``UserDefinedPropertyStatus.Pending`` does: absent from the permission map, the join,
                   conditions and orders, and refused as unknown by any request that names it. The definition row itself
                   stays readable to callers who may read it, carrying this status, so an administrator can list what is
                   hidden and bring it back.

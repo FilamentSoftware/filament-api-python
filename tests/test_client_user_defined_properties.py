@@ -288,13 +288,14 @@ async def test_invalidated_in_flight_discovery_cannot_publish_stale_properties()
     assert permission_calls == 2
 
 
-@pytest.mark.asyncio
-async def test_read_data_hydrates_udp_value_from_cached_definition() -> None:
-    client = _client()
+def _read_data_invoke(
+    permissions: dict[str, Any],
+) -> Callable[..., Awaitable[Any]]:
+    """Hub stub for a ReadData of one TaskEntity carrying ``udpBudget``."""
 
     async def invoke(method: str, *args: Any) -> Any:
         if method == "GetEntityPropertyPermissions":
-            return _permissions_response()
+            return permissions
         if method == "Subscribe":
             return {
                 "success": True, "message": "", "errorCode": 0,
@@ -320,7 +321,40 @@ async def test_read_data_hydrates_udp_value_from_cached_definition() -> None:
             }
         raise AssertionError(method)
 
-    client._invoke = AsyncMock(side_effect=invoke)
+    return invoke
+
+
+@pytest.mark.asyncio
+async def test_read_data_hydrates_udp_value_from_cached_definition() -> None:
+    client = _client()
+    client._invoke = AsyncMock(side_effect=_read_data_invoke(_permissions_response()))
+    result = await client.read_data(ReadDataRequest(
+        scenario_id=UUID(int=0),
+        request=ReadDataTypeRequest(type_name="TaskEntity"),
+    ))
+
+    assert result.success and result.data is not None
+    entity = result.data.data[0].entity
+    assert isinstance(entity, TaskEntity)
+    assert entity.udp_budget == Decimal("12.50")
+
+
+@pytest.mark.asyncio
+async def test_read_data_accepts_conditional_property_permissions() -> None:
+    # The hub writes conditionalActions keys as the PermissionAction value in
+    # text; discovery must decode them rather than fail the read.
+    client = _client()
+    condition = {
+        "condition": "EqualTo", "property": "ExtensionId", "mode": "Property",
+        "value": str(uuid7()),
+    }
+    permissions = _permissions_response()
+    permissions["data"]["properties"]["extensionId"] = {
+        "actions": 0,
+        "conditionalActions": {"1": dict(condition), "2": dict(condition)},
+        "userDefinedData": None,
+    }
+    client._invoke = AsyncMock(side_effect=_read_data_invoke(permissions))
     result = await client.read_data(ReadDataRequest(
         scenario_id=UUID(int=0),
         request=ReadDataTypeRequest(type_name="TaskEntity"),
