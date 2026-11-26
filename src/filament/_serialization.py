@@ -369,6 +369,10 @@ def _resolve_type_hints(cls: Any) -> dict[str, Any]:
 
 _NONE_MEMBER = "None_"
 _NONE_WIRE = "None"
+# An enum value written as text, as the backend's
+# ``EnumIntegerDictionaryConverterFactory`` writes enum dictionary keys
+# (JSON object keys are always strings).
+_ENUM_NUMERIC_TEXT = re.compile(r"-?[0-9]+")
 
 
 def _enum_to_wire(data: Any) -> Any:
@@ -377,10 +381,16 @@ def _enum_to_wire(data: Any) -> Any:
 
 
 def _enum_from_wire(data: Any, enum_type: Any) -> Any:
-    """Convert a wire value to an enum member."""
+    """Convert a wire value to an enum member.
+
+    Accepts the int value, the member name, or the int value as text (the
+    form enum-keyed dictionaries arrive in).
+    """
     if isinstance(data, str):
         if data == _NONE_WIRE:
             return enum_type[_NONE_MEMBER]
+        if _ENUM_NUMERIC_TEXT.fullmatch(data):
+            return enum_type(int(data))
         return enum_type[data]
     if isinstance(data, Enum):
         return data
