@@ -322,6 +322,7 @@ What an extension last said about itself in an organisation, held on ``Extension
 | `Unknown` | The extension has said nothing since it was last provisioned. |
 | `Ok` | The extension reports that it is working. |
 | `Problem` | The extension reports a problem, described by ``ExtensionEntity.status_data``. |
+| `Disabled` | The extension is disabled in this organisation (``ExtensionEntity.enabled`` is false). Set by the processor, never written by the extension: it is held for as long as the extension is disabled, and gives way to ``ExtensionStatus.Unknown`` when it is enabled again. |
 
 ### `ExtensionStatusSource` (`Enum`)
 
