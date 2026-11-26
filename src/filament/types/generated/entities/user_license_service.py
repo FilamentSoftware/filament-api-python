@@ -17,49 +17,48 @@ __all__ = [
 class UserLicenseEntity(Entity):
     """
     An hourly record of which users have held a given license type during the hour. One row
-    exists per (<see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.LicenseType" />, <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.Instant" />) pair; subsequent propagations
-    within the same hour merge the newly-computed holders into <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.UserIds" /> (union
+    exists per (``UserLicenseEntity.license_type``, ``UserLicenseEntity.instant``) pair; subsequent propagations
+    within the same hour merge the newly-computed holders into ``UserLicenseEntity.user_ids`` (union
     semantics), so a user that qualified at any point in the hour stays in the row even if they
     no longer qualify by a later propagation in the same bucket. A new hour starts fresh. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
     :param license_type: The license type this snapshot is for.
-    :param instant: The hour bucket this snapshot represents, expressed as an <see cref="T:NodaTime.Instant" />
+    :param instant: The hour bucket this snapshot represents, expressed as an ``Instant``
                     floored to the start of the UTC hour.
     :param user_ids: The set of user ids that have held this license type at any propagation during the hour
-                     represented by <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.Instant" />. Updated by union — entries are never removed
+                     represented by ``UserLicenseEntity.instant``. Updated by union — entries are never removed
                      within the bucket.
-    :param user_count: The number of entries in <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.UserIds" />, i.e. how many distinct users held this
-                       license type at any propagation during the hour represented by <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.Instant" />.
-                       Maintained by the processor alongside <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.UserIds" /> so the count can be read (and
+    :param user_count: The number of entries in ``UserLicenseEntity.user_ids``, i.e. how many distinct users held this
+                       license type at any propagation during the hour represented by ``UserLicenseEntity.instant``.
+                       Maintained by the processor alongside ``UserLicenseEntity.user_ids`` so the count can be read (and
                        queried) without materialising the id list; it is never written independently of it.
-    :param month_license_count: A moment-in-time snapshot of license usage for this <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.LicenseType" />, sealed
+    :param month_license_count: A moment-in-time snapshot of license usage for this ``UserLicenseEntity.license_type``, sealed
                                 at the last propagation of this hour bucket. Computed as
-                                <c>max(dayMin, priorValue)</c> where:
-                                <list type="bullet">
-                                <item><c>dayMin</c> is the minimum of <c>UserIds.Count</c> across every entity on
-                                the same UTC day for the same license type (including this one), as observed at the
-                                moment of this hour's last propagation.</item>
-                                <item><c>priorValue</c> is the <see cref="P:Filament.Services.CoreServices.Entities.UserLicenseService.UserLicenseEntity.MonthLicenseCount" /> of the latest-Instant
-                                entity in the same UTC calendar month strictly before today, for the same license
-                                type. Gap days (calendar days with no entities) are walked over — the chain runs back
-                                through prior days in the month until one with entities is found, stopping at the start
-                                of the month. <c>priorValue</c> is 0 only when today is the 1st of the month or no
-                                prior day in the current month has any entities.</item>
-                                </list>
-                                <para><b>What this value is and is not:</b></para>
-                                <list type="bullet">
-                                <item>It resets at the start of each UTC calendar month — values do not carry across
-                                month boundaries.</item>
-                                <item>It is not strictly monotonic within a month: later hours of a day typically see
-                                a smaller <c>dayMin</c> as more rows accumulate, so an entity's <c>MonthLicenseCount</c>
-                                can be lower than another entity earlier on the same day. Two entities on the same day
-                                can therefore hold different values.</item>
-                                <item>Within an hour bucket it is sealed by that hour's last propagation; later hours
-                                never overwrite it.</item>
-                                <item>To read "the current month's value as of right now", look at the latest-Instant
-                                entity in the current calendar month for the license type — not "the maximum value seen
-                                in the month so far". They are not the same.</item>
-                                </list>
+                                ``max(dayMin, priorValue)`` where:
+
+                                - ``dayMin`` is the minimum of ``UserIds.Count`` across every entity on
+                                  the same UTC day for the same license type (including this one), as observed at the
+                                  moment of this hour's last propagation.
+                                - ``priorValue`` is the ``UserLicenseEntity.month_license_count`` of the latest-Instant
+                                  entity in the same UTC calendar month strictly before today, for the same license
+                                  type. Gap days (calendar days with no entities) are walked over — the chain runs back
+                                  through prior days in the month until one with entities is found, stopping at the start
+                                  of the month. ``priorValue`` is 0 only when today is the 1st of the month or no
+                                  prior day in the current month has any entities.
+
+                                **What this value is and is not:**
+
+                                - It resets at the start of each UTC calendar month — values do not carry across
+                                  month boundaries.
+                                - It is not strictly monotonic within a month: later hours of a day typically see
+                                  a smaller ``dayMin`` as more rows accumulate, so an entity's ``MonthLicenseCount``
+                                  can be lower than another entity earlier on the same day. Two entities on the same day
+                                  can therefore hold different values.
+                                - Within an hour bucket it is sealed by that hour's last propagation; later hours
+                                  never overwrite it.
+                                - To read "the current month's value as of right now", look at the latest-Instant
+                                  entity in the current calendar month for the license type — not "the maximum value seen
+                                  in the month so far". They are not the same.
     """
     license_type: UserLicenseType = field(default=UserLicenseType.User)
     instant: datetime.datetime = field(default_factory=datetime.datetime.now)

@@ -34,7 +34,7 @@ class CastUserConnection(EntityConnection):
 @dataclass(kw_only=True)
 class CastTaskConnection(EntityConnection):
     """
-    Represents a connection between a <see cref="T:Filament.Services.CoreServices.Entities.CastService.CastEntity" /> and a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />
+    Represents a connection between a ``CastEntity`` and a ``TaskEntity``
     in the context of casting service operations and task management. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     """
 
@@ -43,7 +43,7 @@ class CastTaskConnection(EntityConnection):
 class CastSkillConnection(GenericTaskSkillConnection_1[CastEntity]):
     """
     Represents a specific connection between a cast entity and a skill entity with task-related functionality.
-    Inherits from <see cref="T:Filament.Services.CoreServices.Entities.Other.GenericTaskSkillConnection`1" />. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
+    Inherits from ``GenericTaskSkillConnection``. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     """
 
 
@@ -51,10 +51,10 @@ class CastSkillConnection(GenericTaskSkillConnection_1[CastEntity]):
 class CastOfficeLocationConnection(EntityConnection):
     """
     Represents the relationship between a cast entity and an office location entity.
-    <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastOfficeLocationConnection.PriorityOrder" /> ranks the office among the cast's offices. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
+    ``CastOfficeLocationConnection.priority_order`` ranks the office among the cast's offices. This type is calculated by the backend and is read-only: create/update/delete requests are rejected.
     
-    :param priority_order: The rank of this office among the offices the cast's tasks can be assigned to. <b>Lower is higher
-                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+    :param priority_order: The rank of this office among the offices the cast's tasks can be assigned to. **Lower is higher
+                           priority**: the office with the smallest ``PriorityOrder`` is preferred, and offices sharing
                            the smallest value are equally preferred.
     """
     priority_order: int = field(default=0)

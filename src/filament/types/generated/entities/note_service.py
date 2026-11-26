@@ -27,10 +27,10 @@ class NoteEntity(Entity):
     :param content: The content of the note.
     :param checklist: A list of checklist items for this note.
     :param task_duration: The estimated time the work this note asks for is expected to take. Surfaced in the review
-                          notes UI as "Est. Time (Hr)". <see cref="P:NodaTime.Duration.Zero" /> means no estimate has been given.
+                          notes UI as "Est. Time (Hr)". ``Duration.zero`` means no estimate has been given.
     :param status: Whether this note is still a draft or has been submitted to its recipients. New and edited
-                   notes are saved as <see cref="F:Filament.Services.CoreServices.Entities.NoteService.NoteStatusEnum.Draft" />; "Submit Note" / "Submit All" move them
-                   to <see cref="F:Filament.Services.CoreServices.Entities.NoteService.NoteStatusEnum.Submitted" />.
+                   notes are saved as ``NoteStatusEnum.Draft``; "Submit Note" / "Submit All" move them
+                   to ``NoteStatusEnum.Submitted``.
     :param create_task: Whether the work this note describes should result in a new task being created. Defaults to true,
                         so a note creates a task unless it is explicitly turned off.
     :param task_review_status: The review state being applied to the task this note is on. Stored only - nothing in the

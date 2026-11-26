@@ -20,7 +20,7 @@ class SkillTypeEntity(Entity):
     
     :param name: The name of this skill type (eg. Taskable,
     :param description: A reasonable description of what this skill type represents. For example
-                        a type called "Maya" might be "The skill is assumed to use the Maya software package"
+                        a type called "Maya" might be "The skill is assumed to use the Maya software package\"
     :param context: If this type is a context, set to True. If not, leave False.
     :param taskable: If this type is taskable, set to True. If not, leave False.
     """

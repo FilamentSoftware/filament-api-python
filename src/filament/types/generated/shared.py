@@ -35,11 +35,11 @@ class FileReference:
     
     :param success: Whether the file was resolved.
     :param message: Why the file could not be resolved. Empty on success.
-    :param error_code: The machine-readable reason. <see cref="F:Filament.FSCore.Structs.ErrorCodes.None" /> on success.
+    :param error_code: The machine-readable reason. ``ErrorCodes.None`` on success.
     :param url: A signed, expiring URL the client can fetch directly. Null on failure.
     :param cache_key: A key safe for an application-level cache, stable for the life of the verified bytes.
-    :param issued_at: When the grant behind <see cref="P:Filament.FSCore.FileStore.FileReference.Url" /> was minted. Null on failure.
-    :param expires_at: When <see cref="P:Filament.FSCore.FileStore.FileReference.Url" /> stops being accepted. Null on failure.
+    :param issued_at: When the grant behind ``FileReference.url`` was minted. Null on failure.
+    :param expires_at: When ``FileReference.url`` stops being accepted. Null on failure.
     :param refreshable: Whether the URL expires and can be re-minted.
     :param metadata: Content type, size and, for images, dimensions — so a client can reserve space first.
     :param name: The file's display name, as stored on the row. Null on failure.

@@ -34,22 +34,22 @@ class TaskGroupLevelEntity(ReferenceEntityBase):
     :param description: The description of the task group level entity.
     :param mode: The role of this level. Set only on the three built-in levels (Scope/Item/Task), which
                  are resolved by mode rather than by name — a mode-matched template can rename them.
-                 Levels derived from <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" /> scope group levels
-                 keep the default <see cref="F:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelModeEnum.Arbitrary" />; the mode is never
+                 Levels derived from ``ScopeGroupLevelModeEnum.Arbitrary`` scope group levels
+                 keep the default ``ScopeGroupLevelModeEnum.Arbitrary``; the mode is never
                  copied from a scope group level during population.
     :param parent_ids: The ids of this level's parent levels, in order. The order is semantic: rollup-config
-                       inheritance walks the <em>first</em> parent at each step; the remaining entries are
+                       inheritance walks the *first* parent at each step; the remaining entries are
                        topology only.
     :param parents: Represents the parent levels of this level. Assigning values to this property populates
-                    the associated <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskGroupLevelEntity.ParentIds" /> property with the corresponding identifiers, in
+                    the associated ``TaskGroupLevelEntity.parent_ids`` property with the corresponding identifiers, in
                     the given order.
-    :param actual_status_rollup_rules_data: JSON-serialized <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskGroupLevelEntity.ActualStatusRollupRules" /> for this level, copied from the
-                                            backing <see cref="T:Filament.Services.CoreServices.Entities.ScopeGroupService.ScopeGroupLevelEntity" /> (or its mode-matched template for built-in
+    :param actual_status_rollup_rules_data: JSON-serialized ``TaskGroupLevelEntity.actual_status_rollup_rules`` for this level, copied from the
+                                            backing ``ScopeGroupLevelEntity`` (or its mode-matched template for built-in
                                             levels) during population. Null means the level inherits the nearest ancestor level's
-                                            config (walking <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskGroupLevelEntity.ParentIds" />[0]), or the built-in default when no ancestor
+                                            config (walking ``TaskGroupLevelEntity.parent_ids``[0]), or the built-in default when no ancestor
                                             defines one.
-    :param auto_generated_by: The name of the task module that generated this task group level during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this task group level during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -72,22 +72,22 @@ class TaskMilestoneEntity(ReferenceEntityBase):
     :param reference: Represents a linked entity instance.
     :param name: The given name for this milestone.
     :param description: The description of this milestone
-    :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Fixed" /> anchors
-                 to a concrete instant, <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Priority" /> promotes upstream tasks,
-                 and <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Report" /> is observational only.
-    :param priority_order: The rank of this milestone among <see cref="F:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneModeEnum.Priority" /> milestones.
-                           <b>Lower is higher priority</b>: the scheduler's pull strength is the priority-milestone weight
-                           divided by <c>PriorityOrder</c>, so order 1 pulls twice as hard as order 2, and a value of zero or
-                           less applies no pull. Copied from <see cref="P:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneEntity.PriorityOrder" /> on a milestone
+    :param mode: How this milestone constrains scheduling: ``TaskMilestoneModeEnum.Fixed`` anchors
+                 to a concrete instant, ``TaskMilestoneModeEnum.Priority`` promotes upstream tasks,
+                 and ``TaskMilestoneModeEnum.Report`` is observational only.
+    :param priority_order: The rank of this milestone among ``TaskMilestoneModeEnum.Priority`` milestones.
+                           **Lower is higher priority**: the scheduler's pull strength is the priority-milestone weight
+                           divided by ``PriorityOrder``, so order 1 pulls twice as hard as order 2, and a value of zero or
+                           less applies no pull. Copied from ``ScopeMilestoneEntity.priority_order`` on a milestone
                            generated from a scope milestone. Has no effect in the other modes.
     :param instant: The moment in time this milestone is due.
                     If the Instant is null, the milestone is flexible and can be moved
     :param direction: Should tasks start after this milestone, or end before it?
     :param warnings_data: JSON-serialized list of warnings raised while processing this milestone - each is a
-                          <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneWarning" /> describing an issue, such as an assignment that
+                          ``TaskMilestoneWarning`` describing an issue, such as an assignment that
                           attached to no tasks. Null when there are no warnings.
-    :param auto_generated_by: The name of the task module that generated this task milestone during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this task milestone during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -132,12 +132,12 @@ class TaskGroupEntity(ReferenceEntityBase):
     :param child_group_level_ids: Represents the ids of the child group levels associated with the current task group entity.
     :param child_group_levels: Represents the child group levels associated with the current task group entity.
     :param ancestor_group_ids: Identifies the IDs of all ancestor task groups in the hierarchy that are related to this
-                               instance of <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskGroupEntity" />.
+                               instance of ``TaskGroupEntity``.
     :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task group.
                             This property is used to establish relationships between task groups in a hierarchical structure,
                             identifying all ancestor groups for the current entity.
-    :param auto_generated_by: The name of the task module that generated this task group during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this task group during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.
@@ -168,42 +168,42 @@ class TaskEntity(ReferenceEntityBase):
     :param reference: Represents a linked entity instance.
     :param contexts: Context key-value pairs. On a task a module generated they are the module's: the scope module writes
                      the originating step, combine key and instance number; the note module writes the note lineage and its
-                     <c>NoteChargeableTicks</c> marker. A task created by hand may carry any contexts a client chooses - the
+                     ``NoteChargeableTicks`` marker. A task created by hand may carry any contexts a client chooses - the
                      property is client-writable - which is why neither module trusts contexts alone: a task is a module's
-                     only when <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.AutoGeneratedBy" /> is set as well.
+                     only when ``TaskEntity.auto_generated_by`` is set as well.
     :param name: The given name for this task.
     :param description: The description of this task
     :param duration: This task's duration.
     :param user_count: How many users can simultaneously work on this task.
     :param deliverables: Deliverables expected for this task to be complete, taken from the
-                         <see cref="T:Filament.Services.CoreServices.Entities.ScopeTaskTypeService.ScopeTaskTypeStepEntity" /> this task was created from.
+                         ``ScopeTaskTypeStepEntity`` this task was created from.
     :param requires_review: If this task needs to go into reviews once it is done.
     :param default_processing_duration: The default processing duration for a TaskEntity, representing the expected time required to process the task under normal conditions.
-                                        This will be used as the default processing duration to be filled in on <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity" />.
+                                        This will be used as the default processing duration to be filled in on ``TaskStatusEntity``.
     :param priority_weight: The scheduling weight of this task, derived from the scope and scope item
-                            <c>PriorityWeight</c>s and their statuses' priority multipliers. <b>Higher is higher priority</b>:
+                            ``PriorityWeight``s and their statuses' priority multipliers. **Higher is higher priority**:
                             it feeds the scheduler's task-priority score, which ranks higher weights first.
     :param ancestor_group_ids: Identifies the IDs of all ancestor task groups in the hierarchy that are related to this
-                               instance of <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
+                               instance of ``TaskEntity``.
     :param ancestor_groups: Contains the collection of ancestor task groups that are hierarchically above the current task.
                             This property is used to establish relationships between task groups in a hierarchical structure,
                             identifying all ancestor groups for the current entity.
     :param chargeable: The calculated chargeable amount for this task, derived from the task type's chargeable per hour,
                        the task duration, and the scope/item chargeable multipliers, with currency conversion applied.
     :param estimated_cost: The task's total estimated cost at reference skill: what the work costs the studio, not what the client
-                           is charged. <c>null</c> means the task is not estimated (a task made by hand); 0 means it is genuinely
+                           is charged. ``null`` means the task is not estimated (a task made by hand); 0 means it is genuinely
                            free, and is used as it stands.
     :param currency_id: The currency this task's chargeable amount is denominated in, taken from the ScopeItemEntity. It
-                        describes <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.Chargeable" /> only, not <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.EstimatedCost" />, which is in the organisation's
+                        describes ``TaskEntity.chargeable`` only, not ``TaskEntity.estimated_cost``, which is in the organisation's
                         currency.
     :param currency: A helper method for setting the CurrencyId property. Pass in a CurrencyEntity type.
     :param specialty_id: The specialty this task falls under. Populated by TaskScopeModule from the owning
-                         <see cref="T:Filament.Services.CoreServices.Entities.ScopeTaskTypeService.ScopeTaskTypeEntity" /> for a generated task, or supplied directly for a manually
+                         ``ScopeTaskTypeEntity`` for a generated task, or supplied directly for a manually
                          created task — deliberately not a calculated property, for the same reason as
-                         <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.Deliverables" />.
+                         ``TaskEntity.deliverables``.
     :param specialty: A helper method for setting the SpecialtyId property. Pass in a SpecialtyEntity type.
-    :param auto_generated_by: The name of the task module that generated this task during propagation - <c>TaskScopeModule</c> or
-                              <c>TaskNoteModule</c> - or null when it was created by hand through data entry. The task service's data
+    :param auto_generated_by: The name of the task module that generated this task during propagation - ``TaskScopeModule`` or
+                              ``TaskNoteModule`` - or null when it was created by hand through data entry. The task service's data
                               entry module refuses to create, update or delete anything a module generated, and refuses to set this.
                               Excluded from equality and from the state's whole-entity update diff, so re-projecting a row never
                               touches it.

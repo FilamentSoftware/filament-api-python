@@ -20,14 +20,14 @@ class ClientMethods(Protocol):
         Establishes per-connection client capabilities for an API-key connection. Currently this
         advertises the maximum size of a single SignalR message the client can accept; the server
         enforces that limit on both invocation responses and pushed events, returning a structured
-        <see cref="F:Filament.FSCore.Structs.ErrorCodes.ResponseTooLarge" /> error rather than sending a message the client
+        ``ErrorCodes.ResponseTooLarge`` error rather than sending a message the client
         would close the connection on. Intended to be called once, immediately after connecting.
         Clients that never call this method are held to the server default
-        (<c>--default-max-message-size</c>) on invocation responses rather than being treated as
+        (``--default-max-message-size``) on invocation responses rather than being treated as
         unlimited; pushed events to such a connection are bounded by entity count only.
         
         :param request: The capability handshake, including the negotiated maximum message size.
-        :returns: A <see cref="T:Filament.FSCore.Structs.ValueOrErrorPublic`1" /> carrying the <see cref="T:Filament.FilamentHub.Connections.ServerCapabilities" />
+        :returns: A ``ValueOrErrorPublic`` carrying the ``ServerCapabilities``
                   this deployment advertises. Invalid values (zero, negative, or below the minimum floor) are
                   rejected, and the capabilities are withheld rather than returned alongside the error.
         """
@@ -46,7 +46,7 @@ class ClientMethods(Protocol):
         Defines a new user-defined property on one of the organization's entity or connection types.
         
         :param request: The definition to create.
-        :returns: A <see cref="T:Filament.FSCore.Structs.ValueOrErrorPublic`1" /> carrying the created definition, or the
+        :returns: A ``ValueOrErrorPublic`` carrying the created definition, or the
                   reason it was refused.
         """
         ...
@@ -56,7 +56,7 @@ class ClientMethods(Protocol):
         Edits an existing user-defined property definition.
         
         :param request: The edit to apply.
-        :returns: A <see cref="T:Filament.FSCore.Structs.ValueOrErrorPublic`1" /> carrying the edited definition, or the
+        :returns: A ``ValueOrErrorPublic`` carrying the edited definition, or the
                   reason the edit was refused.
         """
         ...
@@ -188,8 +188,8 @@ class ServerEvents(Protocol):
     def data_update_rejected(self, notification: DataUpdateRejectedNotification) -> None:
         """
         Notifies the client that a pushed data update was rejected because its serialised size would
-        exceed the maximum message size negotiated for this connection via <c>ClientHello</c>. Sent
-        in place of <see cref="M:Filament.FilamentHub.Api.v0.IApiSignalRClient.DataUpdated(Filament.FSCore.ServiceDataTypes.ServiceDataUpdate)" /> for the affected update; the client routes it to the
+        exceed the maximum message size negotiated for this connection via ``ClientHello``. Sent
+        in place of ``IApiSignalRClient.DataUpdated`` for the affected update; the client routes it to the
         subscription's callback as an error path.
         
         :param notification: Details of the rejected update, including the subscription ID, actual and limit byte counts, and a human-readable reason.
@@ -201,7 +201,7 @@ class ServerEvents(Protocol):
         Notifies the client that the hub removed one of its subscriptions. Sent only when the removal
         originates in the hub itself — for example a subscription dropped because its condition
         references a user-defined property that was hidden — never for a removal the client requested
-        through <c>Unsubscribe</c>. No further <see cref="M:Filament.FilamentHub.Api.v0.IApiSignalRClient.DataUpdated(Filament.FSCore.ServiceDataTypes.ServiceDataUpdate)" /> pushes follow for the
+        through ``Unsubscribe``. No further ``IApiSignalRClient.DataUpdated`` pushes follow for the
         subscription, and unsubscribing from it is unnecessary.
         
         :param notification: The notification identifying the removed subscription.

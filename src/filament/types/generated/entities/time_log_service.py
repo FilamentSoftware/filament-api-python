@@ -20,7 +20,7 @@ __all__ = [
 class TimeLogEntity(ReferenceEntityBase):
     """
     Represents a time log entry entity that records a time-related event for a user.
-    A time log entry will always have <see cref="P:Filament.FSCore.Entities.ReferenceEntityBase.Reference" /> pointing to a <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
+    A time log entry will always have ``ReferenceEntityBase.reference`` pointing to a ``TaskEntity``.
     
     :param reference: Represents a linked entity instance.
     :param start_instant: The start instant of the time log entry.

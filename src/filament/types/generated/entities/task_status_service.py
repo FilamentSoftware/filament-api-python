@@ -19,27 +19,27 @@ __all__ = [
 class TaskStatusEntity(Entity):
     """
     Represents the status entity for a task, defined as a sidecar entity
-    associated with <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskEntity" />.
+    associated with ``TaskEntity``.
     
     :param processing_status: The state of the automated processing stage that follows the task's hands-on work.
-                              When <see cref="F:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEnum.Undefined" />, whether processing is required is derived
-                              from the effective processing duration (see <see cref="P:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEntity.ProcessingDuration" />).
+                              When ``TaskStatusEnum.Undefined``, whether processing is required is derived
+                              from the effective processing duration (see ``TaskStatusEntity.processing_duration``).
     :param review_status: The state of the human review stage that follows the task's hands-on work (and its
-                          processing stage, when one exists). When <see cref="F:Filament.Services.CoreServices.Entities.TaskStatusService.TaskStatusEnum.Undefined" />, whether
-                          review is required is derived from <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.RequiresReview" />.
+                          processing stage, when one exists). When ``TaskStatusEnum.Undefined``, whether
+                          review is required is derived from ``TaskEntity.requires_review``.
     :param block_user_ids: The collection of user identifiers associated with their corresponding
-                           blocking reasons, as specified in the <see cref="T:Filament.Services.CoreServices.Entities.TaskStatusService.BlockUserReasonEnum" /> enumeration.
+                           blocking reasons, as specified in the ``BlockUserReasonEnum`` enumeration.
                            This property is used to track which users have been blocked and the reasons for their block status
                            in the context of a task's lifecycle.
     :param processing_duration: Represents the estimated processing duration required until the task is finished.
-                                When null, the task's <see cref="P:Filament.Services.CoreServices.Entities.TaskService.TaskEntity.DefaultProcessingDuration" /> applies; an
-                                explicit <see cref="P:NodaTime.Duration.Zero" /> means the task needs no processing.
+                                When null, the task's ``TaskEntity.default_processing_duration`` applies; an
+                                explicit ``Duration.zero`` means the task needs no processing.
     :param override_review_group_ids: The ids of review groups that override the default review routing for this task. When
                                       non-empty, review events are matched against these review groups only, instead of the
                                       task's ancestor task groups.
     :param override_review_groups: Represents the review groups that override the default review routing for this task.
                                    Assigning values to this property populates the associated
-                                   <c>OverrideReviewGroupIds</c> property with the corresponding identifiers.
+                                   ``OverrideReviewGroupIds`` property with the corresponding identifiers.
     """
     processing_status: TaskStatusEnum = field(default=TaskStatusEnum.Undefined)
     review_status: TaskStatusEnum = field(default=TaskStatusEnum.Undefined)

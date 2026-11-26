@@ -21,7 +21,7 @@ class CastEntity(Entity):
     
     :param cast_key: String created from skill and office location data for easy lookup later.
     :param specialty_id: The id of the specialty that this Cast is most associated with
-    :param specialty: A helper property for setting the <see cref="P:Filament.Services.CoreServices.Entities.CastService.CastEntity.SpecialtyId" /> property.
+    :param specialty: A helper property for setting the ``CastEntity.specialty_id`` property.
     """
     cast_key: str = field(default='')
     specialty_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))

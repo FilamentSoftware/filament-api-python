@@ -38,12 +38,11 @@ class ScopeItemMilestoneConnection(EntityConnection):
     Represents a connection between a scope item and a scope milestone.
     
     :param scope_task_type_step_ids: The ScopeTaskTypeStep entity ids whose generated tasks the milestone attaches to for this item.
-                                     <para>
-                                     Null and empty are distinct: <c>null</c> means "no override" and defers to the milestone entity's
-                                     <c>ScopeTaskTypeStepIds</c>, whereas an empty list is an explicit override that suppresses the
+
+                                     Null and empty are distinct: ``null`` means "no override" and defers to the milestone entity's
+                                     ``ScopeTaskTypeStepIds``, whereas an empty list is an explicit override that suppresses the
                                      milestone's default and attaches to the item as a whole (its leaf tasks) rather than to any
                                      particular steps. A non-empty list attaches to exactly those steps.
-                                     </para>
     :param task_combine_key: The key used to define which combined group should be attached to the milestone.
     """
     scope_task_type_step_ids: Optional[list[UUID]] = field(default=None)
@@ -58,15 +57,15 @@ class ScopeItemGroupConnection(EntityConnection):
 @dataclass(kw_only=True)
 class ScopeItemOfficeLocationConnection(EntityConnection):
     """
-    Represents a connection between a <see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemEntity" /> and an <see cref="T:Filament.Services.CoreServices.Entities.OrganizationService.OfficeLocationEntity" />.
+    Represents a connection between a ``ScopeItemEntity`` and an ``OfficeLocationEntity``.
     This class models the relationship and contextual data needed for managing these entities.
     
-    :param scope_task_type_id: The identifier for the associated <see cref="T:Filament.Services.CoreServices.Entities.ScopeTaskTypeService.ScopeTaskTypeEntity" />.
+    :param scope_task_type_id: The identifier for the associated ``ScopeTaskTypeEntity``.
                                This property establishes a link to a specific task type within the scope, allowing
                                for detailed categorization and context for the connection.
     :param scope_task_type: A helper property for setting the scope task type ID.
-    :param priority_order: The rank of this office among the offices this scope item's tasks can be assigned to. <b>Lower is higher
-                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+    :param priority_order: The rank of this office among the offices this scope item's tasks can be assigned to. **Lower is higher
+                           priority**: the office with the smallest ``PriorityOrder`` is preferred, and offices sharing
                            the smallest value are equally preferred.
     :param scope_item_context_id: A link to another scope item to use as scope context for the office connection.
     :param scope_item_context: A helper property for setting the scope item context ID.
@@ -120,6 +119,6 @@ class ScopeItemTaskTypeOverrideConnection(GenericScopeTaskTypeConnection_2[Scope
 @dataclass(kw_only=True)
 class ScopeVersionItemVersionConnection(EntityConnection):
     """
-    Groups a scope item version (<see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeItemVersionEntity" />) under a scope version
-    (<see cref="T:Filament.Services.CoreServices.Entities.ScopeItemService.ScopeVersionEntity" />). No properties: the connection is the membership.
+    Groups a scope item version (``ScopeItemVersionEntity``) under a scope version
+    (``ScopeVersionEntity``). No properties: the connection is the membership.
     """

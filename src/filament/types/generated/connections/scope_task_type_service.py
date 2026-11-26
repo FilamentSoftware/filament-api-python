@@ -38,8 +38,8 @@ class ScopeTaskTypeOfficeLocationConnection(EntityConnection):
     """
     Represents a connection between a scope task type and an office location.
     
-    :param priority_order: The rank of this office among the offices this task type's tasks can be assigned to. <b>Lower is higher
-                           priority</b>: the office with the smallest <c>PriorityOrder</c> is preferred, and offices sharing
+    :param priority_order: The rank of this office among the offices this task type's tasks can be assigned to. **Lower is higher
+                           priority**: the office with the smallest ``PriorityOrder`` is preferred, and offices sharing
                            the smallest value are equally preferred.
     """
     priority_order: int = field(default=1)

@@ -42,8 +42,8 @@ class UserEntity(UserBaseEntity):
                           Used as a primary means of electronic communication for the user.
     :param pronouns: The pronouns this user perfers to use.
     :param image_id: The user's profile image.
-    :param image_data: The hub-populated read projection of <see cref="P:Filament.Services.CoreServices.Entities.UserService.UserEntity.ImageId" />, carrying a <c>FileReference</c>.
-    :param image: The image as a <c>FileReference</c>. <b>Arrives unset — populate it from <c>ImageData</c>.</b>
+    :param image_data: The hub-populated read projection of ``UserEntity.image_id``, carrying a ``FileReference``.
+    :param image: The image as a ``FileReference``. **Arrives unset — populate it from ``ImageData``.**
     :param name: Gets the full name of the user formatted based on the specified display order.
                  Includes the given name, optional middle names, and family name
                  displayed in either "Given Name First" or "Family Name First" order.
@@ -70,7 +70,7 @@ class UserEntity(UserBaseEntity):
     preferred_name: Optional[str] = field(default=None)
     name_display_order: NameOrder = field(default=NameOrder.GivenNameFirst)
     user_name: str = field(default='')
-    password: Optional[str] = field(default=None)
+    password: Optional[str] = field(default=None, metadata={"write_only": True})
     email_address: str = field(default='')
     pronouns: Optional[str] = field(default=None)
     image_id: Optional[UUID] = field(default=None)

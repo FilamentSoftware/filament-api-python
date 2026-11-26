@@ -33,7 +33,7 @@ class SkillEntity(Entity):
     :param allowed_context_ids: All allowed contexts for this skill.
     :param allowed_contexts: A collection of skill entities that can be used to define the allowed contexts
                              in which this skill applies. Assigning values to this property will populate the
-                             associated <c>AllowedContextIds</c> property with the corresponding identifiers.
+                             associated ``AllowedContextIds`` property with the corresponding identifiers.
     :param skill_type_id: A link to the skill type that this skill is (eg. A Taskable skill)
     :param skill_type: Helper property to set the skill type id.
     :param specialty_id: A link to the specialty this skill falls under (e.g. compositing, lighting, pipeline dev)
@@ -84,7 +84,7 @@ class SkillLevelEntity(Entity):
     :param level: The numeric number of this level.
     :param reference: Indicates whether this level is the reference level for the skill.
                       It is technically possible for multiple skill levels on a skill to be marked as
-                      reference, or none. The <see cref="T:Filament.Services.CoreServices.Entities.SkillService.SkillLevelEntityCache" /> provides a way of
+                      reference, or none. The ``SkillLevelEntityCache`` provides a way of
                       identifying a single reference level per skill via conflict resolution.
     :param description: A brief description of the expectations for a user of this level.
     :param duration_multiplier: This is the handicap associated with the skill level that a user gets when being assigned a

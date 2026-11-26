@@ -24,7 +24,7 @@ class ReviewGroupEntity(Entity):
     :param description: A brief description of the review group.
     :param task_group_ids: The ids of the task groups whose tasks are reviewed by this review group.
     :param task_groups: Represents the task groups covered by this review group. Assigning values to this property
-                        populates the associated <c>TaskGroupIds</c> property with the corresponding identifiers.
+                        populates the associated ``TaskGroupIds`` property with the corresponding identifiers.
     """
     name: str = field(default='')
     description: str = field(default='')

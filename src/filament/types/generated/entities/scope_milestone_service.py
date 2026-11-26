@@ -21,20 +21,20 @@ class ScopeMilestoneEntity(Entity):
     
     :param name: The name of the milestone.
     :param description: A description of the milestone.
-    :param mode: How this milestone constrains scheduling: <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Fixed" /> anchors
-                 to a concrete instant, <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Priority" /> promotes upstream tasks,
-                 and <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Report" /> is observational only.
-    :param priority_order: The rank of this milestone among <see cref="F:Filament.Services.CoreServices.Entities.ScopeMilestoneService.ScopeMilestoneModeEnum.Priority" /> milestones.
-                           <b>Lower is higher priority</b>: the scheduler's pull strength is the priority-milestone weight
-                           divided by <c>PriorityOrder</c>, so order 1 pulls twice as hard as order 2, and a value of zero or
-                           less applies no pull. Copied to the derived <see cref="T:Filament.Services.CoreServices.Entities.TaskService.TaskMilestoneEntity" />. Has no effect
+    :param mode: How this milestone constrains scheduling: ``ScopeMilestoneModeEnum.Fixed`` anchors
+                 to a concrete instant, ``ScopeMilestoneModeEnum.Priority`` promotes upstream tasks,
+                 and ``ScopeMilestoneModeEnum.Report`` is observational only.
+    :param priority_order: The rank of this milestone among ``ScopeMilestoneModeEnum.Priority`` milestones.
+                           **Lower is higher priority**: the scheduler's pull strength is the priority-milestone weight
+                           divided by ``PriorityOrder``, so order 1 pulls twice as hard as order 2, and a value of zero or
+                           less applies no pull. Copied to the derived ``TaskMilestoneEntity``. Has no effect
                            in the other modes.
     :param instant: The moment in time this milestone begins or ends (depending on its Direction)
                     If the Instant is null, then it if flexible and can be moved
     :param direction: Is this a start milestone or a delivery milestone.  StartAfter means connected tasks must start
                       after the milestone.  EndBefore means the tasks must be finished before this milestone.
     :param scope_task_type_step_ids: The default set of ScopeTaskTypeStep entity ids whose generated tasks this milestone attaches to,
-                                     used by item connections whose own <c>ScopeTaskTypeStepIds</c> is null. A connection's non-null
+                                     used by item connections whose own ``ScopeTaskTypeStepIds`` is null. A connection's non-null
                                      list overrides this (an empty one suppressing it entirely); when neither yields a step id the
                                      milestone attaches to the item's leaf tasks instead.
     """

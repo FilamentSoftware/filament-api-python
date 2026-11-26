@@ -7,7 +7,7 @@ from typing import Optional
 from uuid_utils import UUID, uuid7
 
 from ..base.base import Entity
-from ..enums import PermissionAction, PermissionDeltaMode, PermissionType
+from ..enums import PermissionAction, PermissionDeltaMode, PermissionGrantOrigin, PermissionType
 
 __all__ = [
     "PermissionsRoleEntity",
@@ -47,9 +47,9 @@ class PermissionsRoleDeltaEntity(Entity):
     :param permissions_role_id: The id of the role this delta changes — a core role's derived id or an organisation role's row id.
     :param mode: How this delta combines with the role.
     :param apply_order: Where this delta sits among the deltas on the same role. Lowest applies first.
-    :param name: The role's new name, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
-    :param description: The role's new description, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
-    :param level: The role's new level, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param name: The role's new name, or null to leave it alone. ``PermissionDeltaMode.Override`` only.
+    :param description: The role's new description, or null to leave it alone. ``PermissionDeltaMode.Override`` only.
+    :param level: The role's new level, or null to leave it alone. ``PermissionDeltaMode.Override`` only.
     :param inferred_role_ids: The inferred roles to add, remove or replace, by mode. Null or empty leaves them alone.
     """
     permissions_role_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
@@ -71,18 +71,18 @@ class PermissionDeltaEntity(Entity):
                           permission's row id.
     :param mode: How this delta combines with the permission.
     :param apply_order: Where this delta sits among the deltas on the same permission. Lowest applies first.
-    :param action: The actions to add, remove or replace, by mode. <see cref="F:Filament.FSCore.Permissions.Attributes.PermissionAction.None" /> leaves them alone.
-    :param all_properties: The blanket property flag. Null leaves it alone; <see langword="true" /> turns it on
-                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Additive" />), off (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Subtractive" />) or sets it
-                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" />); <see langword="false" /> is
-                           <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param action: The actions to add, remove or replace, by mode. ``PermissionAction.None`` leaves them alone.
+    :param all_properties: The blanket property flag. Null leaves it alone; ``True`` turns it on
+                           (``PermissionDeltaMode.Additive``), off (``PermissionDeltaMode.Subtractive``) or sets it
+                           (``PermissionDeltaMode.Override``); ``False`` is
+                           ``PermissionDeltaMode.Override`` only.
     :param include_properties: The names to add to, remove from or replace the permission's include list with, by mode. Null or empty
                                leaves the list alone.
     :param exclude_properties: The names to add to, remove from or replace the permission's exclude list with, by mode. Null or empty
                                leaves the list alone.
-    :param condition_data: The permission's new condition, in the form <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.ConditionData" /> stores. Null leaves
-                           the condition alone; an empty string clears it. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
-    :param description: The permission's new description, or null to leave it alone. <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" />
+    :param condition_data: The permission's new condition, in the form ``PermissionEntity.condition_data`` stores. Null leaves
+                           the condition alone; an empty string clears it. ``PermissionDeltaMode.Override`` only.
+    :param description: The permission's new description, or null to leave it alone. ``PermissionDeltaMode.Override``
                         only.
     """
     permission_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
@@ -103,17 +103,17 @@ class PermissionPropertyDeltaEntity(Entity):
     permission. Applied when permissions are composed, after each permission has been split into one row per action.
     
     :param permission_id: The id of the one permission this delta changes, or null when the target is a role and entity type.
-    :param type_name: The entity type whose grants this delta changes, with <see cref="P:Filament.FSCore.CoreEntities.PermissionPropertyDeltaEntity.PermissionsRoleId" />; null or empty when
+    :param type_name: The entity type whose grants this delta changes, with ``PermissionPropertyDeltaEntity.permissions_role_id``; null or empty when
                       the target is one permission.
-    :param permissions_role_id: The id of the role whose grants on <see cref="P:Filament.FSCore.CoreEntities.PermissionPropertyDeltaEntity.TypeName" /> this delta changes, or null when the target is one
+    :param permissions_role_id: The id of the role whose grants on ``PermissionPropertyDeltaEntity.type_name`` this delta changes, or null when the target is one
                                 permission.
     :param mode: How this delta combines with the scope of each row it targets.
     :param apply_order: Where this delta sits among the deltas on the same row. Lowest applies first.
-    :param actions: The actions whose rows this delta changes. <see cref="F:Filament.FSCore.Permissions.Attributes.PermissionAction.None" /> means every action.
-    :param all_properties: The blanket property flag. Null leaves it alone; <see langword="true" /> turns it on
-                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Additive" />), off (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Subtractive" />) or sets it
-                           (<see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" />); <see langword="false" /> is
-                           <see cref="F:Filament.FSCore.CoreEntities.PermissionDeltaMode.Override" /> only.
+    :param actions: The actions whose rows this delta changes. ``PermissionAction.None`` means every action.
+    :param all_properties: The blanket property flag. Null leaves it alone; ``True`` turns it on
+                           (``PermissionDeltaMode.Additive``), off (``PermissionDeltaMode.Subtractive``) or sets it
+                           (``PermissionDeltaMode.Override``); ``False`` is
+                           ``PermissionDeltaMode.Override`` only.
     :param include_properties: The names to add to, remove from or replace each row's include list with, by mode. Null or empty leaves the
                                list alone.
     :param exclude_properties: The names to add to, remove from or replace each row's exclude list with, by mode. Null or empty leaves the
@@ -140,10 +140,10 @@ class PermissionEntity(Entity):
     :param permission_type: The type of permission.
     :param type_name: The type name this permission applies to.
     :param action: The permission actions allowed.
-    :param all_properties: Whether every ordinary property of <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.TypeName" /> is in this permission's property scope.
+    :param all_properties: Whether every ordinary property of ``PermissionEntity.type_name`` is in this permission's property scope.
     :param include_properties: The properties named into this permission's scope — ordinary and user-defined properties in one list.
     :param exclude_properties: The properties named out of this permission's scope. Exclusion wins over both
-                               <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.AllProperties" /> and <see cref="P:Filament.FSCore.CoreEntities.PermissionEntity.IncludeProperties" />.
+                               ``PermissionEntity.all_properties`` and ``PermissionEntity.include_properties``.
     :param condition_data: Stores condition-related data formatted as a serialized string, used to evaluate conditional permissions or logic.
     :param super_admin: Whether this permission grants super admin access.
     :param organization_admin: Whether this permission grants organization admin access.
@@ -152,6 +152,11 @@ class PermissionEntity(Entity):
     :param description: What the grant is for, or null when nobody has said.
     :param source_permission_id: On a composed row, the id of the definition the row was split from — a core permission's derived id or an
                                  organisation permission's row id. Null on a definition itself.
+    :param grant_origin: Where this row's grant comes from: the origin of the action it grants, and of each name in
+                         ``PermissionEntity.grant_origin_properties``. Any other name the row includes is a ``PermissionGrantOrigin.User``
+                         grant.
+    :param grant_origin_properties: The names in ``PermissionEntity.include_properties`` whose grant has this row's ``PermissionEntity.grant_origin``. Null or empty
+                                    when none has: every name the row includes is then a ``PermissionGrantOrigin.User`` grant.
     """
     permissions_role_id: UUID = field(default_factory=lambda: UUID('00000000-0000-0000-0000-000000000000'))
     permissions_role: Optional[PermissionsRoleEntity] = field(default=None)
@@ -167,3 +172,5 @@ class PermissionEntity(Entity):
     restrict_deltas: bool = field(default=False)
     description: Optional[str] = field(default=None)
     source_permission_id: Optional[UUID] = field(default=None)
+    grant_origin: PermissionGrantOrigin = field(default=PermissionGrantOrigin.User)
+    grant_origin_properties: Optional[list[str]] = field(default=None)

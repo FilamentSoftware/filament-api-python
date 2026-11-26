@@ -14,9 +14,9 @@ __all__ = [
 @dataclass(kw_only=True)
 class FileSettingsEntity(Entity):
     """
-    Per-tenant file settings. A singleton keyed on <see cref="P:Filament.FSCore.Entities.EntityBase.Id" /> of
-    <see cref="F:System.Guid.Empty" />, following the convention <c>ScheduleResultEntity</c> and
-    <c>ScheduleScopeSettingsEntity</c> already use.
+    Per-tenant file settings. A singleton keyed on ``EntityBase.id`` of
+    ``Guid.Empty``, following the convention ``ScheduleResultEntity`` and
+    ``ScheduleScopeSettingsEntity`` already use.
     
     :param quota_bytes: The tenant's total byte allowance across all files.
     :param unreferenced_retention: How long to keep a file that nothing currently links to. Null keeps them indefinitely.

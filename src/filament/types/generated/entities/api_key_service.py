@@ -16,19 +16,19 @@ class ApiKeyEntity(Entity):
     """
     Represents an API key entity with business configuration for programmatic access.
     The plaintext key is write-only; it is hashed and stored on the corresponding
-    <see cref="T:Filament.FSCore.CoreEntities.AuthApiKeyEntity" /> during processing.
+    ``AuthApiKeyEntity`` during processing.
     
     :param name: The display name of the API key.
     :param key: The plaintext API key value. Write-only: shown once on creation, never stored.
-                Must be exactly 64 characters with sufficient randomness (&gt;= 16 unique characters).
+                Must be exactly 64 characters with sufficient randomness (>= 16 unique characters).
                 The key is hashed with a random salt and stored on the AuthApiKeyEntity.
     :param cidr_list: A list of CIDRs that are allowed to use this API key.
-                      An empty list denies all IPs; <c>0.0.0.0/0</c> must be explicitly added to allow all.
+                      An empty list denies all IPs; ``0.0.0.0/0`` must be explicitly added to allow all.
     :param expiry_instant: The instant at which this API key expires.
     :param rate_limit_per_minute: The maximum number of requests per minute allowed for this API key.
     """
     name: str = field(default='')
-    key: Optional[str] = field(default=None)
+    key: Optional[str] = field(default=None, metadata={"write_only": True})
     cidr_list: list[str] = field(default_factory=list)
     expiry_instant: datetime.datetime = field(default_factory=datetime.datetime.now)
     rate_limit_per_minute: int = field(default=300)
