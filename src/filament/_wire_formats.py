@@ -9,10 +9,12 @@ Wire formats match the C# backend converters in
 
 - Instant  : ``uuuu-MM-ddTHH:mm:ss.ffffffffZ`` (8 fractional digits + Z)
 - Duration : ``[-]D:HH:MM:SS[.FFFFFFFFF]`` (NodaTime ``Duration.ToString()``)
+- LocalDateTime : ``uuuu-MM-ddTHH:mm:ss[.FFFFFFFFF]`` (no zone, no ``Z``)
 """
 from __future__ import annotations
 
 import datetime
+import re
 
 # ``%f`` produces 6 microsecond digits; the trailing literal ``00`` pads to 8.
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f00Z"
@@ -57,6 +59,45 @@ def instant_from_wire(value: str) -> datetime.datetime:
     # so any 7th–9th fractional digits are dropped.
     microseconds = int((frac + "000000")[:6]) if frac else 0
     return parsed.replace(microsecond=microseconds, tzinfo=datetime.timezone.utc)
+
+
+# ``%f`` produces 6 microsecond digits; the trailing literal ``000`` pads to 9.
+LOCAL_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f000"
+
+# Date and time, an optional fraction of any length up to nanoseconds, and an
+# optional NodaTime calendar suffix such as `` (ISO)``. Deliberately no ``Z``
+# or offset: a value carrying one is an instant, not a local date and time.
+_LOCAL_DATETIME_WIRE = re.compile(
+    r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:[.,]([0-9]{1,9}))?(?: \([^)]*\))?"
+)
+
+
+def local_datetime_to_wire(value: datetime.datetime) -> str:
+    """Format a datetime as a C# ``LocalDateTime`` wire string.
+
+    A local date and time has no zone of its own: the zone it is read in is
+    carried by a sibling property (e.g. ``date_time_zone``). The value is
+    therefore written as its wall-clock fields with no ``Z`` or offset. A
+    timezone-aware input keeps its wall-clock fields and loses its ``tzinfo``;
+    it is not converted, because the target zone is not known here.
+    """
+    return value.replace(tzinfo=None).strftime(LOCAL_DATETIME_FORMAT)
+
+
+def local_datetime_from_wire(value: str) -> datetime.datetime:
+    """Parse a C# ``LocalDateTime`` wire string into a naive datetime.
+
+    The fraction may be absent or up to 9 digits and is truncated to
+    microseconds, the most a Python ``datetime`` can represent. The result
+    carries no ``tzinfo``, since the wire value names no zone.
+    """
+    match = _LOCAL_DATETIME_WIRE.fullmatch(value)
+    if match is None:
+        raise ValueError(f"Invalid LocalDateTime wire format: {value!r}")
+    main, frac = match.group(1), match.group(2)
+    parsed = datetime.datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
+    microseconds = int((frac + "000000")[:6]) if frac else 0
+    return parsed.replace(microsecond=microseconds)
 
 
 def timedelta_to_wire(value: datetime.timedelta) -> str:
