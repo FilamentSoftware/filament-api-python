@@ -512,13 +512,14 @@ Changelog content is carried **in commit messages**, not written into the change
 
 - **`CHANGELOG_DEV.md` and `CHANGELOG.md` are generated/maintained by the release tooling.** Hand-editing either one causes version drift and merge conflicts. This is stated in `.claude/CLAUDE.md` "Changelog" — treat it with the same weight as the "Generated Code" DO NOT EDIT rule.
 - The unit of changelog intent is a commit with a `CHANGELOG: <summary>` line in its message. The branch's user-visible change is described there, and the tooling does the rest on merge.
+- **The line format is defined by the PR check, not by any doc.** The "Require CHANGELOG line in commits" step in `.github/workflows/validate-pull-request.yml` is the source of truth: it passes when at least one commit message between the merge base and `HEAD` has a line matching `grep -qE '^CHANGELOG:'`. So the marker is case-sensitive and must start the line. `Changelog:`, an indented `CHANGELOG:` or one placed mid-line does not count. Dependabot PRs are exempt.
 
 So the auditor's job here is two-fold: confirm the branch carries its changelog intent in a commit (not in the changelog files), and flag any direct edit to the changelog files.
 
 ### Rules
 
 - **Each branch should have at least one commit with a `CHANGELOG:` line in it.** This is where a user-visible change is recorded for the release tooling to harvest. "User-visible" means any change a downstream consumer could notice: a new / changed / removed `__all__` export, a new ctor parameter, a behaviour change in serialization, a new event handler, a regenerated type. A branch with such a change but no `CHANGELOG:` commit line is `[FIX]`.
-  - Grep hint: `git log <merge-base>..HEAD --format=%B | grep -i '^CHANGELOG:'` — zero matches on a branch with user-visible changes is the tell.
+  - Grep hint: `git log <merge-base>..HEAD --format=%B | grep -E '^CHANGELOG:'` — zero matches on a branch with user-visible changes is the tell. (Same pattern as the PR check: case-sensitive.)
 
 - **Changelogs should never be written to `CHANGELOG_DEV.md` or `CHANGELOG.md` as part of the branch.** Any branch diff that touches either file is `[FIX]` — these are owned by the release tooling, and a manual edit causes version drift and merge conflicts (see `.claude/CLAUDE.md` "Changelog").
   - Grep hint: any add/modify of `CHANGELOG_DEV.md` or `CHANGELOG.md` in the branch diff.
