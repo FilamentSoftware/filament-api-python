@@ -1,3 +1,10 @@
+## 0.9.1-dev.0.0.2 (2026-11-27 09:14)
+
+### Types
+
+#### OTHER
+- Added ExtensionStatus.Disabled, reported while an extension is disabled in an organisation
+
 ## 0.9.1-dev.0.0.1 (2026-11-26 19:17)
 
 ### Client
