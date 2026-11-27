@@ -543,10 +543,14 @@ class ExtensionStatus(Enum):
     :cvar Unknown: The extension has said nothing since it was last provisioned.
     :cvar Ok: The extension reports that it is working.
     :cvar Problem: The extension reports a problem, described by ``ExtensionEntity.status_data``.
+    :cvar Disabled: The extension is disabled in this organisation (``ExtensionEntity.enabled`` is false). Set by the
+                    processor, never written by the extension: it is held for as long as the extension is disabled, and gives
+                    way to ``ExtensionStatus.Unknown`` when it is enabled again.
     """
     Unknown = 0
     Ok = 1
     Problem = 2
+    Disabled = 3
 
 
 class ExtensionStatusSource(Enum):
